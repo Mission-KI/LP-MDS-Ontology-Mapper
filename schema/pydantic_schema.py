@@ -11,10 +11,17 @@ class DataSpace(BaseModel):
 
 
 class DataSetVolume(str, Enum):
+    kb = "KB"
     mb = "MB"
     gb = "GB"
     tb = "TB"
     pb = "PB"
+
+class DataSetFrequenzy(str, Enum):
+    second = "second"
+    minute = "minute"
+    hour = "hour"
+    day = "day"
 
 
 class DataSetTransfer(str, Enum):
@@ -56,6 +63,8 @@ class BaseColumn(BaseModel):
 class NumericColumn(BaseColumn):
     min: Optional[float] = Field(default=None, strict=True)
     max: Optional[float] = Field(default=None, strict=True)
+    mean: Optional[float] = Field(default=None, strict=True)
+    median: Optional[float] = Field(default=None, strict=True)
     stddev: Optional[float] = Field(default=None, strict=True)
     data_type: NumericColumnTypes = Field(strict=True)
 
@@ -73,10 +82,10 @@ class EDPSchema(BaseModel):
     transfer: DataSetTransfer = Field(
         strict=True, description="Is the dataset frequently updated, or static"
     )
-    frequency: int = Field(
+    frequency: DataSetFrequenzy = Field(
         strict=True,
         description="If transfer is frequent, this parameter gives the update frequency",
-    )  # TODO: Unit?
+    )
     growth_rate: Optional[DataSetVolume] = Field(
         default=None,
         strict=True,
@@ -90,6 +99,14 @@ class EDPSchema(BaseModel):
     )
     compression: DataSetCompression = Field(
         strict=True, description="Compression of the dataset"
+    )
+    column_count: int = Field(
+        strict=True,
+        description="Number of columns",
+    )
+    row_count: int = Field(
+        strict=True,
+        description="Number of row",
     )
     columns: List[EDP_COLUMN] = Field(strict=True, description="The dataset's columns")
 

@@ -11,6 +11,16 @@
             "title": "DataSetCompression",
             "type": "string"
         },
+        "DataSetFrequenzy": {
+            "enum": [
+                "second",
+                "minute",
+                "hour",
+                "day"
+            ],
+            "title": "DataSetFrequenzy",
+            "type": "string"
+        },
         "DataSetImmutability": {
             "enum": [
                 "immutable",
@@ -41,6 +51,7 @@
         },
         "DataSetVolume": {
             "enum": [
+                "KB",
                 "MB",
                 "GB",
                 "TB",
@@ -97,6 +108,30 @@
                     ],
                     "default": null,
                     "title": "Max"
+                },
+                "mean": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Mean"
+                },
+                "median": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Median"
                 },
                 "stddev": {
                     "anyOf": [
@@ -169,9 +204,8 @@
             "description": "Is the dataset frequently updated, or static"
         },
         "frequency": {
-            "description": "If transfer is frequent, this parameter gives the update frequency",
-            "title": "Frequency",
-            "type": "integer"
+            "$ref": "#/$defs/DataSetFrequenzy",
+            "description": "If transfer is frequent, this parameter gives the update frequency"
         },
         "growth_rate": {
             "anyOf": [
@@ -197,6 +231,16 @@
             "$ref": "#/$defs/DataSetCompression",
             "description": "Compression of the dataset"
         },
+        "column_count": {
+            "description": "Number of columns",
+            "title": "Column Count",
+            "type": "integer"
+        },
+        "row_count": {
+            "description": "Number of row",
+            "title": "Row Count",
+            "type": "integer"
+        },
         "columns": {
             "description": "The dataset's columns",
             "items": {
@@ -221,6 +265,8 @@
         "immutability",
         "structure",
         "compression",
+        "column_count",
+        "row_count",
         "columns"
     ],
     "title": "EDPSchema",
