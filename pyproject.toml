@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edps"
+version = "0.0.1"
+authors = [
+    { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
+    { name = "Daniel Eckstein", email = "de@beebucket.de" },
+]
+description = "Beebucket application to create Enhanced Dataset Profiles."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "argparse",
+    "numpy",
+    "pydantic",
+    "pathlib",
+    "pandas",
+]
+
+[project.scripts]
+edps = "edps.__main__:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "bandit",
+    "black",
+    "isort",
+]
+dev = ["edps[test]"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["edps*"]
+exclude = ["tests*"]
+
+[tool.isort]
+profile = 'black'
+
+[tool.black]
+line-length = 120
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
+
+[tool.bandit]
+exclude_dirs = ['tests']
+skips = ["B403"]

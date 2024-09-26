@@ -1,0 +1,81 @@
+{
+    "assetId": 1,
+    "assetName": "Test Asset",
+    "assetUrl": "www.theasset.de",
+    "assetDataCategory": "the_category",
+    "dataSpace": {
+        "dataSpaceId": 123,
+        "name": "Test Dataspace",
+        "url": "www.thedataspace.de"
+    },
+    "publisherId": 1234,
+    "licenseId": 12345,
+    "assetVolume": 1000,
+    "assetVolumeCompressed": 500,
+    "assetCompressionAlgorithm": "gzip",
+    "assetDescription": null,
+    "assetTags": [],
+    "assetDataSubCategory": null,
+    "assetTransferTypeFlag": null,
+    "assetImmutabilityFlag": null,
+    "assetGrowthFlag": null,
+    "hasNdaFlag": null,
+    "nda": null,
+    "assetStructure": null,
+    "asset": {
+        "columnCount": 2,
+        "rowCount": 50,
+        "columns": [
+            {
+                "granularity": 1,
+                "temporalConsistency": [
+                    {
+                        "frequency": "s",
+                        "stable": false,
+                        "differentAbundancies": 2
+                    },
+                    {
+                        "frequency": "min",
+                        "stable": false,
+                        "differentAbundancies": 3
+                    },
+                    {
+                        "frequency": "h",
+                        "stable": false,
+                        "differentAbundancies": 7
+                    },
+                    {
+                        "frequency": "d",
+                        "stable": true,
+                        "differentAbundancies": 1
+                    }
+                ]
+            },
+            {
+                "granularity": 1,
+                "temporalConsistency": [
+                    {
+                        "frequency": "s",
+                        "stable": false,
+                        "differentAbundancies": 3
+                    },
+                    {
+                        "frequency": "min",
+                        "stable": false,
+                        "differentAbundancies": 3
+                    },
+                    {
+                        "frequency": "h",
+                        "stable": false,
+                        "differentAbundancies": 8
+                    },
+                    {
+                        "frequency": "d",
+                        "stable": true,
+                        "differentAbundancies": 1
+                    }
+                ]
+            }
+        ]
+    }
+}
