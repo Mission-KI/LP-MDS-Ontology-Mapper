@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edps"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
     { name = "Daniel Eckstein", email = "de@beebucket.de" },
+    { name = "Joshua Lauterbach", email = "jl@beebucket.de" },
 ]
 description = "Beebucket application to create Enhanced Dataset Profiles."
 readme = "README.md"
@@ -20,25 +21,16 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
-    "argparse",
-    "numpy",
-    "pydantic",
-    "pathlib",
-    "pandas",
-]
+dependencies = ["argparse", "numpy", "pydantic", "pathlib", "pandas"]
 
 [project.scripts]
 edps = "edps.__main__:main"
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "bandit",
-    "black",
-    "isort",
-]
+test = ["pytest", "bandit", "black", "isort", "mypy"]
 dev = ["edps[test]"]
 
 [tool.setuptools.packages.find]
