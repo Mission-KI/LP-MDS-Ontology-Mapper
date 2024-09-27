@@ -1,10 +1,11 @@
 from pathlib import Path
+from pydantic import BaseModel
 
 import pytest
 from pytest import mark
 
 from edp import Service
-from edp.types import DataSetType
+from edp.types import DataSetType, Asset, UserProvidedAssetData, DataSpace
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -18,11 +19,28 @@ async def test_load_unknown_dir():
         await service.analyse_asset(Path("/does/not/exist/"))
 
 
+def _as_dict(model: BaseModel):
+    field_keys = model.model_fields.keys()
+    return {key: model.__dict__[key] for key in field_keys}
+
+
 @mark.asyncio
-async def test_load_pickle_dir():
+async def test_load_pickle_dir(output_directory):
     service = Service()
     result = await service.analyse_asset(CSV_PATH)
-    with open(DIR.parent / "output/csv_edp.json", "wt", encoding=ENCODING) as file:
-        file.write(result.model_dump_json())
+    user_data = UserProvidedAssetData(
+        id=1234,
+        name="BeebucketCsv",
+        url="https://beebucket.ai/en/",
+        dataCategory="TestData",
+        dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
+        publisherId=0x0815,
+        licenseId=0,
+        description="Our very first test edp",
+        tags=["test", "csv"],
+    )
+    asset = Asset(**_as_dict(result), **_as_dict(user_data))
+    with open(output_directory / "csv_edp.json", "wt", encoding=ENCODING) as file:
+        file.write(asset.model_dump_json())
     assert len(result.dataTypes) == 1
     assert DataSetType.structured in result.dataTypes
