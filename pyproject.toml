@@ -37,7 +37,7 @@ dependencies = [
 edps = "edp.__main__:main"
 
 [project.optional-dependencies]
-test = ["pytest", "bandit", "black", "isort", "mypy"]
+test = ["pytest", "pytest-asyncio", "bandit", "black", "isort", "mypy"]
 dev = ["edps[test]"]
 
 [tool.setuptools.packages.find]
@@ -54,7 +54,15 @@ line-length = 120
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 
 [tool.bandit]
 exclude_dirs = ['tests']
 skips = ["B403"]
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+exclude = ["build"]
+check_untyped_defs = true

@@ -1,106 +1,123 @@
-import logging
+from contextlib import asynccontextmanager
+from logging import getLogger
 from pathlib import Path
-from typing import Dict, List
+from tempfile import TemporaryDirectory
+from typing import Dict, AsyncIterator, List, Optional, Set
 
-import pandas as pd
-
-from edp.date_time_column import DateTimeColumn
-from edp.numeric_column import NumericColumn
-from edp.schema import Schema, StructuredEDPDataSet
-from edp.string_column import StringColumn
-
-
-class _StructuredData:
-    def __init__(self, data: pd.DataFrame):
-        self._logger = logging.getLogger(__name__)
-        self._data = data
-
-    def get_column_types(self) -> Dict:
-        columns: Dict = {"text_columns": [], "numeric_columns": [], "datetime_columns": []}
-
-        for column in self._data.columns:
-            self._logger.debug(
-                "Checking column %s", (column, pd.api.types.infer_dtype(self._data[column], skipna=True))
-            )
-
-            kind = self._data[column].dtype.kind
-            if kind in "biufc":
-                self._logger.info("Assumed type of column '%s' is numeric", column)
-                columns["numeric_columns"].append(NumericColumn(column, self._data[column]))
-
-            if kind in "O":
-                self._logger.info("Assumed type of column '%s' is string", column)
-                try:
-                    numeric_column = self._to_numeric(column)
-                    columns["numeric_columns"].append(numeric_column)
-                    continue
-                except:
-                    self._logger.warning("Cast to numeric failed for column '%s'", column)
-
-                try:
-                    datetime_column = self._to_date_time(column)
-                    columns["datetime_columns"].append(datetime_column)
-                    continue
-                except Exception as e:
-                    self._logger.warning("Cast to date/time failed for column '%s': %s" % (column, e))
-
-                self._logger.info("Column '%s' is string", column)
-                columns["text_columns"].append(StringColumn(column, self._data[column]))
-
-            if kind in "M":
-                try:
-                    datetime_column = self._to_date_time(column)
-                    columns["datetime_columns"].append(datetime_column)
-                    continue
-                except Exception as e:
-                    self._logger.warning("Cast to date/time failed for column '%s': %s" % (column, e))
-
-                    self._logger.info("Column '%s' is string", column)
-                    columns["text_columns"].append(StringColumn(column, self._data[column]))
-
-        return columns
-
-    def _to_date_time(self, column: pd.Series) -> DateTimeColumn:
-        dt_elements = pd.to_datetime(self._data[column])
-        self._logger.info("Column '%s' is date/time", column)
-        return DateTimeColumn(column, dt_elements)
-
-    def _to_numeric(self, column: pd.Series) -> NumericColumn:
-        numeric_elements = pd.to_numeric(self._data[column])
-        self._logger.info("Column '%s' is numeric", column)
-        return NumericColumn(column, numeric_elements)
+from edp.file import File
+from edp.importers import Importer, csv_importer
+from edp.types import ComputedAssetData, DataSetType, Dataset, Compression
+from edp.compression import CompressionAlgorithm
 
 
 class Service:
     def __init__(self):
-        self._logger = logging.getLogger(__name__)
-        self._extensions: List = ["pickle"]
-        self._logger.info("Initializing EDP service. The following extensions are supported: %s", self._extensions)
+        self._logger = getLogger(__name__)
+        self._logger.info("Initializing")
 
-    def load_files_in_directory(self, directory_path: Path):
-        if not directory_path.is_dir():
-            error_message = f"Path '{directory_path}' isn't a directory."
-            self._logger.error(error_message)
-            raise ValueError(error_message)
+        self._importers = _create_importers()
+        self._compressions = _create_compressions()
+        self._logger.info("The following data types are supported: [%s]", ", ".join(self._importers))
+        implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
+        self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-        self._logger.info("Loading files in directory '%s'", directory_path)
+    async def analyse_asset(self, path: Path) -> ComputedAssetData:
+        if not path.exists():
+            raise FileNotFoundError(f'File "{path}" can not be found!')
+        if not path.is_file():
+            raise RuntimeError("Please pass the path to a single file!")
+        file = File(path)
+        compressions: List[str] = []
+        extracted_size = 0
+        datasets: List[Dataset] = []
+        data_structures: Set[DataSetType] = set()
 
-        for extension in self._extensions:
-            files = directory_path.glob(f"*.{extension}")
-            columns: Dict = {}
+        async for child_files in self._walk_all_files(file.path, compressions):
+            file_type = child_files.type
+            extracted_size += child_files.size
+            if not file_type in self._importers:
+                raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
+            structure = await self._importers[file_type](child_files)
+            data_structures.add(structure.data_set_type)
+            datasets.append(await structure.analyze())
 
-            column_list = []
-            for file in files:
-                self._logger.info("Processing file '%s'", file)
-                df = pd.read_pickle(file)
-                sd = _StructuredData(df)
-                columns = sd.get_column_types()  # TODO: merge
+        compression: Optional[Compression]
+        if len(compressions) == 0:
+            compression = None
+        else:
+            compression = Compression(algorithms=compressions, extractedSize=extracted_size)
 
-            for dt_col in columns["datetime_columns"]:
-                column_list.append(dt_col.get_column_definition())
+        return ComputedAssetData(
+            volume=file.size,
+            compression=compression,
+            dataTypes=data_structures,
+            datasets=datasets,
+        )
 
-            self._edp_schema.asset = StructuredEDPDataSet(
-                columnCount=len(column_list), rowCount=50, columns=column_list
-            )
+    async def _walk_all_files(self, path: Path, compressions: List[str]) -> AsyncIterator[File]:
+        """Will yield all files, recursively through directories and archives."""
 
-        print(self._edp_schema.model_dump_json())
+        if path.is_file():
+            file = File(path)
+            if file.type not in self._compressions:
+                yield file
+            else:
+                compressions.append(file.type)
+                async with self._extract(file) as extracted_path:
+                    async for child_file in self._walk_all_files(extracted_path, compressions):
+                        yield child_file
+        elif path.is_dir():
+            for file in path.iterdir():
+                async for child_file in self._walk_all_files(file.path, compressions):
+                    yield child_file
+        else:
+            self._logger.warning('Can not extract or analyse "%s"', path)
+
+    @asynccontextmanager
+    async def _extract(self, file: File) -> AsyncIterator[Path]:
+        archive_type = file.type
+        if not archive_type in self._compressions:
+            raise RuntimeError(f'"{archive_type}" is not a know archive type')
+        compression = self._compressions[archive_type]
+        if compression is None:
+            raise NotImplementedError(f'Extractin "{archive_type}" is not implemented')
+        with TemporaryDirectory() as directory:
+            compression.extract(file.path, directory)
+            yield directory
+
+
+def _create_importers() -> Dict[str, Importer]:
+    return {"csv": csv_importer}
+
+
+def _create_compressions() -> Dict[str, Optional[CompressionAlgorithm]]:
+    return {
+        "br": None,
+        "rpm": None,
+        "dcm": None,
+        "epub": None,
+        "zip": None,
+        "tar": None,
+        "rar": None,
+        "gz": None,
+        "bz2": None,
+        "7z": None,
+        "xz": None,
+        "pdf": None,
+        "exe": None,
+        "swf": None,
+        "rtf": None,
+        "eot": None,
+        "ps": None,
+        "sqlite": None,
+        "nes": None,
+        "crx": None,
+        "cab": None,
+        "deb": None,
+        "ar": None,
+        "Z": None,
+        "lzo": None,
+        "lz": None,
+        "lz4": None,
+        "zstd": None,
+    }

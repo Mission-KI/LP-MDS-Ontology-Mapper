@@ -1,2 +1,2 @@
 from edp.service import Service
-from edp.schema import Schema
+from edp.types import Asset
