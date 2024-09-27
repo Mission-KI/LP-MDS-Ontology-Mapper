@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "edps"
+name = "edp"
 version = "0.1.0"
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
@@ -34,16 +34,16 @@ dependencies = [
 ]
 
 [project.scripts]
-edps = "edp.__main__:main"
+export_edps_schema = "edp.types:export_edp_schema"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio", "bandit", "black", "isort", "mypy"]
-dev = ["edps[test]"]
+dev = ["edp[test]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["edps*"]
-exclude = ["tests*"]
+include = ["edp*"]
+exclude = ["test*"]
 
 [tool.isort]
 profile = 'black'

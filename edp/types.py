@@ -1,8 +1,10 @@
+from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import List, Optional, Union, Set, Tuple
+from pathlib import Path
+from typing import List, Optional, Union, Set, Dict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 
 
 class DataSpace(BaseModel):
@@ -161,10 +163,17 @@ class Asset(UserProvidedAssetData, ComputedAssetData):
     pass
 
 
-def main():
-    with open("edp_schema.json", "w") as f:
-        json.dump(Asset.model_json_schema(), f)
+def export_edp_schema():
+    args = _get_args()
+    output: Path = args.output
+    if output.is_dir():
+        output /= "edsp_schema.json"
+    adapter = TypeAdapter(Dict)
+    with open(output, "wb") as file:
+        file.write(adapter.dump_json(Asset.model_json_schema()))
 
 
-if __name__ == "__main__":
-    main()
+def _get_args():
+    parser = ArgumentParser()
+    parser.add_argument("-o", "--output", type=Path, help="Path to output the schema to")
+    return parser.parse_args()

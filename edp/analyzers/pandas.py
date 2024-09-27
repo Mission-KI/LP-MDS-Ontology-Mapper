@@ -32,7 +32,7 @@ class Pandas(Analyzer):
 
     async def analyze(self) -> StructuredEDPDataSet:
         columns = [column async for column in self._analyze_columns()]
-        return StructuredEDPDataSet(name=, rowCount=len(self._data.index), columns=columns)
+        return StructuredEDPDataSet(rowCount=len(self._data.index), columns=columns)
 
     async def _analyze_columns(self) -> AsyncIterator[Column]:
         for column_name in self._data.columns:
