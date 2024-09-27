@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from edps.schema.pydantic_schema import (
+from edp.schema.pydantic_schema import (
     DateTimeColumnDefinition,
     TemporalConsistency,
     TemporalConsistencyFrequency,

@@ -4,10 +4,10 @@ from typing import Dict, List
 
 import pandas as pd
 
-from edps.date_time_column import DateTimeColumn
-from edps.numeric_column import NumericColumn
-from edps.schema.pydantic_schema import EDPSchema, StructuredEDPDataSet
-from edps.string_column import StringColumn
+from edp.date_time_column import DateTimeColumn
+from edp.numeric_column import NumericColumn
+from edp.schema import Schema, StructuredEDPDataSet
+from edp.string_column import StringColumn
 
 
 class _StructuredData:
@@ -71,12 +71,11 @@ class _StructuredData:
         return NumericColumn(column, numeric_elements)
 
 
-class EDPS:
-    def __init__(self, edp_schema: EDPSchema):
+class Service:
+    def __init__(self):
         self._logger = logging.getLogger(__name__)
         self._extensions: List = ["pickle"]
-        self._logger.info("Initializing EDPS service. The following extensions are supported: %s", self._extensions)
-        self._edp_schema = edp_schema
+        self._logger.info("Initializing EDP service. The following extensions are supported: %s", self._extensions)
 
     def load_files_in_directory(self, directory_path: Path):
         if not directory_path.is_dir():
@@ -100,6 +99,8 @@ class EDPS:
             for dt_col in columns["datetime_columns"]:
                 column_list.append(dt_col.get_column_definition())
 
-            self._edp_schema.asset = StructuredEDPDataSet(columnCount=len(column_list), rowCount=50, columns=column_list)
+            self._edp_schema.asset = StructuredEDPDataSet(
+                columnCount=len(column_list), rowCount=50, columns=column_list
+            )
 
         print(self._edp_schema.model_dump_json())

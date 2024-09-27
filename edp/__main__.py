@@ -1,6 +1,6 @@
 import logging
 
-from edps.edps import EDPS
+from edp.edps import EDPS
 
 
 def main():

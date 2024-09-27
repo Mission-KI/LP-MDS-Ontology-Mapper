@@ -24,10 +24,17 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = ["argparse", "numpy", "pydantic", "pathlib", "pandas"]
+dependencies = [
+    "argparse",
+    "filetype",
+    "numpy",
+    "pandas",
+    "pathlib",
+    "pydantic",
+]
 
 [project.scripts]
-edps = "edps.__main__:main"
+edps = "edp.__main__:main"
 
 [project.optional-dependencies]
 test = ["pytest", "bandit", "black", "isort", "mypy"]

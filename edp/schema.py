@@ -109,7 +109,7 @@ class StructuredEDPDataSet(BaseModel):
 EDP_DATASET_SPECIALIZATION = Union[StructuredEDPDataSet]
 
 
-class EDPSchema(BaseModel):
+class Schema(BaseModel):
     assetId: int = Field(strict=True, description="The asset ID is a unique identifier for an asset within a data room")
     assetName: str = Field(strict=True, description="Name of the asset")
     assetUrl: str = Field(
@@ -169,7 +169,7 @@ class EDPSchema(BaseModel):
 
 def main():
     with open("edp_schema.json", "w") as f:
-        json.dump(EDPSchema.model_json_schema(), f)
+        json.dump(Schema.model_json_schema(), f)
 
 
 if __name__ == "__main__":
