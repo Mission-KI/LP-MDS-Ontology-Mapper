@@ -1,7 +1,7 @@
 from pandas import read_csv
 
-from edp.file import File
 from edp.analyzers.pandas import Pandas
+from edp.file import File
 
 
 async def csv(file: File):

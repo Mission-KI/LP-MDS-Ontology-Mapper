@@ -1,17 +1,21 @@
 from datetime import timedelta
 from logging import getLogger
-from numpy import mean, min as numpy_min, max as numpy_max, median, std, unique
-from pandas import DataFrame, to_numeric, to_datetime, Series, DatetimeIndex
-from typing import Sequence, List, AsyncIterator
+from typing import AsyncIterator, List, Sequence
+
+from numpy import max as numpy_max
+from numpy import mean, median
+from numpy import min as numpy_min
+from numpy import std, unique
+from pandas import DataFrame, DatetimeIndex, Series, to_datetime, to_numeric
 
 from edp.analyzers.base import Analyzer
 from edp.types import (
-    StructuredEDPDataSet,
-    DataSetType,
     Column,
-    NumericColumn,
+    DataSetType,
     DateTimeColumn,
+    NumericColumn,
     StringColumn,
+    StructuredEDPDataSet,
     TemporalConsistency,
 )
 

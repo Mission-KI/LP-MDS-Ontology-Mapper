@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union, Set, Dict
+from typing import Any, Dict, List, Optional, Set, Union
 
 from pydantic import BaseModel, Field, TypeAdapter
 
@@ -21,7 +21,7 @@ class DataSetVolume(str, Enum):
     pb = "PB"
 
 
-class DataSetFrequenzy(str, Enum):
+class DataSetFrequency(str, Enum):
     second = "second"
     minute = "minute"
     hour = "hour"
@@ -132,7 +132,7 @@ class UserProvidedAssetData(BaseModel):
         default=None,
         description="If transfer is frequent, this parameter gives the growth rate of the dataset per day",
     )
-    transferTypeFlag: Optional[DataSetFrequenzy] = Field(
+    transferTypeFrequency: Optional[DataSetFrequency] = Field(
         default=None,
         description="If transfer is frequent, this parameter gives the update frequency",
     )
@@ -168,7 +168,7 @@ def export_edp_schema():
     output: Path = args.output
     if output.is_dir():
         output /= "edsp_schema.json"
-    adapter = TypeAdapter(Dict)
+    adapter = TypeAdapter(Dict[str, Any])
     with open(output, "wb") as file:
         file.write(adapter.dump_json(Asset.model_json_schema()))
 

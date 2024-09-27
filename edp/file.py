@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from filetype import guess
 
 
@@ -17,7 +18,7 @@ class File:
     def type(self) -> str:
         most_likely_type = guess(self.path.absolute())
         if most_likely_type is not None:
-            return most_likely_type.extension
+            return str(most_likely_type.extension)
         _, type_by_suffix = self.path.name.split(".", 1)
         if type_by_suffix is not None:
             return type_by_suffix
@@ -32,7 +33,7 @@ def _calculate_size(path: Path) -> int:
     if path.is_file():
         return path.stat().st_size
     elif path.is_dir():
-        return sum((_calculate_size(file for file in path.iterdir())))
+        return sum((_calculate_size(file) for file in path.iterdir()))
     elif path.is_symlink():
         return 0
     else:

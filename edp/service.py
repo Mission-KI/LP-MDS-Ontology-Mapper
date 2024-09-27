@@ -2,12 +2,12 @@ from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, AsyncIterator, List, Optional, Set
+from typing import AsyncIterator, Dict, List, Optional, Set
 
+from edp.compression import CompressionAlgorithm
 from edp.file import File
 from edp.importers import Importer, csv_importer
-from edp.types import ComputedAssetData, DataSetType, Dataset, Compression
-from edp.compression import CompressionAlgorithm
+from edp.types import Compression, ComputedAssetData, Dataset, DataSetType
 
 
 class Service:
@@ -67,8 +67,8 @@ class Service:
                     async for child_file in self._walk_all_files(extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
-            for file in path.iterdir():
-                async for child_file in self._walk_all_files(file.path, compressions):
+            for file_path in path.iterdir():
+                async for child_file in self._walk_all_files(file_path, compressions):
                     yield child_file
         else:
             self._logger.warning('Can not extract or analyse "%s"', path)
@@ -81,8 +81,9 @@ class Service:
         compression = self._compressions[archive_type]
         if compression is None:
             raise NotImplementedError(f'Extractin "{archive_type}" is not implemented')
-        with TemporaryDirectory() as directory:
-            compression.extract(file.path, directory)
+        with TemporaryDirectory() as directory_str:
+            directory = Path(directory_str)
+            await compression.extract(file.path, directory)
             yield directory
 
 

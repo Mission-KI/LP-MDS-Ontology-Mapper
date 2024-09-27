@@ -1,4 +1,5 @@
-from typing import Callable as _Callable, Awaitable as _Awaitable
+from typing import Awaitable as _Awaitable
+from typing import Callable as _Callable
 
 from edp.analyzers import Analyzer as _Analyzer
 from edp.file import File as _File

@@ -37,7 +37,15 @@ dependencies = [
 export_edps_schema = "edp.types:export_edp_schema"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-asyncio", "bandit", "black", "isort", "mypy"]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "bandit",
+    "black",
+    "isort",
+    "mypy",
+    "pandas-stubs",
+]
 dev = ["edp[test]"]
 
 [tool.setuptools.packages.find]
@@ -66,3 +74,7 @@ warn_return_any = true
 warn_unused_configs = true
 exclude = ["build"]
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["filetype"]
+ignore_missing_imports = true

@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
 
+import pytest
 from pytest import mark
 
 from edp import Service
@@ -15,7 +15,7 @@ CSV_PATH = DIR / "data/test.csv"
 async def test_load_unknown_dir():
     service = Service()
     with pytest.raises(FileNotFoundError):
-        service.analyse_asset(Path("/does/not/exist/"))
+        await service.analyse_asset(Path("/does/not/exist/"))
 
 
 @mark.asyncio
