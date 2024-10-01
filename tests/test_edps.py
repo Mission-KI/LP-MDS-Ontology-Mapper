@@ -9,11 +9,11 @@ from edp.types import (
     Asset,
     DataSetType,
     DataSpace,
-    Publisher,
-    UserProvidedAssetData,
-    StringColumn,
-    NumericColumn,
     DateTimeColumn,
+    NumericColumn,
+    Publisher,
+    StringColumn,
+    UserProvidedAssetData,
 )
 
 DIR = Path(__file__).parent
@@ -45,7 +45,7 @@ async def test_load_pickle_dir(output_directory):
     assert isinstance(dataset.columns["ausfahrt"], DateTimeColumn)
     aufenthalt = dataset.columns["aufenthalt"]
     assert isinstance(aufenthalt, NumericColumn)
-    assert aufenthalt.dataType == "int32"
+    assert aufenthalt.dataType == "uint32"
     parkhaus = dataset.columns["parkhaus"]
     assert isinstance(parkhaus, NumericColumn)
     assert parkhaus.dataType == "uint8"
