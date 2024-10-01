@@ -5,7 +5,16 @@ from pydantic import BaseModel
 from pytest import mark
 
 from edp import Service
-from edp.types import Asset, DataSetType, DataSpace, Publisher, UserProvidedAssetData
+from edp.types import (
+    Asset,
+    DataSetType,
+    DataSpace,
+    Publisher,
+    UserProvidedAssetData,
+    StringColumn,
+    NumericColumn,
+    DateTimeColumn,
+)
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -28,6 +37,15 @@ def _as_dict(model: BaseModel):
 async def test_load_pickle_dir(output_directory):
     service = Service()
     result = await service.analyse_asset(CSV_PATH)
+    assert len(result.datasets) == 1
+    assert len(result.datasets[0].columns) == 5
+    dataset = result.datasets[0]
+    assert isinstance(dataset.columns["uuid"], StringColumn)
+    assert isinstance(dataset.columns["einfahrt"], DateTimeColumn)
+    assert isinstance(dataset.columns["ausfahrt"], DateTimeColumn)
+    assert isinstance(dataset.columns["aufenthalt"], NumericColumn)
+    assert isinstance(dataset.columns["parkhaus"], NumericColumn)
+
     user_data = UserProvidedAssetData(
         id=1234,
         name="BeebucketCsv",
