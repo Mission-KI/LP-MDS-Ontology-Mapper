@@ -102,6 +102,11 @@ class StructuredEDPDataSet(BaseModel):
 Dataset = Union[StructuredEDPDataSet]
 
 
+class Publisher(BaseModel):
+    id: str = Field(description="Unique identifier of the publisher")
+    name: str = Field(description="Name of the publisher")
+
+
 class UserProvidedAssetData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
@@ -113,9 +118,7 @@ class UserProvidedAssetData(BaseModel):
         description="A data room-specific categorization of the asset (e.g. https://github.com/Mobility-Data-Space/mobility-data-space/wiki/MDS-Ontology",
     )
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
-    publisherId: int = Field(
-        description="Identifier that describes the data provider that placed the asset in the data room"
-    )
+    publisher: Publisher = Field(description="Provider that placed the asset in the data room")
     licenseId: int = Field(
         description="Identifier, which describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)",
     )

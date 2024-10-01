@@ -1,11 +1,11 @@
 from pathlib import Path
-from pydantic import BaseModel
 
 import pytest
+from pydantic import BaseModel
 from pytest import mark
 
 from edp import Service
-from edp.types import DataSetType, Asset, UserProvidedAssetData, DataSpace
+from edp.types import Asset, DataSetType, DataSpace, Publisher, UserProvidedAssetData
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -34,7 +34,7 @@ async def test_load_pickle_dir(output_directory):
         url="https://beebucket.ai/en/",
         dataCategory="TestData",
         dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
-        publisherId=0x0815,
+        publisher=Publisher(id="0815-1234", name="beebucket"),
         licenseId=0,
         description="Our very first test edp",
         tags=["test", "csv"],
