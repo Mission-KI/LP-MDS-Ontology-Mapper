@@ -5,4 +5,4 @@ from edp.file import File
 
 
 async def csv(file: File):
-    return Pandas(read_csv(file.path.absolute()))
+    return Pandas(read_csv(file.path.absolute(), parse_dates=True))

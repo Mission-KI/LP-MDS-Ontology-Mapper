@@ -19,6 +19,8 @@ from edp.types import (
     TemporalConsistency,
 )
 
+DATE_TIME_FORMAT = "ISO8601"
+
 
 class Pandas(Analyzer):
     def __init__(self, data: DataFrame):
@@ -58,7 +60,7 @@ class Pandas(Analyzer):
             return NumericColumn
         elif type_character in "OSU":
             try:
-                self._data[column_name] = to_datetime(self._data[column_name], errors="raise")
+                self._data[column_name] = to_datetime(self._data[column_name], errors="raise", format=DATE_TIME_FORMAT)
                 return DateTimeColumn
             except (ValueError, TypeError):
                 pass
