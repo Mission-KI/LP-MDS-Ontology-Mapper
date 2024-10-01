@@ -1,34 +1,46 @@
-from edps.edps import EDPS
-import pytest
 from pathlib import Path
 
-from edps.schema.pydantic_schema import DataSpace, EDPSchema, DataSetCompression
+import pytest
+from pydantic import BaseModel
+from pytest import mark
+
+from edp import Service
+from edp.types import Asset, DataSetType, DataSpace, Publisher, UserProvidedAssetData
+
+DIR = Path(__file__).parent
+ENCODING = "utf-8"
+CSV_PATH = DIR / "data/test.csv"
 
 
-@pytest.fixture
-def edp_schema():
-    dataspace_schema = DataSpace(dataSpaceId=123, name="Test Dataspace", url="www.thedataspace.de")
-    return EDPSchema(
-        assetId=1,
-        assetName="Test Asset",
-        assetUrl="www.theasset.de",
-        assetDataCategory="the_category",
-        dataSpace=dataspace_schema,
-        publisherId=1234,
-        licenseId=12345,
-        assetVolume=1000,
-        assetVolumeCompressed=500,
-        assetCompressionAlgorithm=DataSetCompression.gzip,
+@mark.asyncio
+async def test_load_unknown_dir():
+    service = Service()
+    with pytest.raises(FileNotFoundError):
+        await service.analyse_asset(Path("/does/not/exist/"))
+
+
+def _as_dict(model: BaseModel):
+    field_keys = model.model_fields.keys()
+    return {key: model.__dict__[key] for key in field_keys}
+
+
+@mark.asyncio
+async def test_load_pickle_dir(output_directory):
+    service = Service()
+    result = await service.analyse_asset(CSV_PATH)
+    user_data = UserProvidedAssetData(
+        id=1234,
+        name="BeebucketCsv",
+        url="https://beebucket.ai/en/",
+        dataCategory="TestData",
+        dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
+        publisher=Publisher(id="0815-1234", name="beebucket"),
+        licenseId=0,
+        description="Our very first test edp",
+        tags=["test", "csv"],
     )
-
-
-def test_load_unknown_dir(edp_schema):
-    e = EDPS(edp_schema)
-    with pytest.raises(ValueError):
-        e.load_files_in_directory(Path("/does/not/exist/"))
-
-
-def test_load_pickle_dir(edp_schema):
-    e = EDPS(edp_schema)
-    with pytest.raises(ValueError):
-        e.load_files_in_directory(Path("./tests/data"))
+    asset = Asset(**_as_dict(result), **_as_dict(user_data))
+    with open(output_directory / "csv_edp.json", "wt", encoding=ENCODING) as file:
+        file.write(asset.model_dump_json())
+    assert len(result.dataTypes) == 1
+    assert DataSetType.structured in result.dataTypes

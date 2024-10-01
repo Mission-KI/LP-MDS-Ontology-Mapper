@@ -3,11 +3,12 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "edps"
-version = "0.0.1"
+name = "edp"
+version = "0.1.1"
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
     { name = "Daniel Eckstein", email = "de@beebucket.de" },
+    { name = "Joshua Lauterbach", email = "jl@beebucket.de" },
 ]
 description = "Beebucket application to create Enhanced Dataset Profiles."
 readme = "README.md"
@@ -20,31 +21,37 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "argparse",
+    "filetype",
     "numpy",
-    "pydantic",
-    "pathlib",
     "pandas",
+    "pathlib",
+    "pydantic",
 ]
 
 [project.scripts]
-edps = "edps.__main__:main"
+export_edps_schema = "edp.types:export_edp_schema"
 
 [project.optional-dependencies]
 test = [
     "pytest",
+    "pytest-asyncio",
     "bandit",
     "black",
     "isort",
+    "mypy",
+    "pandas-stubs",
 ]
-dev = ["edps[test]"]
+dev = ["edp[test]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["edps*"]
-exclude = ["tests*"]
+include = ["edp*"]
+exclude = ["test*"]
 
 [tool.isort]
 profile = 'black'
@@ -55,7 +62,19 @@ line-length = 120
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 
 [tool.bandit]
 exclude_dirs = ['tests']
 skips = ["B403"]
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+exclude = ["build"]
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["filetype"]
+ignore_missing_imports = true

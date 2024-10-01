@@ -1,0 +1,46 @@
+name: Build container
+
+on: [pull_request]
+
+jobs:
+    linter:
+        runs-on: ubuntu-24.04
+        name: Linters
+        steps:
+        -   uses: actions/checkout@v4
+            with:
+                lfs: true
+        -   uses: actions/setup-python@v5
+            with:
+                python-version: "3.12"
+                cache: "pip"
+        -   name: Install
+            run: |
+                pip install .[test]
+        -   name: Execute tests
+            run: |
+                mypy .
+                black --check .
+                isort --check .
+                bandit --configfile pyproject.toml -r .
+
+    unit-tests:
+        runs-on: ubuntu-20.04
+        strategy:
+            matrix:
+                PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        name: Perform unit tests
+        steps:
+        -   uses: actions/checkout@v4
+            with:
+                lfs: true
+        -   uses: actions/setup-python@v5
+            with:
+                python-version: ${{ matrix.PYTHON_VERSION}}
+                cache: "pip"
+        -   name: Install
+            run: |
+                pip install .[test]
+        -   name: Execute tests
+            run: |
+                pytest .
