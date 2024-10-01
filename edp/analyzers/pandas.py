@@ -2,7 +2,8 @@ from datetime import timedelta
 from logging import getLogger
 from typing import AsyncIterator, Tuple
 
-from numpy import any, count_nonzero
+from numpy import any as numpy_any
+from numpy import count_nonzero
 from numpy import max as numpy_max
 from numpy import mean, median
 from numpy import min as numpy_min
@@ -40,8 +41,10 @@ class Pandas(Analyzer):
         return DataSetType.structured
 
     async def analyze(self) -> StructuredEDPDataSet:
+        row_count = len(self._data.index)
+        self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
         columns = {name: column async for name, column in self._analyze_columns()}
-        return StructuredEDPDataSet(rowCount=len(self._data.index), columns=columns)
+        return StructuredEDPDataSet(rowCount=row_count, columns=columns)
 
     async def _analyze_columns(self) -> AsyncIterator[Tuple[str, Column]]:
         for column_name in self._data.columns:
@@ -58,6 +61,7 @@ class Pandas(Analyzer):
         return await self._analyze_string_column(column)
 
     async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
+        self._logger.debug('Analyzing column "%s" as numeric', column.name)
         return NumericColumn(
             null_entries=number_null_entries(column),
             min=numpy_min(column),
@@ -69,6 +73,8 @@ class Pandas(Analyzer):
         )
 
     async def _analyze_datetime_column(self, column: Series) -> DateTimeColumn:
+        self._logger.debug('Analyzing column "%s" as datetime', column.name)
+
         INTERVALS = [
             timedelta(seconds=1),
             timedelta(minutes=1),
@@ -91,6 +97,7 @@ class Pandas(Analyzer):
         )
 
     async def _analyze_string_column(self, column: Series) -> StringColumn:
+        self._logger.debug('Analyzing column "%s" as string', column.name)
         return StringColumn(null_entries=number_null_entries(column))
 
 
@@ -121,7 +128,7 @@ def infer_type_and_convert(column: Series) -> Series:
     type_character = column.dtype.kind
 
     if type_character in "i":
-        if any(column < 0):
+        if numpy_any(column < 0):
             return to_numeric(column, downcast="signed", errors="raise")
         return to_numeric(column, downcast="unsigned", errors="raise")
 

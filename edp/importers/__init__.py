@@ -7,3 +7,4 @@ from edp.file import File as _File
 Importer = _Callable[[_File], _Awaitable[_Analyzer]]
 
 from edp.importers.pandas import csv as csv_importer
+from edp.importers.python import pickle as pickle_importer

@@ -19,6 +19,7 @@ from edp.types import (
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
 CSV_PATH = DIR / "data/test.csv"
+PICKLE_PATH = DIR / "data/test.pickle"
 
 
 @mark.asyncio
@@ -34,7 +35,7 @@ def _as_dict(model: BaseModel):
 
 
 @mark.asyncio
-async def test_load_pickle_dir(output_directory):
+async def test_analyse_csv(output_directory):
     service = Service()
     result = await service.analyse_asset(CSV_PATH)
     assert len(result.datasets) == 1
@@ -66,3 +67,8 @@ async def test_load_pickle_dir(output_directory):
         file.write(asset.model_dump_json())
     assert len(result.dataTypes) == 1
     assert DataSetType.structured in result.dataTypes
+
+
+async def test_analyse_pickle():
+    service = Service()
+    await service.analyse_asset(PICKLE_PATH)

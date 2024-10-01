@@ -6,7 +6,7 @@ from typing import AsyncIterator, Dict, List, Optional, Set
 
 from edp.compression import CompressionAlgorithm
 from edp.file import File
-from edp.importers import Importer, csv_importer
+from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import Compression, ComputedAssetData, Dataset, DataSetType
 
 
@@ -88,7 +88,7 @@ class Service:
 
 
 def _create_importers() -> Dict[str, Importer]:
-    return {"csv": csv_importer}
+    return {"csv": csv_importer, "pickle": pickle_importer}
 
 
 def _create_compressions() -> Dict[str, Optional[CompressionAlgorithm]]:
