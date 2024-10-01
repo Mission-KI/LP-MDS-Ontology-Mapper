@@ -1,7 +1,8 @@
 from datetime import timedelta
 from logging import getLogger
-from typing import AsyncIterator, List, Sequence
+from typing import AsyncIterator, Tuple
 
+from numpy import any
 from numpy import max as numpy_max
 from numpy import mean, median
 from numpy import min as numpy_min
@@ -19,60 +20,38 @@ from edp.types import (
     TemporalConsistency,
 )
 
+DATE_TIME_FORMAT = "ISO8601"
+
 
 class Pandas(Analyzer):
     def __init__(self, data: DataFrame):
         self._logger = getLogger(__name__)
         self._data = data
-        self._column_analyzers = {
-            NumericColumn: self._analyze_numeric_column,
-            DateTimeColumn: self._analyze_datetime_column,
-            StringColumn: self._analyze_string_column,
-        }
 
     @property
     def data_set_type(self):
         return DataSetType.structured
 
     async def analyze(self) -> StructuredEDPDataSet:
-        columns = [column async for column in self._analyze_columns()]
+        columns = {name: column async for name, column in self._analyze_columns()}
         return StructuredEDPDataSet(rowCount=len(self._data.index), columns=columns)
 
-    async def _analyze_columns(self) -> AsyncIterator[Column]:
+    async def _analyze_columns(self) -> AsyncIterator[Tuple[str, Column]]:
         for column_name in self._data.columns:
-            column_type = self._translate_type(column_name)
-            if column_type is NumericColumn:
-                yield await self._analyze_numeric_column(column_name)
-            elif column_type is DateTimeColumn:
-                yield await self._analyze_datetime_column(column_name)
-            else:
-                yield await self._analyze_string_column(column_name)
+            yield column_name, await self._analyze_column(self._data[column_name])
 
-    def _translate_type(self, column_name: str):
-        type_character = self._data[column_name].dtype.kind
-        if type_character in "iufc":
-            return NumericColumn
-        elif type_character in "M":
-            return DateTimeColumn
-        elif type_character in "m":
-            return NumericColumn
-        elif type_character in "OSU":
-            try:
-                self._data[column_name] = to_datetime(self._data[column_name], errors="raise")
-                return DateTimeColumn
-            except (ValueError, TypeError):
-                pass
-            try:
-                self._data[column_name] = to_numeric(self._data[column_name], errors="raise")
-                return NumericColumn
-            except (ValueError, TypeError):
-                pass
-        return StringColumn
+    async def _analyze_column(self, column: Series):
+        column = infer_type_and_convert(column)
+        type_char = column.dtype.kind
+        if type_char in "iufcm":
+            return await self._analyze_numeric_column(column)
+        if type_char in "M":
+            return await self._analyze_datetime_column(column)
 
-    async def _analyze_numeric_column(self, name: str) -> NumericColumn:
-        column = self._data[name]
+        return await self._analyze_string_column(column)
+
+    async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
         return NumericColumn(
-            name=name,
             min=numpy_min(column),
             max=numpy_max(column),
             mean=mean(column),
@@ -81,7 +60,7 @@ class Pandas(Analyzer):
             dataType=str(column.dtype),
         )
 
-    async def _analyze_datetime_column(self, name: str) -> DateTimeColumn:
+    async def _analyze_datetime_column(self, column: Series) -> DateTimeColumn:
         CONSISTENCY_INTERVALS = [
             timedelta(seconds=1),
             timedelta(minutes=1),
@@ -90,9 +69,7 @@ class Pandas(Analyzer):
             timedelta(weeks=1),
         ]
 
-        column = self._data[name]
         return DateTimeColumn(
-            name=name,
             earliest=numpy_min(column),
             latest=numpy_max(column),
             temporalConsistencies=[
@@ -100,8 +77,8 @@ class Pandas(Analyzer):
             ],
         )
 
-    async def _analyze_string_column(self, name: str) -> StringColumn:
-        return StringColumn(name=name)
+    async def _analyze_string_column(self, column: Series) -> StringColumn:
+        return StringColumn()
 
     def _compute_temporal_consistency(self, column: Series, interval: timedelta) -> TemporalConsistency:
         column.index = DatetimeIndex(column)
@@ -114,3 +91,39 @@ class Pandas(Analyzer):
             differentAbundancies=different_abundances,
             abundances=abundances.tolist(),
         )
+
+
+def infer_type_and_convert(column: Series) -> Series:
+    type_character = column.dtype.kind
+
+    if type_character in "i":
+        if any(column < 0):
+            return to_numeric(column, downcast="signed", errors="raise")
+        return to_numeric(column, downcast="unsigned", errors="raise")
+
+    if type_character in "u":
+        return to_numeric(column, downcast="unsigned", errors="raise")
+
+    if type_character in "f":
+        return to_numeric(column, downcast="float", errors="raise")
+
+    if type_character in "c":
+        return column
+
+    if type_character in "M":
+        return to_datetime(column, errors="raise", format=DATE_TIME_FORMAT)
+
+    if type_character in "m":
+        return column
+
+    try:
+        return to_datetime(column, errors="raise", format=DATE_TIME_FORMAT)
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        return infer_type_and_convert(to_numeric(column, errors="raise"))
+    except (ValueError, TypeError):
+        pass
+
+    return column

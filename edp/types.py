@@ -65,11 +65,7 @@ class TemporalConsistency(BaseModel):
 Numeric = Union[int, float, timedelta, complex]
 
 
-class BaseColumn(BaseModel):
-    name: str = Field(description="Name of the column")
-
-
-class NumericColumn(BaseColumn):
+class NumericColumn(BaseModel):
     min: Numeric
     max: Numeric
     mean: Numeric
@@ -78,14 +74,14 @@ class NumericColumn(BaseColumn):
     dataType: str
 
 
-class DateTimeColumn(BaseColumn):
+class DateTimeColumn(BaseModel):
     earliest: datetime
     latest: datetime
     granularity: Optional[int] = Field(default=None)
     temporalConsistencies: List[TemporalConsistency]
 
 
-class StringColumn(BaseColumn):
+class StringColumn(BaseModel):
     pass
 
 
@@ -96,7 +92,7 @@ class StructuredEDPDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
     )
-    columns: List[Column] = Field(description="The dataset's columns")
+    columns: Dict[str, Column] = Field(description="The dataset's columns")
 
 
 Dataset = Union[StructuredEDPDataSet]
