@@ -2,12 +2,19 @@ from datetime import timedelta
 from logging import getLogger
 from typing import AsyncIterator, Tuple
 
-from numpy import any
+from numpy import any, count_nonzero
 from numpy import max as numpy_max
 from numpy import mean, median
 from numpy import min as numpy_min
 from numpy import std, unique
-from pandas import DataFrame, DatetimeIndex, Series, to_datetime, to_numeric
+from pandas import (
+    DataFrame,
+    DatetimeIndex,
+    Series,
+    to_datetime,
+    to_numeric,
+    to_timedelta,
+)
 
 from edp.analyzers.base import Analyzer
 from edp.types import (
@@ -61,7 +68,7 @@ class Pandas(Analyzer):
         )
 
     async def _analyze_datetime_column(self, column: Series) -> DateTimeColumn:
-        CONSISTENCY_INTERVALS = [
+        INTERVALS = [
             timedelta(seconds=1),
             timedelta(minutes=1),
             timedelta(hours=1),
@@ -72,25 +79,35 @@ class Pandas(Analyzer):
         return DateTimeColumn(
             earliest=numpy_min(column),
             latest=numpy_max(column),
-            temporalConsistencies=[
-                self._compute_temporal_consistency(column, interval) for interval in CONSISTENCY_INTERVALS
-            ],
+            all_entries_are_unique=column.is_unique,
+            monotonically_increasing=column.is_monotonic_increasing,
+            monotonically_decreasing=column.is_monotonic_decreasing,
+            temporalConsistencies=[compute_temporal_consistency(column, interval) for interval in INTERVALS],
+            gaps={interval: compute_gaps(column, interval) for interval in INTERVALS},
         )
 
     async def _analyze_string_column(self, column: Series) -> StringColumn:
         return StringColumn()
 
-    def _compute_temporal_consistency(self, column: Series, interval: timedelta) -> TemporalConsistency:
-        column.index = DatetimeIndex(column)
-        # TODO: Restrict to only the most abundant ones.
-        abundances = unique(list(column.resample(interval).count()))
-        different_abundances = len(abundances)
-        return TemporalConsistency(
-            interval=interval,
-            stable=(different_abundances == 1),
-            differentAbundancies=different_abundances,
-            abundances=abundances.tolist(),
-        )
+
+def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
+    column.index = DatetimeIndex(column)
+    # TODO: Restrict to only the most abundant ones.
+    abundances = unique(list(column.resample(interval).count()))
+    different_abundances = len(abundances)
+    return TemporalConsistency(
+        interval=interval,
+        stable=(different_abundances == 1),
+        differentAbundancies=different_abundances,
+        abundances=abundances.tolist(),
+    )
+
+
+def compute_gaps(column: Series, interval: timedelta) -> int:
+    deltas = column.sort_values().diff()
+    interval_timedelta = to_timedelta(interval)
+    over_interval_size = deltas > interval_timedelta
+    return count_nonzero(over_interval_size)
 
 
 def infer_type_and_convert(column: Series) -> Series:

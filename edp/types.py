@@ -77,8 +77,12 @@ class NumericColumn(BaseModel):
 class DateTimeColumn(BaseModel):
     earliest: datetime
     latest: datetime
+    all_entries_are_unique: bool
+    monotonically_increasing: bool
+    monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
     temporalConsistencies: List[TemporalConsistency]
+    gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
 
 
 class StringColumn(BaseModel):
