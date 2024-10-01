@@ -43,8 +43,12 @@ async def test_load_pickle_dir(output_directory):
     assert isinstance(dataset.columns["uuid"], StringColumn)
     assert isinstance(dataset.columns["einfahrt"], DateTimeColumn)
     assert isinstance(dataset.columns["ausfahrt"], DateTimeColumn)
-    assert isinstance(dataset.columns["aufenthalt"], NumericColumn)
-    assert isinstance(dataset.columns["parkhaus"], NumericColumn)
+    aufenthalt = dataset.columns["aufenthalt"]
+    assert isinstance(aufenthalt, NumericColumn)
+    assert aufenthalt.dataType == "int32"
+    parkhaus = dataset.columns["parkhaus"]
+    assert isinstance(parkhaus, NumericColumn)
+    assert parkhaus.dataType == "uint8"
 
     user_data = UserProvidedAssetData(
         id=1234,
