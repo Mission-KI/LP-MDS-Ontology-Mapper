@@ -59,6 +59,7 @@ class Pandas(Analyzer):
 
     async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
         return NumericColumn(
+            null_entries=number_null_entries(column),
             min=numpy_min(column),
             max=numpy_max(column),
             mean=mean(column),
@@ -76,18 +77,21 @@ class Pandas(Analyzer):
             timedelta(weeks=1),
         ]
 
+        deltas = column.sort_values().diff()
+
         return DateTimeColumn(
+            null_entries=number_null_entries(column),
             earliest=numpy_min(column),
             latest=numpy_max(column),
             all_entries_are_unique=column.is_unique,
             monotonically_increasing=column.is_monotonic_increasing,
             monotonically_decreasing=column.is_monotonic_decreasing,
             temporalConsistencies=[compute_temporal_consistency(column, interval) for interval in INTERVALS],
-            gaps={interval: compute_gaps(column, interval) for interval in INTERVALS},
+            gaps={interval: compute_gaps(deltas, interval) for interval in INTERVALS},
         )
 
     async def _analyze_string_column(self, column: Series) -> StringColumn:
-        return StringColumn()
+        return StringColumn(null_entries=number_null_entries(column))
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
@@ -103,11 +107,14 @@ def compute_temporal_consistency(column: Series, interval: timedelta) -> Tempora
     )
 
 
-def compute_gaps(column: Series, interval: timedelta) -> int:
-    deltas = column.sort_values().diff()
+def compute_gaps(deltas: Series, interval: timedelta) -> int:
     interval_timedelta = to_timedelta(interval)
     over_interval_size = deltas > interval_timedelta
     return count_nonzero(over_interval_size)
+
+
+def number_null_entries(column: Series) -> int:
+    return column.isnull().sum()
 
 
 def infer_type_and_convert(column: Series) -> Series:

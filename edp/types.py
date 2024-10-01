@@ -65,7 +65,11 @@ class TemporalConsistency(BaseModel):
 Numeric = Union[int, float, timedelta, complex]
 
 
-class NumericColumn(BaseModel):
+class _BaseColumn(BaseModel):
+    null_entries: int = Field(description="Number of empty entries in the column")
+
+
+class NumericColumn(_BaseColumn):
     min: Numeric
     max: Numeric
     mean: Numeric
@@ -74,7 +78,7 @@ class NumericColumn(BaseModel):
     dataType: str
 
 
-class DateTimeColumn(BaseModel):
+class DateTimeColumn(_BaseColumn):
     earliest: datetime
     latest: datetime
     all_entries_are_unique: bool
@@ -85,7 +89,7 @@ class DateTimeColumn(BaseModel):
     gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
 
 
-class StringColumn(BaseModel):
+class StringColumn(_BaseColumn):
     pass
 
 
