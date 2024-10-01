@@ -1,17 +1,15 @@
 name: Release
 
 on:
-    label:
-        types:
-            - created
-            - edited
+    push:
+        tags: "*"
 
 jobs:
     publish_schema:
         runs-on: ubuntu-24.04
         name: Publish Schemata
         env:
-            EDPS_SCHEMA: edps_schema_${{ github.event.label.name }}.json
+            EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
         steps:
         -   uses: actions/checkout@v4
             with:
