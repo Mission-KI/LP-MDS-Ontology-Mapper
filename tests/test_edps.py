@@ -60,6 +60,8 @@ async def test_analyse_csv(output_directory):
         publisher=Publisher(id="0815-1234", name="beebucket"),
         licenseId=0,
         description="Our very first test edp",
+        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
+        version="2.3.1",
         tags=["test", "csv"],
     )
     asset = Asset(**_as_dict(result), **_as_dict(user_data))

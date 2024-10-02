@@ -129,14 +129,16 @@ class UserProvidedAssetData(BaseModel):
     )
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
     publisher: Publisher = Field(description="Provider that placed the asset in the data room")
+    publishDate: datetime = Field(description="Date on which this asset has been published")
     licenseId: int = Field(
         description="Identifier, which describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)",
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
-    tags: Optional[List[str]] = Field(default=[], description="Optional list of tags")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Optional list of tags")
     dataSubCategory: Optional[str] = Field(
         default=None, description="A data room-specific sub-categorization for assetDataCategory"
     )
+    version: Optional[str] = Field(default=None, description="Provide supplied version of the asset")
     transferTypeFlag: Optional[DataSetTransfer] = Field(
         default=None, description="Describes whether an asset grows steadily over time "
     )
