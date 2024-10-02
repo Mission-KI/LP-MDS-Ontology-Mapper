@@ -26,7 +26,7 @@ class Service:
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
         extracted_size = 0
-        datasets: List[Dataset] = []
+        datasets: Dict[str, Dataset] = {}
         data_structures: Set[DataSetType] = set()
         base_path = path if path.is_dir() else path.parent
 
@@ -37,7 +37,7 @@ class Service:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
             structure = await self._importers[file_type](child_files)
             data_structures.add(structure.data_set_type)
-            datasets.append(await structure.analyze(output_context))
+            datasets[str(child_files)] = await structure.analyze(output_context)
 
         compression: Optional[Compression]
         if len(compressions) == 0:

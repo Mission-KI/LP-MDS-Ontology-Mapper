@@ -45,8 +45,8 @@ async def test_analyse_csv(output_directory, output_context):
     service = Service()
     result = await service.analyse_asset(CSV_PATH, output_context)
     assert len(result.datasets) == 1
-    assert len(result.datasets[0].columns) == 5
-    dataset = result.datasets[0]
+    assert len(result.datasets["test.csv"].columns) == 5
+    dataset = result.datasets["test.csv"]
     assert isinstance(dataset.columns["uuid"], StringColumn)
     assert isinstance(dataset.columns["einfahrt"], DateTimeColumn)
     assert isinstance(dataset.columns["ausfahrt"], DateTimeColumn)

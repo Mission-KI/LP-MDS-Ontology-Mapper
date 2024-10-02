@@ -174,9 +174,9 @@ class ComputedAssetData(BaseModel):
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
 
-    datasets: List[Dataset] = Field(
-        default_factory=list,
-        description="Additional columns dependent on the type of the dataset",
+    datasets: Dict[str, Dataset] = Field(
+        default_factory=dict,
+        description="Additional columns dependent on the type of the datasets",
     )
 
 
