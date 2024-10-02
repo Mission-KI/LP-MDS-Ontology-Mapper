@@ -77,10 +77,16 @@ class NumericColumn(_BaseColumn):
     stddev: Numeric
     upperPercentile: Numeric = Field(description="Value of the upper 1% quantile")
     lowerPercentile: Numeric = Field(description="Value of the lower 1% quantile")
+    upperQuantile: Numeric = Field(description="Value of the upper 25% quantile")
+    lowerQuantile: Numeric = Field(description="Value of the lower 25% quantile")
     percentileOutlierCount: int = Field(description="Number of elements in the lower or upper percentile")
     upperZScore: Numeric = Field(description="Value of the upper standard score")
     lowerZScore: Numeric = Field(description="Value of the lower standard score")
     zScoreOutlierCount: int = Field(description="Number of elements outside the lower and upper standard scores")
+    upperIQR: Numeric = Field(description="Value of the upper limit of the inter quartile range (25%)")
+    lowerIQR: Numeric = Field(description="Value of the lower limit of the inter quartile range (25%)")
+    iqr: Numeric = Field(description="Value of the inter quartile range")
+    iqrOutlierCount: int = Field(description="Number of elements outside of the inter quartile range")
     dataType: str
 
 

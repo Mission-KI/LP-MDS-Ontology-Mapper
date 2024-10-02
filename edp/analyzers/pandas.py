@@ -64,6 +64,9 @@ class Pandas(Analyzer):
         self._logger.debug('Analyzing column "%s" as numeric', column.name)
         upper_percentile, lower_percentile, percentile_outliers = compute_percentiles(column)
         upper_z_score, lower_z_score, z_outliers = compute_standard_score(column)
+        upper_quantile, lower_quantile, iqr, upper_iqr_limit, lower_iqr_limit, iqr_outliers = (
+            compute_inter_quartile_range(column)
+        )
         return NumericColumn(
             null_entries=number_null_entries(column),
             min=numpy_min(column),
@@ -73,10 +76,16 @@ class Pandas(Analyzer):
             stddev=std(column),
             upperPercentile=upper_percentile,
             lowerPercentile=lower_percentile,
+            upperQuantile=upper_quantile,
+            lowerQuantile=lower_quantile,
             percentileOutlierCount=percentile_outliers,
             upperZScore=upper_z_score,
             lowerZScore=lower_z_score,
             zScoreOutlierCount=z_outliers,
+            upperIQR=upper_iqr_limit,
+            lowerIQR=lower_iqr_limit,
+            iqr=iqr,
+            iqrOutlierCount=iqr_outliers,
             dataType=str(column.dtype),
         )
 
@@ -149,6 +158,22 @@ def compute_standard_score(column: Series) -> Tuple[float, float, int]:
     upper_z = column_mean + 3.0 * column_std
     lower_z = column_mean - 3.0 * column_std
     return upper_z, lower_z, _get_outliers(column, lower_z, upper_z)
+
+
+def compute_inter_quartile_range(column: Series) -> Tuple[float, float, float, float, float, int]:
+    upper_quantile = column.quantile(0.75)
+    lower_quantile = column.quantile(0.25)
+    inter_quartile_range = upper_quantile - lower_quantile
+    upper_iqr_limit = upper_quantile + 1.5 * inter_quartile_range
+    lower_iqr_limit = lower_quantile - 1.5 * inter_quartile_range
+    return (
+        upper_quantile,
+        lower_quantile,
+        inter_quartile_range,
+        upper_iqr_limit,
+        lower_iqr_limit,
+        _get_outliers(column, lower_iqr_limit, upper_iqr_limit),
+    )
 
 
 def infer_type_and_convert(column: Series) -> Series:
