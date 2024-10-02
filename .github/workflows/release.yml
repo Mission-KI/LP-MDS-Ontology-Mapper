@@ -4,12 +4,13 @@ on:
     push:
         tags: "*"
 
+env:
+    EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
+
 jobs:
-    publish_schema:
+    generate_schemas:
         runs-on: ubuntu-24.04
-        name: Publish Schemata
-        env:
-            EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
+        name: Generate Schemas
         steps:
         -   uses: actions/checkout@v4
             with:
@@ -22,6 +23,23 @@ jobs:
             run: pip install .
         -   name: Generate Schema
             run: export_edps_schema --output ${{ env.EDPS_SCHEMA }}
+        -   uses: actions/upload-artifact@v4
+            with:
+                name: ${{ env.EDPS_SCHEMA }}
+                path: ${{ env.EDPS_SCHEMA }}
+        
+    create_release:
+        runs-on: ubuntu-24.04
+        name: Create Release
+        needs:
+        -   generate_schemas
+        env:
+            EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
+        steps:
+        -   uses: actions/download-artifact@v4
+            with:
+                name: ${{ env.EDPS_SCHEMA }}
+                path: ${{ env.EDPS_SCHEMA }}
         -   name: Release
             uses: softprops/action-gh-release@v2
             with:
