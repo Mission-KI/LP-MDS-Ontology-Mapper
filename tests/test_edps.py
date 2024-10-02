@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
 from pydantic import BaseModel
-from pytest import mark
+from pytest import fixture, mark, raises
 
 from edp import Service
+from edp.file import OutputContext
 from edp.types import (
     Asset,
     DataSetType,
@@ -23,11 +23,16 @@ CSV_PATH = DIR / "data/test.csv"
 PICKLE_PATH = DIR / "data/test.pickle"
 
 
+@fixture
+def output_context(output_directory):
+    return OutputContext(output_directory)
+
+
 @mark.asyncio
-async def test_load_unknown_dir():
+async def test_load_unknown_dir(output_context):
     service = Service()
-    with pytest.raises(FileNotFoundError):
-        await service.analyse_asset(Path("/does/not/exist/"))
+    with raises(FileNotFoundError):
+        await service.analyse_asset(Path("/does/not/exist/"), output_context)
 
 
 def _as_dict(model: BaseModel):
@@ -36,9 +41,9 @@ def _as_dict(model: BaseModel):
 
 
 @mark.asyncio
-async def test_analyse_csv(output_directory):
+async def test_analyse_csv(output_directory, output_context):
     service = Service()
-    result = await service.analyse_asset(CSV_PATH)
+    result = await service.analyse_asset(CSV_PATH, output_context)
     assert len(result.datasets) == 1
     assert len(result.datasets[0].columns) == 5
     dataset = result.datasets[0]
@@ -72,6 +77,6 @@ async def test_analyse_csv(output_directory):
     assert DataSetType.structured in result.dataTypes
 
 
-async def test_analyse_pickle():
+async def test_analyse_pickle(output_context):
     service = Service()
-    await service.analyse_asset(PICKLE_PATH)
+    await service.analyse_asset(PICKLE_PATH, output_context)

@@ -18,6 +18,7 @@ from pandas import (
 )
 
 from edp.analyzers.base import Analyzer
+from edp.file import File, OutputContext
 from edp.types import (
     Column,
     DataSetType,
@@ -32,35 +33,36 @@ DATE_TIME_FORMAT = "ISO8601"
 
 
 class Pandas(Analyzer):
-    def __init__(self, data: DataFrame):
+    def __init__(self, data: DataFrame, file: File):
         self._logger = getLogger(__name__)
         self._data = data
+        self._file = file
 
     @property
     def data_set_type(self):
         return DataSetType.structured
 
-    async def analyze(self) -> StructuredEDPDataSet:
+    async def analyze(self, output_context: OutputContext) -> StructuredEDPDataSet:
         row_count = len(self._data.index)
         self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
-        columns = {name: column async for name, column in self._analyze_columns()}
+        columns = {name: column async for name, column in self._analyze_columns(output_context)}
         return StructuredEDPDataSet(rowCount=row_count, columns=columns)
 
-    async def _analyze_columns(self) -> AsyncIterator[Tuple[str, Column]]:
+    async def _analyze_columns(self, output_context: OutputContext) -> AsyncIterator[Tuple[str, Column]]:
         for column_name in self._data.columns:
-            yield column_name, await self._analyze_column(self._data[column_name])
+            yield column_name, await self._analyze_column(self._data[column_name], output_context)
 
-    async def _analyze_column(self, column: Series):
+    async def _analyze_column(self, column: Series, output_context: OutputContext):
         column = infer_type_and_convert(column)
         type_char = column.dtype.kind
         if type_char in "iufcm":
-            return await self._analyze_numeric_column(column)
+            return await self._analyze_numeric_column(column, output_context)
         if type_char in "M":
             return await self._analyze_datetime_column(column)
 
         return await self._analyze_string_column(column)
 
-    async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
+    async def _analyze_numeric_column(self, column: Series, output_context: OutputContext) -> NumericColumn:
         self._logger.debug('Analyzing column "%s" as numeric', column.name)
         upper_percentile, lower_percentile, percentile_outliers = compute_percentiles(column)
         upper_z_score, lower_z_score, z_outliers = compute_standard_score(column)

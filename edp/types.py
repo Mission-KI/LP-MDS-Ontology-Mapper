@@ -165,7 +165,7 @@ class UserProvidedAssetData(BaseModel):
 
 
 class Compression(BaseModel):
-    algorithms: List[str] = Field(description="List of all used compression algorithms in an asset")
+    algorithms: Set[str] = Field(description="List of all used compression algorithms in an asset")
     extractedSize: int = Field(description="Size in bytes when all compressions got extracted")
 
 

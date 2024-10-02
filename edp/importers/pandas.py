@@ -12,4 +12,4 @@ async def csv(file: File):
     logger.info("Importing %s as CSV", file)
     loop = get_running_loop()
     data_frame = await loop.run_in_executor(None, read_csv, file.path.absolute())
-    return Pandas(data_frame)
+    return Pandas(data_frame, file)

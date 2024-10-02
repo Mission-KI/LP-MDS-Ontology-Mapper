@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from shutil import rmtree
 from typing import AsyncIterator, Dict, List, Optional, Set
 
 from edp.compression import CompressionAlgorithm
-from edp.file import File
+from edp.file import File, OutputContext, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import Compression, ComputedAssetData, Dataset, DataSetType
 
@@ -21,25 +21,23 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(self, path: Path) -> ComputedAssetData:
+    async def analyse_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
-        if not path.is_file():
-            raise RuntimeError("Please pass the path to a single file!")
-        file = File(path)
-        compressions: List[str] = []
+        compressions: Set[str] = set()
         extracted_size = 0
         datasets: List[Dataset] = []
         data_structures: Set[DataSetType] = set()
+        base_path = path if path.is_dir() else path.parent
 
-        async for child_files in self._walk_all_files(file.path, compressions):
+        async for child_files in self._walk_all_files(base_path, path, compressions):
             file_type = child_files.type
             extracted_size += child_files.size
             if not file_type in self._importers:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
             structure = await self._importers[file_type](child_files)
             data_structures.add(structure.data_set_type)
-            datasets.append(await structure.analyze())
+            datasets.append(await structure.analyze(output_context))
 
         compression: Optional[Compression]
         if len(compressions) == 0:
@@ -48,27 +46,27 @@ class Service:
             compression = Compression(algorithms=compressions, extractedSize=extracted_size)
 
         return ComputedAssetData(
-            volume=file.size,
+            volume=calculate_size(path),
             compression=compression,
             dataTypes=data_structures,
             datasets=datasets,
         )
 
-    async def _walk_all_files(self, path: Path, compressions: List[str]) -> AsyncIterator[File]:
+    async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""
 
         if path.is_file():
-            file = File(path)
+            file = File(base_path, path)
             if file.type not in self._compressions:
                 yield file
             else:
-                compressions.append(file.type)
+                compressions.add(file.type)
                 async with self._extract(file) as extracted_path:
-                    async for child_file in self._walk_all_files(extracted_path, compressions):
+                    async for child_file in self._walk_all_files(base_path, extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
             for file_path in path.iterdir():
-                async for child_file in self._walk_all_files(file_path, compressions):
+                async for child_file in self._walk_all_files(base_path, file_path, compressions):
                     yield child_file
         else:
             self._logger.warning('Can not extract or analyse "%s"', path)
@@ -81,10 +79,17 @@ class Service:
         compression = self._compressions[archive_type]
         if compression is None:
             raise NotImplementedError(f'Extractin "{archive_type}" is not implemented')
-        with TemporaryDirectory() as directory_str:
-            directory = Path(directory_str)
-            await compression.extract(file.path, directory)
+        archive_name = file.path.name
+        directory = file.path.parent / archive_name.replace(".", "_")
+        while directory.exists():
+            directory /= "extracted"
+
+        directory.mkdir()
+        await compression.extract(file.path, directory)
+        try:
             yield directory
+        finally:
+            rmtree(directory.absolute())
 
 
 def _create_importers() -> Dict[str, Importer]:
