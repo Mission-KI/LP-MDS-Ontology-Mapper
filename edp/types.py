@@ -75,6 +75,9 @@ class NumericColumn(_BaseColumn):
     mean: Numeric
     median: Numeric
     stddev: Numeric
+    upperPercentile: Numeric = Field(description="Value of the upper 1% quantile")
+    lowerPercentile: Numeric = Field(description="Value of the lower 1% quantile")
+    percentileOutlierCount: int = Field(description="Number of elements in the lower or upper percentile")
     dataType: str
 
 

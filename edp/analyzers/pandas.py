@@ -62,6 +62,7 @@ class Pandas(Analyzer):
 
     async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
         self._logger.debug('Analyzing column "%s" as numeric', column.name)
+        upper_percentile, lower_percentile, outliers = compute_percentiles(column)
         return NumericColumn(
             null_entries=number_null_entries(column),
             min=numpy_min(column),
@@ -69,6 +70,9 @@ class Pandas(Analyzer):
             mean=mean(column),
             median=median(column),
             stddev=std(column),
+            upperPercentile=upper_percentile,
+            lowerPercentile=lower_percentile,
+            percentileOutlierCount=outliers,
             dataType=str(column.dtype),
         )
 
@@ -122,6 +126,13 @@ def compute_gaps(deltas: Series, interval: timedelta) -> int:
 
 def number_null_entries(column: Series) -> int:
     return column.isnull().sum()
+
+
+def compute_percentiles(column: Series) -> Tuple[float, float, int]:
+    upper_percentile = column.quantile(0.99)
+    lower_percentile = column.quantile(0.01)
+    is_outlier = (column > upper_percentile) | (column < lower_percentile)
+    return upper_percentile, lower_percentile, count_nonzero(is_outlier)
 
 
 def infer_type_and_convert(column: Series) -> Series:
