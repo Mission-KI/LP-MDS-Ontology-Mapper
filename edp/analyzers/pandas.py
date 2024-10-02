@@ -62,7 +62,8 @@ class Pandas(Analyzer):
 
     async def _analyze_numeric_column(self, column: Series) -> NumericColumn:
         self._logger.debug('Analyzing column "%s" as numeric', column.name)
-        upper_percentile, lower_percentile, outliers = compute_percentiles(column)
+        upper_percentile, lower_percentile, percentile_outliers = compute_percentiles(column)
+        upper_z_score, lower_z_score, z_outliers = compute_standard_score(column)
         return NumericColumn(
             null_entries=number_null_entries(column),
             min=numpy_min(column),
@@ -72,7 +73,10 @@ class Pandas(Analyzer):
             stddev=std(column),
             upperPercentile=upper_percentile,
             lowerPercentile=lower_percentile,
-            percentileOutlierCount=outliers,
+            percentileOutlierCount=percentile_outliers,
+            upperZScore=upper_z_score,
+            lowerZScore=lower_z_score,
+            zScoreOutlierCount=z_outliers,
             dataType=str(column.dtype),
         )
 
@@ -128,11 +132,23 @@ def number_null_entries(column: Series) -> int:
     return column.isnull().sum()
 
 
+def _get_outliers(column: Series, lower_limit: float, upper_limit: float) -> int:
+    is_outlier = (column < lower_limit) | (column > upper_limit)
+    return count_nonzero(is_outlier)
+
+
 def compute_percentiles(column: Series) -> Tuple[float, float, int]:
     upper_percentile = column.quantile(0.99)
     lower_percentile = column.quantile(0.01)
-    is_outlier = (column > upper_percentile) | (column < lower_percentile)
-    return upper_percentile, lower_percentile, count_nonzero(is_outlier)
+    return upper_percentile, lower_percentile, _get_outliers(column, lower_percentile, upper_percentile)
+
+
+def compute_standard_score(column: Series) -> Tuple[float, float, int]:
+    column_mean = column.mean()
+    column_std = column.std()
+    upper_z = column_mean + 3.0 * column_std
+    lower_z = column_mean - 3.0 * column_std
+    return upper_z, lower_z, _get_outliers(column, lower_z, upper_z)
 
 
 def infer_type_and_convert(column: Series) -> Series:
