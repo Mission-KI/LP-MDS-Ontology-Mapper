@@ -1,5 +1,6 @@
 from datetime import timedelta
 from logging import getLogger
+from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Tuple
 
 from numpy import any as numpy_any
@@ -16,6 +17,7 @@ from pandas import (
     to_numeric,
     to_timedelta,
 )
+from seaborn import boxplot
 
 from edp.analyzers.base import Analyzer
 from edp.file import File, OutputContext
@@ -23,6 +25,7 @@ from edp.types import (
     Column,
     DataSetType,
     DateTimeColumn,
+    ImageList,
     NumericColumn,
     StringColumn,
     StructuredEDPDataSet,
@@ -69,8 +72,11 @@ class Pandas(Analyzer):
         upper_quantile, lower_quantile, iqr, upper_iqr_limit, lower_iqr_limit, iqr_outliers = (
             compute_inter_quartile_range(column)
         )
+        images = [await self._generate_box_plot(column, output_context)]
+        images_posix: ImageList = [PurePosixPath(path) for path in images]
         return NumericColumn(
             null_entries=number_null_entries(column),
+            images=images_posix,
             min=numpy_min(column),
             max=numpy_max(column),
             mean=mean(column),
@@ -118,6 +124,23 @@ class Pandas(Analyzer):
     async def _analyze_string_column(self, column: Series) -> StringColumn:
         self._logger.debug('Analyzing column "%s" as string', column.name)
         return StringColumn(null_entries=number_null_entries(column))
+
+    async def _generate_box_plot(self, column: Series, output_context: OutputContext) -> Path:
+        async with output_context.create_plot(self._file.output_directory / str(column.name) / "box_plot") as (
+            axes,
+            relative_path,
+        ):
+            boxplot(
+                column,
+                notch=True,
+                showcaps=True,
+                width=0.3,
+                flierprops={"marker": "x"},
+                boxprops={"facecolor": (0.3, 0.5, 0.7, 0.5)},
+                medianprops={"color": "r", "linewidth": 2},
+                ax=axes,
+            )
+        return relative_path
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:

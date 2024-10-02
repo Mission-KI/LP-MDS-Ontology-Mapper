@@ -27,10 +27,12 @@ classifiers = [
 dependencies = [
     "argparse",
     "filetype",
+    "matplotlib",
     "numpy",
     "pandas",
     "pathlib",
     "pydantic",
+    "seaborn",
 ]
 
 [project.scripts]
@@ -45,6 +47,7 @@ test = [
     "isort",
     "mypy",
     "pandas-stubs",
+    "types-seaborn",
 ]
 dev = ["edp[test]"]
 

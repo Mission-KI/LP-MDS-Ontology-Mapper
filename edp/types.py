@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, FileUrl, TypeAdapter
 
 
 class DataSpace(BaseModel):
@@ -65,8 +65,12 @@ class TemporalConsistency(BaseModel):
 Numeric = Union[int, float, timedelta, complex]
 
 
+ImageList = List[Union[PurePosixPath, FileUrl]]
+
+
 class _BaseColumn(BaseModel):
     null_entries: int = Field(description="Number of empty entries in the column")
+    images: ImageList = Field(default_factory=list, description="References to images representing this column")
 
 
 class NumericColumn(_BaseColumn):
@@ -196,5 +200,5 @@ def export_edp_schema():
 
 def _get_args():
     parser = ArgumentParser()
-    parser.add_argument("-o", "--output", type=Path, help="Path to output the schema to")
+    parser.add_argument("-o", "--output", type=Path, help="PurePosixPath to output the schema to")
     return parser.parse_args()

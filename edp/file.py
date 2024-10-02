@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Tuple
 
 from filetype import guess
 from matplotlib.axes import Axes
@@ -19,14 +19,16 @@ class OutputContext:
         return resulting
 
     @asynccontextmanager
-    async def create_plot(self, path: Path) -> AsyncIterator[Axes]:
+    async def create_plot(self, path: Path) -> AsyncIterator[Tuple[Axes, Path]]:
+        name = path.name.replace(".", "_")
         save_path = self.path / path
         if not save_path.suffix:
-            save_path /= ".png"
+            save_path = save_path.with_name(name).with_suffix(".png")
         if save_path.exists():
             raise RuntimeError(f'Can not create plot, the file "{save_path}" already exists!')
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         figure, axes = subplots()
-        yield axes
+        yield axes, save_path.relative_to(self.path)
         figure.savefig(save_path)
 
 
@@ -59,6 +61,12 @@ class File:
     @property
     def relative(self) -> Path:
         return self.path.relative_to(self._base_path)
+
+    @property
+    def output_directory(self) -> Path:
+        relative = self.relative
+        name = relative.name.replace(".", "_")
+        return relative.with_name(name)
 
     def __repr__(self) -> str:
         return str(self.relative.as_posix())
