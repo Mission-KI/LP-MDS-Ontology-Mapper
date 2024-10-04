@@ -47,6 +47,7 @@ test = [
     "isort",
     "mypy",
     "pandas-stubs",
+    "scipy-stubs",
     "types-seaborn",
 ]
 dev = ["edp[test]"]

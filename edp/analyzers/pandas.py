@@ -1,15 +1,16 @@
 from asyncio import get_running_loop
 from datetime import timedelta
 from logging import getLogger
-from typing import AsyncIterator, Dict, List, Tuple
+from typing import AsyncIterator, List, Tuple, Union
 
 from fitter import Fitter
 from numpy import any as numpy_any
-from numpy import count_nonzero
+from numpy import count_nonzero, linspace
 from numpy import max as numpy_max
 from numpy import mean, median
 from numpy import min as numpy_min
-from numpy import std, unique
+from numpy import ndarray, std, unique
+from numpy.random import choice as random_choice
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -19,6 +20,7 @@ from pandas import (
     to_timedelta,
 )
 from pydantic import BaseModel, Field
+from scipy.stats import distributions
 from seaborn import boxplot
 
 from edp.analyzers.base import Analyzer
@@ -162,6 +164,7 @@ class Pandas(Analyzer):
         self._data = data
         self._file = file
         self._fitting_config = FittingConfig()
+        self._max_elements_per_column = 100000
 
     @property
     def data_set_type(self):
@@ -195,8 +198,19 @@ class Pandas(Analyzer):
         upper_quantile, lower_quantile, iqr, upper_iqr_limit, lower_iqr_limit, iqr_outliers = (
             compute_inter_quartile_range(column)
         )
-        images = [await generate_box_plot(column_plot_base + "_box_plot", column, output_context)]
         counts = compute_counts(column)
+
+        distribution_name, distribution_plot = await compute_best_fit_distribution(
+            column,
+            self._fitting_config,
+            column_plot_base + "_distribution",
+            self._max_elements_per_column,
+            output_context,
+        )
+        images = [
+            await generate_box_plot(column_plot_base + "_box_plot", column, output_context),
+            distribution_plot,
+        ]
         return NumericColumn(
             nonNullCount=counts.nonNullCount,
             nullCount=counts.nullCount,
@@ -219,7 +233,7 @@ class Pandas(Analyzer):
             lowerIQR=lower_iqr_limit,
             iqr=iqr,
             iqrOutlierCount=iqr_outliers,
-            distribution=await compute_best_fit_distribution(column, self._fitting_config),
+            distribution=str(distribution_name),
             dataType=str(column.dtype),
         )
 
@@ -275,10 +289,16 @@ async def generate_box_plot(plot_name: str, column: Series, output_context: Outp
     return reference
 
 
-async def compute_best_fit_distribution(column: Series, config: FittingConfig) -> str:
+async def compute_best_fit_distribution(
+    column: Series, config: FittingConfig, plot_name: str, max_elements: int, output_context: OutputContext
+):
+    representatives: Union[Series, ndarray] = (
+        column if column.size < max_elements else random_choice(column, max_elements)
+    )
+
     loop = get_running_loop()
     fitter = Fitter(
-        column, timeout=config.timeout.total_seconds(), bins=config.bins, distributions=config.distributions
+        representatives, timeout=config.timeout.total_seconds(), bins=config.bins, distributions=config.distributions
     )
 
     def runner():
@@ -287,7 +307,16 @@ async def compute_best_fit_distribution(column: Series, config: FittingConfig) -
     await loop.run_in_executor(None, runner)
     # According to documentation, this ony ever contains one entry.
     best_distribution_dict = fitter.get_best(method=config.error_function)
-    return str(next(iter(best_distribution_dict)))
+    distribution_name, distribution_parameters = next(iter(best_distribution_dict.items()))
+
+    async with output_context.get_plot(plot_name) as (axes, reference):
+        axes.hist(representatives, bins=config.bins, density=True)
+        x_min, x_max = axes.get_xlim()
+        x = linspace(x_min, x_max, 2048)
+        distribution = getattr(distributions, distribution_name)
+        distribution_y = distribution.pdf(x, **distribution_parameters)
+        axes.plot(x, distribution_y)
+    return distribution_name, reference
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
