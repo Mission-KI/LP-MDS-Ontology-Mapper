@@ -68,12 +68,13 @@ class Pandas(Analyzer):
 
     async def _analyze_numeric_column(self, column: Series, output_context: OutputContext) -> NumericColumn:
         self._logger.debug('Analyzing column "%s" as numeric', column.name)
+        column_plot_base = self._file.output_reference + "_" + str(column.name)
         upper_percentile, lower_percentile, percentile_outliers = compute_percentiles(column)
         upper_z_score, lower_z_score, z_outliers = compute_standard_score(column)
         upper_quantile, lower_quantile, iqr, upper_iqr_limit, lower_iqr_limit, iqr_outliers = (
             compute_inter_quartile_range(column)
         )
-        images = [await self._generate_box_plot(column, output_context)]
+        images = [await generate_box_plot(column_plot_base + "_box_plot", column, output_context)]
         return NumericColumn(
             null_entries=number_null_entries(column),
             images=images,
@@ -125,20 +126,20 @@ class Pandas(Analyzer):
         self._logger.debug('Analyzing column "%s" as string', column.name)
         return StringColumn(null_entries=number_null_entries(column))
 
-    async def _generate_box_plot(self, column: Series, output_context: OutputContext) -> FileReference:
-        plot_name = self._file.output_reference + "_" + str(column.name) + "_box_plot"
-        async with output_context.get_plot(plot_name) as (axes, reference):
-            boxplot(
-                column,
-                notch=True,
-                showcaps=True,
-                width=0.3,
-                flierprops={"marker": "x"},
-                boxprops={"facecolor": (0.3, 0.5, 0.7, 0.5)},
-                medianprops={"color": "r", "linewidth": 2},
-                ax=axes,
-            )
-        return reference
+
+async def generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
+    async with output_context.get_plot(plot_name) as (axes, reference):
+        boxplot(
+            column,
+            notch=True,
+            showcaps=True,
+            width=0.3,
+            flierprops={"marker": "x"},
+            boxprops={"facecolor": (0.3, 0.5, 0.7, 0.5)},
+            medianprops={"color": "r", "linewidth": 2},
+            ax=axes,
+        )
+    return reference
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:

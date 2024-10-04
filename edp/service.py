@@ -4,11 +4,20 @@ from pathlib import Path
 from shutil import rmtree
 from typing import AsyncIterator, Dict, Optional, Set
 
+from pydantic import BaseModel
+
 from edp.compression import CompressionAlgorithm
-from edp.context import OutputLocalFilesContext
+from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
-from edp.types import Compression, ComputedAssetData, Dataset, DataSetType
+from edp.types import (
+    Asset,
+    Compression,
+    ComputedAssetData,
+    Dataset,
+    DataSetType,
+    UserProvidedAssetData,
+)
 
 
 class Service:
@@ -22,7 +31,16 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(self, path: Path, output_context: OutputLocalFilesContext) -> ComputedAssetData:
+    async def analyse_asset(self, path: Path, user_data: UserProvidedAssetData, output_context: OutputContext) -> None:
+        computed_data = await self._compute_asset(path, output_context)
+        asset = Asset(**_as_dict(computed_data), **_as_dict(user_data))
+        json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
+        json_name = json_name.replace(".", "_")
+        json_name += ".json"
+        async with output_context.get_text_file(json_name) as (output, _):
+            await output.write(asset.model_dump_json())
+
+    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
@@ -128,3 +146,8 @@ def _create_compressions() -> Dict[str, Optional[CompressionAlgorithm]]:
         "lz4": None,
         "zstd": None,
     }
+
+
+def _as_dict(model: BaseModel):
+    field_keys = model.model_fields.keys()
+    return {key: model.__dict__[key] for key in field_keys}

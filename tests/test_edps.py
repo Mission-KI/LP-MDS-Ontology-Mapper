@@ -1,13 +1,11 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import BaseModel
 from pytest import fixture, mark, raises
 
 from edp import Service
 from edp.context import OutputLocalFilesContext
 from edp.types import (
-    Asset,
     DataSetType,
     DataSpace,
     DateTimeColumn,
@@ -49,21 +47,15 @@ def user_data():
 async def test_load_unknown_dir(output_context):
     service = Service()
     with raises(FileNotFoundError):
-        await service.analyse_asset(Path("/does/not/exist/"), output_context)
+        await service._compute_asset(Path("/does/not/exist/"), output_context)
 
 
-def _as_dict(model: BaseModel):
-    field_keys = model.model_fields.keys()
-    return {key: model.__dict__[key] for key in field_keys}
-
-
-@mark.asyncio
-async def test_analyse_csv(output_directory, output_context, user_data):
+async def test_analyse_pickle(output_context):
     service = Service()
-    result = await service.analyse_asset(CSV_PATH, output_context)
-    assert len(result.datasets) == 1
-    assert len(result.datasets["test.csv"].columns) == 5
-    dataset = result.datasets["test.csv"]
+    computed_data = await service._compute_asset(PICKLE_PATH, output_context)
+    assert len(computed_data.datasets) == 1
+    assert len(computed_data.datasets["test.pickle"].columns) == 5
+    dataset = computed_data.datasets["test.pickle"]
     assert isinstance(dataset.columns["uuid"], StringColumn)
     assert isinstance(dataset.columns["einfahrt"], DateTimeColumn)
     assert isinstance(dataset.columns["ausfahrt"], DateTimeColumn)
@@ -73,14 +65,11 @@ async def test_analyse_csv(output_directory, output_context, user_data):
     parkhaus = dataset.columns["parkhaus"]
     assert isinstance(parkhaus, NumericColumn)
     assert parkhaus.dataType == "uint8"
-
-    asset = Asset(**_as_dict(result), **_as_dict(user_data))
-    with open(output_directory / "csv_edp.json", "wt", encoding=ENCODING) as file:
-        file.write(asset.model_dump_json())
-    assert len(result.dataTypes) == 1
-    assert DataSetType.structured in result.dataTypes
+    assert len(computed_data.dataTypes) == 1
+    assert DataSetType.structured in computed_data.dataTypes
 
 
-async def test_analyse_pickle(output_context):
+@mark.asyncio
+async def test_analyse_csv(output_context, user_data):
     service = Service()
-    await service.analyse_asset(PICKLE_PATH, output_context)
+    await service.analyse_asset(CSV_PATH, user_data, output_context)
