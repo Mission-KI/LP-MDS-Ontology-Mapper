@@ -32,7 +32,6 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
-    "seaborn",
 ]
 
 [project.scripts]
@@ -48,7 +47,6 @@ test = [
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
-    "types-seaborn",
 ]
 dev = ["edp[test]"]
 

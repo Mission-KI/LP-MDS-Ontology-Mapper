@@ -21,7 +21,6 @@ from pandas import (
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
-from seaborn import boxplot
 
 from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
@@ -276,16 +275,7 @@ class Pandas(Analyzer):
 
 async def generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
     async with output_context.get_plot(plot_name) as (axes, reference):
-        boxplot(
-            column,
-            notch=True,
-            showcaps=True,
-            width=0.3,
-            flierprops={"marker": "x"},
-            boxprops={"facecolor": (0.3, 0.5, 0.7, 0.5)},
-            medianprops={"color": "r", "linewidth": 2},
-            ax=axes,
-        )
+        axes.boxplot(column, notch=True)
     return reference
 
 
