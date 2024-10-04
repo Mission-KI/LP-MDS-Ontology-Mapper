@@ -68,8 +68,13 @@ FileReference = Union[PurePosixPath, FileUrl]
 ImageList = List[FileReference]
 
 
-class _BaseColumn(BaseModel):
-    null_entries: int = Field(description="Number of empty entries in the column")
+class BaseColumnCounts(BaseModel):
+    nonNullCount: int = Field(description="Number of non empty entries in the column")
+    nullCount: int = Field(description="Number of empty entries in the column")
+    numberUnique: int = Field(description="Number of unique values")
+
+
+class _BaseColumn(BaseColumnCounts):
     images: ImageList = Field(default_factory=list, description="References to images representing this column")
 
 

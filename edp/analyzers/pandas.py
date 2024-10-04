@@ -1,7 +1,7 @@
 from asyncio import get_running_loop
 from datetime import timedelta
 from logging import getLogger
-from typing import AsyncIterator, List, Tuple
+from typing import AsyncIterator, Dict, List, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
@@ -25,6 +25,7 @@ from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
 from edp.file import File
 from edp.types import (
+    BaseColumnCounts,
     Column,
     DataSetType,
     DateTimeColumn,
@@ -195,8 +196,11 @@ class Pandas(Analyzer):
             compute_inter_quartile_range(column)
         )
         images = [await generate_box_plot(column_plot_base + "_box_plot", column, output_context)]
+        counts = compute_counts(column)
         return NumericColumn(
-            null_entries=number_null_entries(column),
+            nonNullCount=counts.nonNullCount,
+            nullCount=counts.nullCount,
+            numberUnique=counts.numberUnique,
             images=images,
             min=numpy_min(column),
             max=numpy_max(column),
@@ -232,8 +236,11 @@ class Pandas(Analyzer):
 
         deltas = column.sort_values().diff()
 
+        counts = compute_counts(column)
         return DateTimeColumn(
-            null_entries=number_null_entries(column),
+            nonNullCount=counts.nonNullCount,
+            nullCount=counts.nullCount,
+            numberUnique=counts.numberUnique,
             earliest=numpy_min(column),
             latest=numpy_max(column),
             all_entries_are_unique=column.is_unique,
@@ -245,7 +252,12 @@ class Pandas(Analyzer):
 
     async def _analyze_string_column(self, column: Series) -> StringColumn:
         self._logger.debug('Analyzing column "%s" as string', column.name)
-        return StringColumn(null_entries=number_null_entries(column))
+        counts = compute_counts(column)
+        return StringColumn(
+            nonNullCount=counts.nonNullCount,
+            nullCount=counts.nullCount,
+            numberUnique=counts.numberUnique,
+        )
 
 
 async def generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
@@ -297,8 +309,11 @@ def compute_gaps(deltas: Series, interval: timedelta) -> int:
     return count_nonzero(over_interval_size)
 
 
-def number_null_entries(column: Series) -> int:
-    return column.isnull().sum()
+def compute_counts(column: Series) -> BaseColumnCounts:
+    non_null_count = column.count()
+    null_count = count_nonzero(column.isnull())
+    unique_count = column.unique().size
+    return BaseColumnCounts(nonNullCount=non_null_count, nullCount=null_count, numberUnique=unique_count)
 
 
 def _get_outliers(column: Series, lower_limit: float, upper_limit: float) -> int:
