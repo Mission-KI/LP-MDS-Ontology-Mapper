@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from logging import getLogger
 from pathlib import Path
 from typing import AsyncIterator, Tuple
 
@@ -11,6 +12,7 @@ class OutputContext:
     """This supplies functions to generate output files and graphs."""
 
     def __init__(self, path: Path) -> None:
+        self._logger = getLogger(__name__)
         self.path = path
 
     def get_sub_dir(self, path: Path) -> Path:
@@ -25,8 +27,10 @@ class OutputContext:
         if not save_path.suffix:
             save_path = save_path.with_name(name).with_suffix(".png")
         if save_path.exists():
-            raise RuntimeError(f'Can not create plot, the file "{save_path}" already exists!')
-        save_path.parent.mkdir(parents=True, exist_ok=True)
+            self._logger.warning('The path "%s" already exists, will overwrite!', save_path)
+            save_path.unlink()
+        else:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
         figure, axes = subplots()
         yield axes, save_path.relative_to(self.path)
         figure.savefig(save_path)
