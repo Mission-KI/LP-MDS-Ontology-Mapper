@@ -28,6 +28,23 @@ def output_context(output_directory):
     return OutputContext(output_directory)
 
 
+@fixture
+def user_data():
+    return UserProvidedAssetData(
+        id="my-dataset-id",
+        name="dataset-dummy-name",
+        url="https://beebucket.ai/en/",
+        dataCategory="TestDataCategory",
+        dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
+        publisher=Publisher(id="0815-1234", name="beebucket"),
+        licenseId=0,
+        description="Our very first test edp",
+        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
+        version="2.3.1",
+        tags=["test", "csv"],
+    )
+
+
 @mark.asyncio
 async def test_load_unknown_dir(output_context):
     service = Service()
@@ -41,7 +58,7 @@ def _as_dict(model: BaseModel):
 
 
 @mark.asyncio
-async def test_analyse_csv(output_directory, output_context):
+async def test_analyse_csv(output_directory, output_context, user_data):
     service = Service()
     result = await service.analyse_asset(CSV_PATH, output_context)
     assert len(result.datasets) == 1
@@ -57,19 +74,6 @@ async def test_analyse_csv(output_directory, output_context):
     assert isinstance(parkhaus, NumericColumn)
     assert parkhaus.dataType == "uint8"
 
-    user_data = UserProvidedAssetData(
-        id=1234,
-        name="BeebucketCsv",
-        url="https://beebucket.ai/en/",
-        dataCategory="TestData",
-        dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
-        publisher=Publisher(id="0815-1234", name="beebucket"),
-        licenseId=0,
-        description="Our very first test edp",
-        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
-        version="2.3.1",
-        tags=["test", "csv"],
-    )
     asset = Asset(**_as_dict(result), **_as_dict(user_data))
     with open(output_directory / "csv_edp.json", "wt", encoding=ENCODING) as file:
         file.write(asset.model_dump_json())

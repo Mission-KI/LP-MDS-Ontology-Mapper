@@ -64,7 +64,6 @@ class TemporalConsistency(BaseModel):
 
 Numeric = Union[int, float, timedelta, complex]
 
-
 ImageList = List[Union[PurePosixPath, FileUrl]]
 
 
@@ -130,7 +129,7 @@ class Publisher(BaseModel):
 class UserProvidedAssetData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
-    id: int = Field(description="The asset ID is a unique identifier for an asset within a data room")
+    id: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
     name: str = Field(description="Name of the asset")
     url: str = Field(description="The URL via which the asset can be found in the published data room")
     dataCategory: str = Field(
