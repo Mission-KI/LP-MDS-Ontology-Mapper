@@ -2,10 +2,11 @@ from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
 from shutil import rmtree
-from typing import AsyncIterator, Dict, List, Optional, Set
+from typing import AsyncIterator, Dict, Optional, Set
 
 from edp.compression import CompressionAlgorithm
-from edp.file import File, OutputContext, calculate_size
+from edp.context import OutputLocalFilesContext
+from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import Compression, ComputedAssetData, Dataset, DataSetType
 
@@ -21,7 +22,7 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
+    async def analyse_asset(self, path: Path, output_context: OutputLocalFilesContext) -> ComputedAssetData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()

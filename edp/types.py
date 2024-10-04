@@ -64,7 +64,8 @@ class TemporalConsistency(BaseModel):
 
 Numeric = Union[int, float, timedelta, complex]
 
-ImageList = List[Union[PurePosixPath, FileUrl]]
+FileReference = Union[PurePosixPath, FileUrl]
+ImageList = List[FileReference]
 
 
 class _BaseColumn(BaseModel):

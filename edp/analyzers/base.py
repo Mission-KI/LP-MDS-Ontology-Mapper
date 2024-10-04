@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from edp.file import OutputContext
+from edp.context import OutputContext
 from edp.types import Dataset, DataSetType
 
 

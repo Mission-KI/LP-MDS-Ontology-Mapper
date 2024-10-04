@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from pytest import fixture, mark, raises
 
 from edp import Service
-from edp.file import OutputContext
+from edp.context import OutputLocalFilesContext
 from edp.types import (
     Asset,
     DataSetType,
@@ -25,7 +25,7 @@ PICKLE_PATH = DIR / "data/test.pickle"
 
 @fixture
 def output_context(output_directory):
-    return OutputContext(output_directory)
+    return OutputLocalFilesContext(output_directory)
 
 
 @fixture

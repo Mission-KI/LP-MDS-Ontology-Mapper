@@ -20,12 +20,13 @@ from pandas import (
 from seaborn import boxplot
 
 from edp.analyzers.base import Analyzer
-from edp.file import File, OutputContext
+from edp.context import OutputContext
+from edp.file import File
 from edp.types import (
     Column,
     DataSetType,
     DateTimeColumn,
-    ImageList,
+    FileReference,
     NumericColumn,
     StringColumn,
     StructuredEDPDataSet,
@@ -73,10 +74,9 @@ class Pandas(Analyzer):
             compute_inter_quartile_range(column)
         )
         images = [await self._generate_box_plot(column, output_context)]
-        images_posix: ImageList = [PurePosixPath(path) for path in images]
         return NumericColumn(
             null_entries=number_null_entries(column),
-            images=images_posix,
+            images=images,
             min=numpy_min(column),
             max=numpy_max(column),
             mean=mean(column),
@@ -125,11 +125,9 @@ class Pandas(Analyzer):
         self._logger.debug('Analyzing column "%s" as string', column.name)
         return StringColumn(null_entries=number_null_entries(column))
 
-    async def _generate_box_plot(self, column: Series, output_context: OutputContext) -> Path:
-        async with output_context.create_plot(self._file.output_directory / str(column.name) / "box_plot") as (
-            axes,
-            relative_path,
-        ):
+    async def _generate_box_plot(self, column: Series, output_context: OutputContext) -> FileReference:
+        plot_name = self._file.output_reference + "_" + str(column.name) + "_box_plot"
+        async with output_context.get_plot(plot_name) as (axes, reference):
             boxplot(
                 column,
                 notch=True,
@@ -140,7 +138,7 @@ class Pandas(Analyzer):
                 medianprops={"color": "r", "linewidth": 2},
                 ax=axes,
             )
-        return relative_path
+        return reference
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
