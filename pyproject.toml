@@ -26,6 +26,7 @@ classifiers = [
 dependencies = [
     "argparse",
     "filetype",
+    "fitter",
     "matplotlib",
     "numpy",
     "pandas",
@@ -78,5 +79,5 @@ exclude = ["build"]
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["filetype"]
+module = ["filetype", "fitter"]
 ignore_missing_imports = true

@@ -1,8 +1,9 @@
+from asyncio import get_running_loop
 from datetime import timedelta
 from logging import getLogger
-from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, Tuple
+from typing import AsyncIterator, List, Tuple
 
+from fitter import Fitter
 from numpy import any as numpy_any
 from numpy import count_nonzero
 from numpy import max as numpy_max
@@ -17,6 +18,7 @@ from pandas import (
     to_numeric,
     to_timedelta,
 )
+from pydantic import BaseModel, Field
 from seaborn import boxplot
 
 from edp.analyzers.base import Analyzer
@@ -36,11 +38,129 @@ from edp.types import (
 DATE_TIME_FORMAT = "ISO8601"
 
 
+def _default_distributions() -> List[str]:
+    return [
+        "anglit",
+        "arcsine",
+        "argus",
+        "beta",
+        "betaprime",
+        "bradford",
+        "burr",
+        "burr12",
+        "cauchy",
+        "chi",
+        "chi2",
+        "cosine",
+        "crystalball",
+        "dgamma",
+        "dweibull",
+        "erlang",
+        "expon",
+        "exponnorm",
+        "exponpow",
+        "exponweib",
+        "f",
+        "fatiguelife",
+        "fisk",
+        "foldcauchy",
+        "foldnorm",
+        "frechet_l",
+        "frechet_r",
+        "gamma",
+        "gausshyper",
+        "genexpon",
+        "genextreme",
+        "gengamma",
+        "genhalflogistic",
+        "geninvgauss",
+        "genlogistic",
+        "gennorm",
+        "genpareto",
+        "gilbrat",
+        "gompertz",
+        "gumbel_l",
+        "gumbel_r",
+        "halfcauchy",
+        "halfgennorm",
+        "halflogistic",
+        "halfnorm",
+        "hypsecant",
+        "invgamma",
+        "invgauss",
+        "invweibull",
+        "johnsonsb",
+        "johnsonsu",
+        "kappa3",
+        "kappa4",
+        "ksone",
+        "kstwo",
+        "kstwobign",
+        "laplace",
+        "levy",
+        "levy_l",
+        "levy_stable",
+        "loggamma",
+        "logistic",
+        "loglaplace",
+        "lognorm",
+        "loguniform",
+        "lomax",
+        "maxwell",
+        "mielke",
+        "moyal",
+        "nakagami",
+        "ncf",
+        "nct",
+        "ncx2",
+        "norm",
+        "norminvgauss",
+        "pareto",
+        "pearson3",
+        "powerlaw",
+        "powerlognorm",
+        "powernorm",
+        "rayleigh",
+        "rdist",
+        "recipinvgauss",
+        "reciprocal",
+        "rice",
+        "rv_continuous",
+        "rv_histogram",
+        "semicircular",
+        "skewnorm",
+        "t",
+        "trapz",
+        "triang",
+        "truncexpon",
+        "truncnorm",
+        "tukeylambda",
+        "uniform",
+        "vonmises",
+        "vonmises_line",
+        "wald",
+        "weibull_max",
+        "weibull_min",
+        "wrapcauchy",
+    ]
+
+
+class FittingConfig(BaseModel):
+    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
+    error_function: str = Field(
+        default="sumsquare_error", description="Error function to use to measure performance of the fits"
+    )
+    bins: int = Field(default=100, description="Number of bins to use for the fitting")
+    distributions: List[str] = Field(default_factory=_default_distributions, description="Distributions to try to fit")
+    workers: int = Field(default=-1, description="Number of workers to use for fitting")
+
+
 class Pandas(Analyzer):
     def __init__(self, data: DataFrame, file: File):
         self._logger = getLogger(__name__)
         self._data = data
         self._file = file
+        self._fitting_config = FittingConfig()
 
     @property
     def data_set_type(self):
@@ -95,6 +215,7 @@ class Pandas(Analyzer):
             lowerIQR=lower_iqr_limit,
             iqr=iqr,
             iqrOutlierCount=iqr_outliers,
+            distribution=await compute_best_fit_distribution(column, self._fitting_config),
             dataType=str(column.dtype),
         )
 
@@ -140,6 +261,21 @@ async def generate_box_plot(plot_name: str, column: Series, output_context: Outp
             ax=axes,
         )
     return reference
+
+
+async def compute_best_fit_distribution(column: Series, config: FittingConfig) -> str:
+    loop = get_running_loop()
+    fitter = Fitter(
+        column, timeout=config.timeout.total_seconds(), bins=config.bins, distributions=config.distributions
+    )
+
+    def runner():
+        return fitter.fit(max_workers=config.workers)
+
+    await loop.run_in_executor(None, runner)
+    # According to documentation, this ony ever contains one entry.
+    best_distribution_dict = fitter.get_best(method=config.error_function)
+    return str(next(iter(best_distribution_dict)))
 
 
 def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
