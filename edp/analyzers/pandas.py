@@ -198,6 +198,9 @@ class Pandas(Analyzer):
             compute_inter_quartile_range(column)
         )
         counts = compute_counts(column)
+        minimum = numpy_min(column)
+        maximum = numpy_max(column)
+        x_limits = _get_distribution_x_limits(minimum, maximum, lower_iqr_limit, upper_iqr_limit)
 
         distribution_name, distribution_plot = await compute_best_fit_distribution(
             column,
@@ -205,6 +208,7 @@ class Pandas(Analyzer):
             column_plot_base + "_distribution",
             self._max_elements_per_column,
             output_context,
+            x_limits,
         )
         images = [
             await generate_box_plot(column_plot_base + "_box_plot", column, output_context),
@@ -215,8 +219,8 @@ class Pandas(Analyzer):
             nullCount=counts.nullCount,
             numberUnique=counts.numberUnique,
             images=images,
-            min=numpy_min(column),
-            max=numpy_max(column),
+            min=minimum,
+            max=maximum,
             mean=mean(column),
             median=median(column),
             stddev=std(column),
@@ -280,15 +284,26 @@ async def generate_box_plot(plot_name: str, column: Series, output_context: Outp
 
 
 async def compute_best_fit_distribution(
-    column: Series, config: FittingConfig, plot_name: str, max_elements: int, output_context: OutputContext
+    column: Series,
+    config: FittingConfig,
+    plot_name: str,
+    max_elements: int,
+    output_context: OutputContext,
+    x_limits: Tuple[float, float],
 ):
+    x_min, x_max = x_limits
     representatives: Union[Series, ndarray] = (
         column if column.size < max_elements else random_choice(column, max_elements)
     )
 
     loop = get_running_loop()
     fitter = Fitter(
-        representatives, timeout=config.timeout.total_seconds(), bins=config.bins, distributions=config.distributions
+        representatives,
+        xmin=x_min,
+        xmax=x_max,
+        timeout=config.timeout.total_seconds(),
+        bins=config.bins,
+        distributions=config.distributions,
     )
 
     def runner():
@@ -300,12 +315,13 @@ async def compute_best_fit_distribution(
     distribution_name, distribution_parameters = next(iter(best_distribution_dict.items()))
 
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.hist(representatives, bins=config.bins, density=True)
-        x_min, x_max = axes.get_xlim()
+        axes.set_xlim(x_min, x_max)
+        axes.hist(representatives, bins=config.bins, range=x_limits, density=True)
         x = linspace(x_min, x_max, 2048)
         distribution = getattr(distributions, distribution_name)
         distribution_y = distribution.pdf(x, **distribution_parameters)
         axes.plot(x, distribution_y)
+
     return distribution_name, reference
 
 
@@ -404,3 +420,11 @@ def infer_type_and_convert(column: Series) -> Series:
         pass
 
     return column
+
+
+def _get_distribution_x_limits(
+    minimum: float, maximum: float, lower_iqr: float, upper_iqr: float
+) -> Tuple[float, float]:
+    combined_min = minimum if lower_iqr < minimum else lower_iqr
+    combined_max = maximum if upper_iqr > maximum else upper_iqr
+    return combined_min, combined_max
