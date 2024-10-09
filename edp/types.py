@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field, FileUrl, TypeAdapter
+from pydantic import AnyUrl, BaseModel, Field, TypeAdapter
 
 
 class DataSpace(BaseModel):
@@ -64,7 +64,7 @@ class TemporalConsistency(BaseModel):
 
 Numeric = Union[int, float, timedelta, complex]
 
-FileReference = Union[PurePosixPath, FileUrl]
+FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
 
