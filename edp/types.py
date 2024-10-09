@@ -56,7 +56,6 @@ class DataSetCompression(str, Enum):
 
 
 class TemporalConsistency(BaseModel):
-    interval: timedelta
     stable: bool
     differentAbundancies: int
     abundances: List
@@ -107,7 +106,9 @@ class DateTimeColumn(_BaseColumn):
     monotonically_increasing: bool
     monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
-    temporalConsistencies: List[TemporalConsistency]
+    temporalConsistencies: Dict[timedelta, TemporalConsistency] = Field(
+        description="Temporal consistency at given timescale"
+    )
     gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
 
 
@@ -115,14 +116,15 @@ class StringColumn(_BaseColumn):
     pass
 
 
-Column = Union[NumericColumn, DateTimeColumn, StringColumn]
-
-
 class StructuredEDPDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
     )
-    columns: Dict[str, Column] = Field(description="The dataset's columns")
+    numericColumns: Dict[str, NumericColumn] = Field(description="Numeric columns in this dataset")
+    datetimeColumns: Dict[str, DateTimeColumn] = Field(description="Datetime columns in this dataset")
+    stringColumns: Dict[str, StringColumn] = Field(
+        description="Columns that could only be interpreted as string by the analysis"
+    )
 
 
 Dataset = Union[StructuredEDPDataSet]
