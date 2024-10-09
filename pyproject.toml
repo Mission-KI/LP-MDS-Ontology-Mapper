@@ -31,6 +31,8 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
+    "boto3",
+    "requests"
 ]
 
 [project.scripts]
@@ -46,6 +48,8 @@ test = [
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
+    "boto3-stubs[full]",
+    "types-requests"
 ]
 dev = ["edp[test]"]
 
