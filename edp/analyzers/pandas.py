@@ -1,6 +1,7 @@
 from asyncio import get_running_loop
 from datetime import timedelta
 from logging import getLogger
+from multiprocessing import cpu_count
 from typing import AsyncIterator, List, Tuple, Union
 
 from fitter import Fitter
@@ -154,7 +155,10 @@ class FittingConfig(BaseModel):
     )
     bins: int = Field(default=100, description="Number of bins to use for the fitting")
     distributions: List[str] = Field(default_factory=_default_distributions, description="Distributions to try to fit")
-    workers: int = Field(default=-1, description="Number of workers to use for fitting")
+    workers: int = Field(
+        default_factory=lambda: (cpu_count() - 1),
+        description="Number of workers to use for fitting. Defaults to number cores - 1 to not block up any other processes.",
+    )
 
 
 class Pandas(Analyzer):
