@@ -53,7 +53,7 @@ class OutputLocalFilesContext(OutputContext):
     def __init__(self, path: Path, text_encoding: str = "utf-8") -> None:
         self._logger = getLogger(__name__)
         if path.exists() and not path.is_dir():
-            self._logger.info('Output path "%s" must be a directory!', path)
+            raise RuntimeError(f'Output path "{path}" must be a directory!')
         if not path.exists():
             self._logger.info('Creating output path "%s"', path)
             path.mkdir(parents=True)
