@@ -9,6 +9,7 @@ from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
 
 from boto3 import resource as aws_resource
+from matplotlib import use
 from matplotlib.axes import Axes
 from matplotlib.pyplot import subplots
 from pydantic import HttpUrl
@@ -50,7 +51,13 @@ class OutputContext(ABC):
 class OutputLocalFilesContext(OutputContext):
     """This supplies functions to generate output files and graphs."""
 
-    def __init__(self, path: Path, text_encoding: str = "utf-8") -> None:
+    def __init__(
+        self,
+        path: Path,
+        text_encoding: str = "utf-8",
+        matplotlib_backend: str = "AGG",
+        default_plot_format: str = "png",
+    ) -> None:
         self._logger = getLogger(__name__)
         if path.exists() and not path.is_dir():
             raise RuntimeError(f'Output path "{path}" must be a directory!')
@@ -59,6 +66,8 @@ class OutputLocalFilesContext(OutputContext):
             path.mkdir(parents=True)
         self.path = path
         self.text_encoding = text_encoding
+        use(matplotlib_backend)
+        self._default_plot_format = default_plot_format
 
     def build_full_path(self, relative_path: PurePosixPath):
         return PurePosixPath(self.path / relative_path)
@@ -72,7 +81,7 @@ class OutputLocalFilesContext(OutputContext):
 
     @asynccontextmanager
     async def get_plot(self, name: str):
-        save_path = self._prepare_save_path(name, ".png")
+        save_path = self._prepare_save_path(name, "." + self._default_plot_format)
         figure, axes = subplots()
         yield axes, PurePosixPath(save_path.relative_to(self.path))
         figure.savefig(save_path)
