@@ -63,8 +63,6 @@ def _default_distributions() -> List[str]:
         "fisk",
         "foldcauchy",
         "foldnorm",
-        "frechet_l",
-        "frechet_r",
         "gamma",
         "gausshyper",
         "genexpon",
@@ -75,13 +73,11 @@ def _default_distributions() -> List[str]:
         "genlogistic",
         "gennorm",
         "genpareto",
-        "gilbrat",
         "gompertz",
         "gumbel_l",
         "gumbel_r",
         "halfcauchy",
         "halfgennorm",
-        "halflogistic",
         "halfnorm",
         "hypsecant",
         "invgamma",
@@ -92,7 +88,6 @@ def _default_distributions() -> List[str]:
         "kappa3",
         "kappa4",
         "ksone",
-        "kstwo",
         "kstwobign",
         "laplace",
         "levy",
@@ -123,8 +118,6 @@ def _default_distributions() -> List[str]:
         "recipinvgauss",
         "reciprocal",
         "rice",
-        "rv_continuous",
-        "rv_histogram",
         "semicircular",
         "skewnorm",
         "t",
@@ -144,7 +137,7 @@ def _default_distributions() -> List[str]:
 
 
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(minutes=1), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
