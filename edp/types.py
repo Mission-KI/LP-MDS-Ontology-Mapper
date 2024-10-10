@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from enum import Enum
+from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Union
 
@@ -182,6 +183,7 @@ class Compression(BaseModel):
 
 
 class ComputedAssetData(BaseModel):
+    edps_version: str = Field(default=get_version("edp"), description="Version of EDPS used to generate this EDP")
     volume: int = Field(description="Volume of the asset in MB")
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
