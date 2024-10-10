@@ -68,14 +68,10 @@ FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
 
-class BaseColumnCounts(BaseModel):
+class _BaseColumn(BaseModel):
     nonNullCount: int = Field(description="Number of non empty entries in the column")
     nullCount: int = Field(description="Number of empty entries in the column")
     numberUnique: int = Field(description="Number of unique values")
-
-
-class _BaseColumn(BaseColumnCounts):
-    images: ImageList = Field(default_factory=list, description="References to images representing this column")
 
 
 class NumericColumn(_BaseColumn):
@@ -97,6 +93,10 @@ class NumericColumn(_BaseColumn):
     iqr: Numeric = Field(description="Value of the inter quartile range")
     iqrOutlierCount: int = Field(description="Number of elements outside of the inter quartile range")
     distribution: str = Field(description="The best fitting distribution for the data in this column")
+    distributionGraph: Optional[FileReference] = Field(
+        default=None, description="Link to the combined histogram/distribution graph"
+    )
+    boxPlot: FileReference = Field(description="Link to the box plot of this column")
     dataType: str
 
 

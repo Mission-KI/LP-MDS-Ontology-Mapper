@@ -357,28 +357,11 @@ class Pandas(Analyzer):
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         column_plot_base = self._file.output_reference + "_" + str(object=column.name)
-        images = [await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)]
-        if not computed_fields[_NUMERIC_DISTRIBUTION] in [
-            _Distributions.SingleValue.value,
-            _Distributions.TooSmallDataset.value,
-        ]:
-            images.append(
-                await _plot_distribution(
-                    column,
-                    computed_fields,
-                    self._fitting_config,
-                    column_plot_base + "_distribution",
-                    computed_fields[_NUMERIC_DISTRIBUTION],
-                    computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
-                    output_context,
-                )
-            )
-
-        return NumericColumn(
+        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
+        column_result = NumericColumn(
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
-            images=images,
             min=computed_fields[_NUMERIC_MIN],
             max=computed_fields[_NUMERIC_MAX],
             mean=computed_fields[_NUMERIC_MEAN],
@@ -398,7 +381,22 @@ class Pandas(Analyzer):
             iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
             distribution=computed_fields[_NUMERIC_DISTRIBUTION],
             dataType=str(column.dtype),
+            boxPlot=box_plot,
         )
+        if not computed_fields[_NUMERIC_DISTRIBUTION] in [
+            _Distributions.SingleValue.value,
+            _Distributions.TooSmallDataset.value,
+        ]:
+            column_result.distributionGraph = await _plot_distribution(
+                column,
+                computed_fields,
+                self._fitting_config,
+                column_plot_base + "_distribution",
+                computed_fields[_NUMERIC_DISTRIBUTION],
+                computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
+                output_context,
+            )
+        return column_result
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
         self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
