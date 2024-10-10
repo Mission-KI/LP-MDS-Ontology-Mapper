@@ -33,6 +33,7 @@ dependencies = [
     "pydantic",
     "boto3",
     "requests",
+    "seaborn",
 ]
 
 [project.scripts]

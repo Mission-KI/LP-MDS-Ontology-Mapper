@@ -3,11 +3,11 @@ from datetime import timedelta
 from enum import Enum
 from logging import getLogger
 from multiprocessing import cpu_count
-from typing import Dict, Hashable, Iterator, List, Tuple
+from typing import Dict, Hashable, Iterator, List, Optional, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
-from numpy import count_nonzero, linspace
+from numpy import count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -19,6 +19,7 @@ from pandas import (
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
+from seaborn import diverging_palette, heatmap
 
 from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
@@ -215,9 +216,9 @@ class Pandas(Analyzer):
         columns_by_type = await self._determine_types()
         common_fields = await self._compute_common_fields()
 
-        numeric_column_ids = columns_by_type[_ColumnType.Numeric]
-        numeric_columns = self._data[numeric_column_ids]
-        numeric_common_fields = common_fields.loc[numeric_column_ids]
+        numeric_ids = columns_by_type[_ColumnType.Numeric]
+        numeric_columns = self._data[numeric_ids]
+        numeric_common_fields = common_fields.loc[numeric_ids]
         numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
@@ -235,22 +236,31 @@ class Pandas(Analyzer):
             await self._transform_numeric_results(
                 numeric_columns[name], _get_single_row(name, numeric_fields), output_context
             )
-            for name in numeric_column_ids
+            for name in numeric_ids
         ]
         transformed_datetime_columns = [
             await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
-            for name in columns_by_type[_ColumnType.DateTime]
+            for name in datetime_ids
         ]
         transformed_string_columns = [
             await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
-            for name in columns_by_type[_ColumnType.String]
+            for name in string_ids
         ]
+
+        correlation_ids = numeric_ids + datetime_ids
+        correlation_columns = self._data[correlation_ids]
+        correlation_fields = common_fields.loc[correlation_ids]
+        correlation_graph = await _get_correlation_graph(
+            self._file.output_reference + "_correlations", correlation_columns, correlation_fields, output_context
+        )
+
         return StructuredDataSet(
             name=self._file.output_reference,
             rowCount=row_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
+            correlationGraph=correlation_graph,
         )
 
     async def _compute_common_fields(self) -> DataFrame:
@@ -555,6 +565,31 @@ async def _plot_distribution(
 def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
     """This is mostly a convenience wrapper due to poor pandas stubs."""
     return data_frame.loc[str(row_name)]  # type: ignore
+
+
+async def _get_correlation_graph(
+    plot_name: str, columns: DataFrame, fields: DataFrame, output_context: OutputContext
+) -> Optional[FileReference]:
+    filtered_column_names = (fields[_COMMON_UNIQUE] > 1).index
+    filtered_columns = columns[filtered_column_names]
+    correlation = filtered_columns.corr(numeric_only=False)
+    mask = triu(ones_like(correlation, dtype=bool))
+    colormap = diverging_palette(230, 20, as_cmap=True)
+    async with output_context.get_plot(plot_name) as (axes, reference):
+        heatmap(
+            correlation,
+            annot=True,
+            mask=mask,
+            fmt=".2f",
+            vmax=0.3,
+            center=0,
+            square=True,
+            linewidths=0.5,
+            cbar_kws={"shrink": 0.5},
+            cmap=colormap,
+            ax=axes,
+        )
+    return reference
 
 
 def infer_type_and_convert(column: Series) -> Series:
