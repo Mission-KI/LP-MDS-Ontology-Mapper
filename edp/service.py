@@ -15,6 +15,7 @@ from edp.types import (
     Compression,
     ComputedAssetData,
     DataSetType,
+    FileReference,
     StructuredDataSet,
     UserProvidedAssetData,
 )
@@ -56,8 +57,9 @@ class Service:
         json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
         json_name += ".json"
-        async with output_context.get_text_file(json_name) as (output, _):
+        async with output_context.get_text_file(json_name) as (output, reference):
             await output.write(asset.model_dump_json())
+        return reference
 
     async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
         if not path.exists():
