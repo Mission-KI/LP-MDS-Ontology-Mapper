@@ -97,6 +97,9 @@ class NumericColumn(_BaseColumn):
         default=None, description="Link to the combined histogram/distribution graph"
     )
     boxPlot: FileReference = Field(description="Link to the box plot of this column")
+    seasonalityGraph: Optional[FileReference] = Field(
+        default=None, description="Link to a seasonality graph of this column"
+    )
     dataType: str
 
 
@@ -120,6 +123,9 @@ class StringColumn(_BaseColumn):
 class StructuredDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
+    )
+    correlationGraph: Optional[FileReference] = Field(
+        default=None, description="Reference to a correlation graph of the data columns"
     )
     numericColumns: Dict[str, NumericColumn] = Field(description="Numeric columns in this dataset")
     datetimeColumns: Dict[str, DateTimeColumn] = Field(description="Datetime columns in this dataset")
