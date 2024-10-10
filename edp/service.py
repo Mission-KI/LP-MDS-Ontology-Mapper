@@ -11,7 +11,7 @@ from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import (
-    Asset,
+    ExtendedDatasetProfile,
     Compression,
     ComputedAssetData,
     DataSetType,
@@ -53,7 +53,7 @@ class Service:
             File path or URL to the generated EDP.
         """
         computed_data = await self._compute_asset(path, output_context)
-        asset = Asset(**_as_dict(computed_data), **_as_dict(user_data))
+        asset = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
         json_name += ".json"

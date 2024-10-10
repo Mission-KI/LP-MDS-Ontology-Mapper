@@ -197,7 +197,7 @@ class ComputedAssetData(BaseModel):
     )
 
 
-class Asset(UserProvidedAssetData, ComputedAssetData):
+class ExtendedDatasetProfile(UserProvidedAssetData, ComputedAssetData):
     pass
 
 
@@ -208,7 +208,7 @@ def export_edp_schema():
         output /= "edsp_schema.json"
     adapter = TypeAdapter(Dict[str, Any])
     with open(output, "wb") as file:
-        file.write(adapter.dump_json(Asset.model_json_schema()))
+        file.write(adapter.dump_json(ExtendedDatasetProfile.model_json_schema()))
 
 
 def _get_args():
