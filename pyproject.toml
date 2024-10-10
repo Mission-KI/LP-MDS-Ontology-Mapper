@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edp"
-version = "0.2.0"
+version = "0.4.0"
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
     { name = "Daniel Eckstein", email = "de@beebucket.de" },
@@ -32,7 +32,7 @@ dependencies = [
     "pathlib",
     "pydantic",
     "boto3",
-    "requests"
+    "requests",
 ]
 
 [project.scripts]
@@ -49,7 +49,7 @@ test = [
     "pandas-stubs",
     "scipy-stubs",
     "boto3-stubs[full]",
-    "types-requests"
+    "types-requests",
 ]
 dev = ["edp[test]"]
 
