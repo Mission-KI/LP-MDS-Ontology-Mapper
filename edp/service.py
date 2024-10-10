@@ -11,13 +11,13 @@ from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import (
-    ExtendedDatasetProfile,
     Compression,
-    ComputedAssetData,
+    ComputedEdpData,
     DataSetType,
+    ExtendedDatasetProfile,
     FileReference,
     StructuredDataSet,
-    UserProvidedAssetData,
+    UserProvidedEdpData,
 )
 
 
@@ -33,7 +33,7 @@ class Service:
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
     async def analyse_asset(
-        self, path: Path, user_data: UserProvidedAssetData, output_context: OutputContext
+        self, path: Path, user_data: UserProvidedEdpData, output_context: OutputContext
     ) -> FileReference:
         """Let the service analyse the given asset
 
@@ -61,7 +61,7 @@ class Service:
             await output.write(asset.model_dump_json())
         return reference
 
-    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
+    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
@@ -88,7 +88,7 @@ class Service:
         else:
             compression = Compression(algorithms=compressions, extractedSize=extracted_size)
 
-        return ComputedAssetData(
+        return ComputedEdpData(
             volume=calculate_size(path),
             compression=compression,
             dataTypes=data_structures,

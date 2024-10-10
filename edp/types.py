@@ -139,7 +139,7 @@ class Publisher(BaseModel):
     name: str = Field(description="Name of the publisher")
 
 
-class UserProvidedAssetData(BaseModel):
+class UserProvidedEdpData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
     id: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
@@ -185,7 +185,7 @@ class Compression(BaseModel):
     extractedSize: int = Field(description="Size in bytes when all compressions got extracted")
 
 
-class ComputedAssetData(BaseModel):
+class ComputedEdpData(BaseModel):
     edps_version: str = Field(default=get_version("edp"), description="Version of EDPS used to generate this EDP")
     volume: int = Field(description="Volume of the asset in MB")
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
@@ -197,7 +197,7 @@ class ComputedAssetData(BaseModel):
     )
 
 
-class ExtendedDatasetProfile(UserProvidedAssetData, ComputedAssetData):
+class ExtendedDatasetProfile(UserProvidedEdpData, ComputedEdpData):
     pass
 
 

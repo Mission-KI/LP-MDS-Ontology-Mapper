@@ -5,15 +5,7 @@ from pytest import fixture, mark, raises
 
 from edp import Service
 from edp.context import OutputLocalFilesContext
-from edp.types import (
-    DataSetType,
-    DataSpace,
-    DateTimeColumn,
-    NumericColumn,
-    Publisher,
-    StringColumn,
-    UserProvidedAssetData,
-)
+from edp.types import DataSetType, DataSpace, Publisher, UserProvidedEdpData
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -28,7 +20,7 @@ def output_context(output_directory):
 
 @fixture
 def user_data():
-    return UserProvidedAssetData(
+    return UserProvidedEdpData(
         id="my-dataset-id",
         name="dataset-dummy-name",
         url="https://beebucket.ai/en/",
