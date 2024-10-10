@@ -117,7 +117,7 @@ class StringColumn(_BaseColumn):
     pass
 
 
-class StructuredEDPDataSet(BaseModel):
+class StructuredDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
     )
@@ -126,9 +126,6 @@ class StructuredEDPDataSet(BaseModel):
     stringColumns: Dict[str, StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
-
-
-Dataset = Union[StructuredEDPDataSet]
 
 
 class Publisher(BaseModel):
@@ -188,9 +185,9 @@ class ComputedAssetData(BaseModel):
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
 
-    datasets: Dict[str, Dataset] = Field(
+    structuredDatasets: Dict[str, StructuredDataSet] = Field(
         default_factory=dict,
-        description="Additional columns dependent on the type of the datasets",
+        description="Metadata for all datasets (files) detected to be structured (tables)",
     )
 
 

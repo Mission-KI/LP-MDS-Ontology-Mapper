@@ -29,7 +29,7 @@ from edp.types import (
     FileReference,
     NumericColumn,
     StringColumn,
-    StructuredEDPDataSet,
+    StructuredDataSet,
     TemporalConsistency,
 )
 
@@ -208,7 +208,7 @@ class Pandas(Analyzer):
     def data_set_type(self):
         return DataSetType.structured
 
-    async def analyze(self, output_context: OutputContext) -> StructuredEDPDataSet:
+    async def analyze(self, output_context: OutputContext):
         row_count = len(self._data.index)
         self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
         columns_by_type = await self._determine_types()
@@ -244,7 +244,7 @@ class Pandas(Analyzer):
             name: await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
             for name in columns_by_type[_ColumnType.String]
         }
-        return StructuredEDPDataSet(
+        return StructuredDataSet(
             rowCount=row_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,

@@ -14,8 +14,8 @@ from edp.types import (
     Asset,
     Compression,
     ComputedAssetData,
-    Dataset,
     DataSetType,
+    StructuredDataSet,
     UserProvidedAssetData,
 )
 
@@ -45,7 +45,7 @@ class Service:
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
         extracted_size = 0
-        datasets: Dict[str, Dataset] = {}
+        datasets: Dict[str, StructuredDataSet] = {}
         data_structures: Set[DataSetType] = set()
         base_path = path if path.is_dir() else path.parent
 
@@ -56,7 +56,10 @@ class Service:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
             structure = await self._importers[file_type](child_files)
             data_structures.add(structure.data_set_type)
-            datasets[str(child_files)] = await structure.analyze(output_context)
+            dataset_result = await structure.analyze(output_context)
+            if not isinstance(dataset_result, StructuredDataSet):
+                raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
+            datasets[str(child_files)] = dataset_result
 
         compression: Optional[Compression]
         if len(compressions) == 0:
@@ -68,7 +71,7 @@ class Service:
             volume=calculate_size(path),
             compression=compression,
             dataTypes=data_structures,
-            datasets=datasets,
+            structuredDatasets=datasets,
         )
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
