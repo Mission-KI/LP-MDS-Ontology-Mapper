@@ -68,7 +68,8 @@ line-length = 120
 
 [tool.pytest.ini_options]
 log_cli = true
-log_cli_level = "DEBUG"
+log_cli_level = "WARNING"
+addopts = "-W error"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 
