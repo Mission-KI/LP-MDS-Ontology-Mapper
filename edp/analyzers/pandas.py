@@ -1,9 +1,10 @@
 from asyncio import get_running_loop
+from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
 from logging import getLogger
 from multiprocessing import cpu_count
-from typing import Dict, Hashable, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
