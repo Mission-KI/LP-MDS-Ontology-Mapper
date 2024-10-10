@@ -11,12 +11,13 @@ from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import (
-    Asset,
     Compression,
-    ComputedAssetData,
-    Dataset,
+    ComputedEdpData,
     DataSetType,
-    UserProvidedAssetData,
+    ExtendedDatasetProfile,
+    FileReference,
+    StructuredDataSet,
+    UserProvidedEdpData,
 )
 
 
@@ -31,21 +32,41 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(self, path: Path, user_data: UserProvidedAssetData, output_context: OutputContext) -> None:
+    async def analyse_asset(
+        self, path: Path, user_data: UserProvidedEdpData, output_context: OutputContext
+    ) -> FileReference:
+        """Let the service analyse the given asset
+
+        Parameters
+        ----------
+        path : Path
+             Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
+        user_data : UserProvidedAssetData
+            The meta information about the asset supplied by the data space. These can not get calculated and must be supplied
+            by the user.
+        output_context : OutputContext
+            An instance of "OutputContext" child class. These determine, where and how the generated data gets stored.
+
+        Returns
+        -------
+        FileReference
+            File path or URL to the generated EDP.
+        """
         computed_data = await self._compute_asset(path, output_context)
-        asset = Asset(**_as_dict(computed_data), **_as_dict(user_data))
+        asset = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
         json_name += ".json"
-        async with output_context.get_text_file(json_name) as (output, _):
+        async with output_context.get_text_file(json_name) as (output, reference):
             await output.write(asset.model_dump_json())
+        return reference
 
-    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedAssetData:
+    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
         extracted_size = 0
-        datasets: Dict[str, Dataset] = {}
+        datasets: Dict[str, StructuredDataSet] = {}
         data_structures: Set[DataSetType] = set()
         base_path = path if path.is_dir() else path.parent
 
@@ -54,9 +75,12 @@ class Service:
             extracted_size += child_files.size
             if not file_type in self._importers:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
-            structure = await self._importers[file_type](child_files)
-            data_structures.add(structure.data_set_type)
-            datasets[str(child_files)] = await structure.analyze(output_context)
+            analyzer = await self._importers[file_type](child_files)
+            data_structures.add(analyzer.data_set_type)
+            dataset_result = await analyzer.analyze(output_context)
+            if not isinstance(dataset_result, StructuredDataSet):
+                raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
+            datasets[str(child_files)] = dataset_result
 
         compression: Optional[Compression]
         if len(compressions) == 0:
@@ -64,11 +88,11 @@ class Service:
         else:
             compression = Compression(algorithms=compressions, extractedSize=extracted_size)
 
-        return ComputedAssetData(
+        return ComputedEdpData(
             volume=calculate_size(path),
             compression=compression,
             dataTypes=data_structures,
-            datasets=datasets,
+            structuredDatasets=datasets,
         )
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:

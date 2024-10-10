@@ -1,20 +1,18 @@
 from asyncio import get_running_loop
 from datetime import timedelta
+from enum import Enum
 from logging import getLogger
-from typing import AsyncIterator, List, Tuple, Union
+from multiprocessing import cpu_count
+from typing import Dict, Hashable, List, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
 from numpy import count_nonzero, linspace
-from numpy import max as numpy_max
-from numpy import mean, median
-from numpy import min as numpy_min
-from numpy import ndarray, std, unique
-from numpy.random import choice as random_choice
 from pandas import (
     DataFrame,
     DatetimeIndex,
     Series,
+    concat,
     to_datetime,
     to_numeric,
     to_timedelta,
@@ -26,14 +24,12 @@ from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
 from edp.file import File
 from edp.types import (
-    BaseColumnCounts,
-    Column,
     DataSetType,
     DateTimeColumn,
     FileReference,
     NumericColumn,
     StringColumn,
-    StructuredEDPDataSet,
+    StructuredDataSet,
     TemporalConsistency,
 )
 
@@ -67,8 +63,6 @@ def _default_distributions() -> List[str]:
         "fisk",
         "foldcauchy",
         "foldnorm",
-        "frechet_l",
-        "frechet_r",
         "gamma",
         "gausshyper",
         "genexpon",
@@ -79,13 +73,11 @@ def _default_distributions() -> List[str]:
         "genlogistic",
         "gennorm",
         "genpareto",
-        "gilbrat",
         "gompertz",
         "gumbel_l",
         "gumbel_r",
         "halfcauchy",
         "halfgennorm",
-        "halflogistic",
         "halfnorm",
         "hypsecant",
         "invgamma",
@@ -96,7 +88,6 @@ def _default_distributions() -> List[str]:
         "kappa3",
         "kappa4",
         "ksone",
-        "kstwo",
         "kstwobign",
         "laplace",
         "levy",
@@ -127,8 +118,6 @@ def _default_distributions() -> List[str]:
         "recipinvgauss",
         "reciprocal",
         "rice",
-        "rv_continuous",
-        "rv_histogram",
         "semicircular",
         "skewnorm",
         "t",
@@ -148,13 +137,60 @@ def _default_distributions() -> List[str]:
 
 
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(minutes=1), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
     bins: int = Field(default=100, description="Number of bins to use for the fitting")
     distributions: List[str] = Field(default_factory=_default_distributions, description="Distributions to try to fit")
-    workers: int = Field(default=-1, description="Number of workers to use for fitting")
+
+
+class _ColumnType(str, Enum):
+    Numeric = "Numeric"
+    String = "String"
+    DateTime = "DateTime"
+
+
+# Labels for fields
+
+_COMMON_NON_NULL = "non-null-count"
+_COMMON_NULL = "null-count"
+_COMMON_UNIQUE = "unique-count"
+
+_NUMERIC_MIN = "minimum"
+_NUMERIC_MAX = "maximum"
+_NUMERIC_LOWER_PERCENTILE = "lower-percentile"
+_NUMERIC_UPPER_PERCENTILE = "upper-percentile"
+_NUMERIC_PERCENTILE_OUTLIERS = "percentile-outliers"
+_NUMERIC_MEAN = "mean"
+_NUMERIC_MEDIAN = "median"
+_NUMERIC_STD_DEV = "std-dev"
+_NUMERIC_LOWER_Z = "lower-z-limit"
+_NUMERIC_UPPER_Z = "upper-z-limit"
+_NUMERIC_Z_OUTLIERS = "z-outlier-count"
+_NUMERIC_LOWER_DIST = "lower-distribution-limit"
+_NUMERIC_UPPER_DIST = "upper-distribution-limit"
+_NUMERIC_LOWER_QUANT = "lower-quantile-limit"
+_NUMERIC_UPPER_QUANT = "upper-quantile-limit"
+_NUMERIC_LOWER_IQR = "lower-iqr-limit"
+_NUMERIC_UPPER_IQR = "upper-iqr-limit"
+_NUMERIC_IQR = "inter-quartile-range"
+_NUMERIC_IQR_OUTLIERS = "iqr-outlier-count"
+_NUMERIC_DISTRIBUTION = "distribution"
+_NUMERIC_DISTRIBUTION_PARAMETERS = "distribution-parameters"
+
+_DATETIME_EARLIEST = "earliest"
+_DATETIME_LATEST = "latest"
+_DATETIME_ALL_ENTRIES_UNIQUE = "all-entries-are-unique"
+_DATETIME_MONOTONIC_INCREASING = "monotonically-increasing"
+_DATETIME_MONOTONIC_DECREASING = "monotonically-decreasing"
+_DATETIME_TEMPORAL_CONSISTENCY = "temporal-consistency"
+_DATETIME_GAPS = "gaps"
+
+
+class _Distributions(str, Enum):
+    SingleValue = "single value"
+    TooSmallDataset = "dataset too small to determine distribution"
 
 
 class Pandas(Analyzer):
@@ -163,86 +199,112 @@ class Pandas(Analyzer):
         self._data = data
         self._file = file
         self._fitting_config = FittingConfig()
+        self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
+        self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
+        self._computed_data = DataFrame(index=self._data.columns)
 
     @property
     def data_set_type(self):
         return DataSetType.structured
 
-    async def analyze(self, output_context: OutputContext) -> StructuredEDPDataSet:
+    async def analyze(self, output_context: OutputContext):
         row_count = len(self._data.index)
         self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
-        columns = {name: column async for name, column in self._analyze_columns(output_context)}
-        return StructuredEDPDataSet(rowCount=row_count, columns=columns)
+        columns_by_type = await self._determine_types()
+        common_fields = await self._compute_common_fields()
 
-    async def _analyze_columns(self, output_context: OutputContext) -> AsyncIterator[Tuple[str, Column]]:
-        for column_name in self._data.columns:
-            yield column_name, await self._analyze_column(self._data[column_name], output_context)
+        numeric_column_ids = columns_by_type[_ColumnType.Numeric]
+        numeric_columns = self._data[numeric_column_ids]
+        numeric_common_fields = common_fields.loc[numeric_column_ids]
+        numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
+        numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
-    async def _analyze_column(self, column: Series, output_context: OutputContext):
-        column = infer_type_and_convert(column)
-        type_char = column.dtype.kind
-        if type_char in "iufcm":
-            return await self._analyze_numeric_column(column, output_context)
-        if type_char in "M":
-            return await self._analyze_datetime_column(column)
+        datetime_ids = columns_by_type[_ColumnType.DateTime]
+        datetime_columns = self._data[datetime_ids]
+        datetime_common_fields = common_fields.loc[datetime_ids]
+        datetime_fields = await self._compute_datetime_fields(datetime_columns)
+        datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
 
-        return await self._analyze_string_column(column)
+        string_ids = columns_by_type[_ColumnType.String]
+        string_columns = self._data[string_ids]
+        string_fields = common_fields.loc[string_ids]
 
-    async def _analyze_numeric_column(self, column: Series, output_context: OutputContext) -> NumericColumn:
-        self._logger.debug('Analyzing column "%s" as numeric', column.name)
-        column_plot_base = self._file.output_reference + "_" + str(column.name)
-        upper_percentile, lower_percentile, percentile_outliers = compute_percentiles(column)
-        upper_z_score, lower_z_score, z_outliers = compute_standard_score(column)
-        upper_quantile, lower_quantile, iqr, upper_iqr_limit, lower_iqr_limit, iqr_outliers = (
-            compute_inter_quartile_range(column)
-        )
-        counts = compute_counts(column)
-        minimum = numpy_min(column)
-        maximum = numpy_max(column)
-        x_limits = _get_distribution_x_limits(minimum, maximum, lower_iqr_limit, upper_iqr_limit)
-
-        distribution_name, distribution_plot = await compute_best_fit_distribution(
-            column,
-            self._fitting_config,
-            column_plot_base + "_distribution",
-            self._max_elements_per_column,
-            output_context,
-            x_limits,
-        )
-        images = [
-            await generate_box_plot(column_plot_base + "_box_plot", column, output_context),
-            distribution_plot,
-        ]
-        return NumericColumn(
-            nonNullCount=counts.nonNullCount,
-            nullCount=counts.nullCount,
-            numberUnique=counts.numberUnique,
-            images=images,
-            min=minimum,
-            max=maximum,
-            mean=mean(column),
-            median=median(column),
-            stddev=std(column),
-            upperPercentile=upper_percentile,
-            lowerPercentile=lower_percentile,
-            upperQuantile=upper_quantile,
-            lowerQuantile=lower_quantile,
-            percentileOutlierCount=percentile_outliers,
-            upperZScore=upper_z_score,
-            lowerZScore=lower_z_score,
-            zScoreOutlierCount=z_outliers,
-            upperIQR=upper_iqr_limit,
-            lowerIQR=lower_iqr_limit,
-            iqr=iqr,
-            iqrOutlierCount=iqr_outliers,
-            distribution=str(distribution_name),
-            dataType=str(column.dtype),
+        transformed_numeric_columns = {
+            name: await self._transform_numeric_results(
+                numeric_columns[name], _get_single_row(name, numeric_fields), output_context
+            )
+            for name in numeric_column_ids
+        }
+        transformed_datetime_columns = {
+            name: await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
+            for name in columns_by_type[_ColumnType.DateTime]
+        }
+        transformed_string_columns = {
+            name: await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
+            for name in columns_by_type[_ColumnType.String]
+        }
+        return StructuredDataSet(
+            rowCount=row_count,
+            numericColumns=transformed_numeric_columns,
+            datetimeColumns=transformed_datetime_columns,
+            stringColumns=transformed_string_columns,
         )
 
-    async def _analyze_datetime_column(self, column: Series) -> DateTimeColumn:
-        self._logger.debug('Analyzing column "%s" as datetime', column.name)
+    async def _compute_common_fields(self) -> DataFrame:
+        common_fields = DataFrame(index=self._data.columns)
+        common_fields[_COMMON_NON_NULL] = self._data.count()
+        common_fields[_COMMON_NULL] = self._data.isna().sum()
+        common_fields[_COMMON_UNIQUE] = self._data.nunique(dropna=True)
+        return common_fields
 
+    async def _compute_numeric_fields(self, columns: DataFrame, common_fields: DataFrame) -> DataFrame:
+        fields = DataFrame(index=columns.columns)
+
+        fields[_NUMERIC_MIN] = columns.min()
+        fields[_NUMERIC_MAX] = columns.max()
+        fields[_NUMERIC_LOWER_PERCENTILE] = columns.quantile(0.01)
+        fields[_NUMERIC_UPPER_PERCENTILE] = columns.quantile(0.99)
+        fields[_NUMERIC_PERCENTILE_OUTLIERS] = _get_outliers(
+            columns,
+            fields[_NUMERIC_LOWER_PERCENTILE],
+            fields[_NUMERIC_UPPER_PERCENTILE],
+        )
+        # Standard Distribution
+        fields[_NUMERIC_MEAN] = columns.mean()
+        fields[_NUMERIC_MEDIAN] = columns.median()
+        fields[_NUMERIC_STD_DEV] = columns.std()
+        fields[_NUMERIC_LOWER_Z] = fields[_NUMERIC_MEAN] - 3.0 * fields[_NUMERIC_STD_DEV]
+        fields[_NUMERIC_UPPER_Z] = fields[_NUMERIC_MEAN] + 3.0 * fields[_NUMERIC_STD_DEV]
+        fields[_NUMERIC_Z_OUTLIERS] = _get_outliers(columns, fields[_NUMERIC_LOWER_Z], fields[_NUMERIC_UPPER_Z])
+        # Inter Quartile Range
+        fields[_NUMERIC_LOWER_QUANT] = columns.quantile(0.25)
+        fields[_NUMERIC_UPPER_QUANT] = columns.quantile(0.75)
+        fields[_NUMERIC_IQR] = fields[_NUMERIC_UPPER_QUANT] - fields[_NUMERIC_LOWER_QUANT]
+        fields[_NUMERIC_LOWER_IQR] = fields[_NUMERIC_LOWER_QUANT] - 1.5 * fields[_NUMERIC_IQR]
+        fields[_NUMERIC_UPPER_IQR] = fields[_NUMERIC_UPPER_QUANT] + 1.5 * fields[_NUMERIC_IQR]
+        fields[_NUMERIC_IQR_OUTLIERS] = _get_outliers(columns, fields[_NUMERIC_LOWER_IQR], fields[_NUMERIC_UPPER_IQR])
+        # Distribution
+        fields[_NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_IQR]
+        fields.loc[fields[_NUMERIC_LOWER_IQR] < fields[_NUMERIC_MIN], _NUMERIC_LOWER_DIST] = fields[_NUMERIC_MIN]
+        fields[_NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_IQR]
+        fields.loc[fields[_NUMERIC_UPPER_IQR] > fields[_NUMERIC_MAX], _NUMERIC_UPPER_DIST] = fields[_NUMERIC_MAX]
+        fields = concat(
+            [
+                fields,
+                await _get_distributions(
+                    columns,
+                    concat([common_fields, fields], axis=1),
+                    self._fitting_config,
+                    self._distribution_threshold,
+                    self._workers,
+                ),
+            ],
+            axis=1,
+        )
+        return fields
+
+    async def _compute_datetime_fields(self, columns: DataFrame) -> DataFrame:
         INTERVALS = [
             timedelta(seconds=1),
             timedelta(minutes=1),
@@ -250,140 +312,245 @@ class Pandas(Analyzer):
             timedelta(days=1),
             timedelta(weeks=1),
         ]
+        computed = DataFrame(index=columns.columns)
+        computed[_DATETIME_EARLIEST] = columns.min()
+        computed[_DATETIME_LATEST] = columns.max()
+        # TODO: Vectorize these
+        computed[_DATETIME_ALL_ENTRIES_UNIQUE] = Series({name: column.is_unique for name, column in columns.items()})
+        computed[_DATETIME_MONOTONIC_INCREASING] = Series(
+            {name: column.is_monotonic_increasing for name, column in columns.items()}
+        )
+        computed[_DATETIME_MONOTONIC_DECREASING] = Series(
+            {name: column.is_monotonic_decreasing for name, column in columns.items()}
+        )
+        computed[_DATETIME_TEMPORAL_CONSISTENCY] = _get_temporal_consistencies(columns, INTERVALS)
+        computed[_DATETIME_GAPS] = _get_gaps(columns, INTERVALS)
+        return computed
 
-        deltas = column.sort_values().diff()
+    async def _determine_types(self) -> Dict[_ColumnType, List[str]]:
+        columns_by_type: Dict[_ColumnType, List[str]] = {
+            _ColumnType.Numeric: [],
+            _ColumnType.DateTime: [],
+            _ColumnType.String: [],
+        }
 
-        counts = compute_counts(column)
+        for column_name in self._data.columns:
+            columns_by_type[await self._determine_type(column_name)].append(column_name)
+
+        self._logger.debug("Found Numeric columns: %s", columns_by_type[_ColumnType.Numeric])
+        self._logger.debug("Found DateTime columns: %s", columns_by_type[_ColumnType.DateTime])
+        self._logger.debug("Found String columns: %s", columns_by_type[_ColumnType.String])
+        return columns_by_type
+
+    async def _determine_type(self, column_name: str) -> _ColumnType:
+        self._data[column_name] = infer_type_and_convert(self._data[column_name])
+        type_char = self._data[column_name].dtype.kind
+        if type_char in "iufcm":
+            return _ColumnType.Numeric
+        elif type_char in "M":
+            return _ColumnType.DateTime
+        else:
+            return _ColumnType.String
+
+    async def _transform_numeric_results(
+        self, column: Series, computed_fields: Series, output_context: OutputContext
+    ) -> NumericColumn:
+        self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
+        column_plot_base = self._file.output_reference + "_" + str(object=column.name)
+        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
+        column_result = NumericColumn(
+            nonNullCount=computed_fields[_COMMON_NON_NULL],
+            nullCount=computed_fields[_COMMON_NULL],
+            numberUnique=computed_fields[_COMMON_UNIQUE],
+            min=computed_fields[_NUMERIC_MIN],
+            max=computed_fields[_NUMERIC_MAX],
+            mean=computed_fields[_NUMERIC_MEAN],
+            median=computed_fields[_NUMERIC_MEDIAN],
+            stddev=computed_fields[_NUMERIC_STD_DEV],
+            upperPercentile=computed_fields[_NUMERIC_UPPER_PERCENTILE],
+            lowerPercentile=computed_fields[_NUMERIC_LOWER_PERCENTILE],
+            upperQuantile=computed_fields[_NUMERIC_UPPER_QUANT],
+            lowerQuantile=computed_fields[_NUMERIC_LOWER_QUANT],
+            percentileOutlierCount=computed_fields[_NUMERIC_PERCENTILE_OUTLIERS],
+            upperZScore=computed_fields[_NUMERIC_UPPER_Z],
+            lowerZScore=computed_fields[_NUMERIC_LOWER_Z],
+            zScoreOutlierCount=computed_fields[_NUMERIC_Z_OUTLIERS],
+            upperIQR=computed_fields[_NUMERIC_UPPER_IQR],
+            lowerIQR=computed_fields[_NUMERIC_LOWER_IQR],
+            iqr=computed_fields[_NUMERIC_IQR],
+            iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
+            distribution=computed_fields[_NUMERIC_DISTRIBUTION],
+            dataType=str(column.dtype),
+            boxPlot=box_plot,
+        )
+        if not computed_fields[_NUMERIC_DISTRIBUTION] in [
+            _Distributions.SingleValue.value,
+            _Distributions.TooSmallDataset.value,
+        ]:
+            column_result.distributionGraph = await _plot_distribution(
+                column,
+                computed_fields,
+                self._fitting_config,
+                column_plot_base + "_distribution",
+                computed_fields[_NUMERIC_DISTRIBUTION],
+                computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
+                output_context,
+            )
+        return column_result
+
+    async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
+        self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
+
         return DateTimeColumn(
-            nonNullCount=counts.nonNullCount,
-            nullCount=counts.nullCount,
-            numberUnique=counts.numberUnique,
-            earliest=numpy_min(column),
-            latest=numpy_max(column),
-            all_entries_are_unique=column.is_unique,
-            monotonically_increasing=column.is_monotonic_increasing,
-            monotonically_decreasing=column.is_monotonic_decreasing,
-            temporalConsistencies=[compute_temporal_consistency(column, interval) for interval in INTERVALS],
-            gaps={interval: compute_gaps(deltas, interval) for interval in INTERVALS},
+            nonNullCount=computed_fields[_COMMON_NON_NULL],
+            nullCount=computed_fields[_COMMON_NULL],
+            numberUnique=computed_fields[_COMMON_UNIQUE],
+            earliest=computed_fields[_DATETIME_EARLIEST],
+            latest=computed_fields[_DATETIME_LATEST],
+            all_entries_are_unique=computed_fields[_DATETIME_ALL_ENTRIES_UNIQUE],
+            monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
+            monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
+            temporalConsistencies=computed_fields[_DATETIME_TEMPORAL_CONSISTENCY],
+            gaps=computed_fields[_DATETIME_GAPS],
         )
 
-    async def _analyze_string_column(self, column: Series) -> StringColumn:
-        self._logger.debug('Analyzing column "%s" as string', column.name)
-        counts = compute_counts(column)
+    async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
+        self._logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
-            nonNullCount=counts.nonNullCount,
-            nullCount=counts.nullCount,
-            numberUnique=counts.numberUnique,
+            nonNullCount=computed_fields[_COMMON_NON_NULL],
+            nullCount=computed_fields[_COMMON_NULL],
+            numberUnique=computed_fields[_COMMON_UNIQUE],
         )
 
 
-async def generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
+async def _generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.boxplot(column, notch=True)
+        axes.set_title(plot_name)
+        axes.boxplot(column, notch=True, tick_labels=[str(column.name)])
     return reference
 
 
-async def compute_best_fit_distribution(
-    column: Series,
-    config: FittingConfig,
-    plot_name: str,
-    max_elements: int,
-    output_context: OutputContext,
-    x_limits: Tuple[float, float],
-):
-    x_min, x_max = x_limits
-    representatives: Union[Series, ndarray] = (
-        column if column.size < max_elements else random_choice(column, max_elements)
-    )
-
+async def _find_best_distribution(
+    column: Series, config: FittingConfig, column_fields: Series, workers: int
+) -> Tuple[str, dict]:
     loop = get_running_loop()
     fitter = Fitter(
-        representatives,
-        xmin=x_min,
-        xmax=x_max,
+        column,
+        xmin=column_fields[_NUMERIC_LOWER_DIST],
+        xmax=column_fields[_NUMERIC_UPPER_DIST],
         timeout=config.timeout.total_seconds(),
         bins=config.bins,
         distributions=config.distributions,
     )
 
     def runner():
-        return fitter.fit(max_workers=config.workers)
+        return fitter.fit(max_workers=workers)
 
     await loop.run_in_executor(None, runner)
     # According to documentation, this ony ever contains one entry.
     best_distribution_dict = fitter.get_best(method=config.error_function)
-    distribution_name, distribution_parameters = next(iter(best_distribution_dict.items()))
-
-    async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.set_xlim(x_min, x_max)
-        axes.hist(representatives, bins=config.bins, range=x_limits, density=True)
-        x = linspace(x_min, x_max, 2048)
-        distribution = getattr(distributions, distribution_name)
-        distribution_y = distribution.pdf(x, **distribution_parameters)
-        axes.plot(x, distribution_y)
-
-    return distribution_name, reference
+    distribution_name, parameters = next(iter(best_distribution_dict.items()))
+    return str(distribution_name), parameters
 
 
-def compute_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
+def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) -> Series:
+    # TODO: Vectorize this!
+    return Series({name: _get_temporal_consistencies_for_column(column, intervals) for name, column in columns.items()})
+
+
+def _get_temporal_consistencies_for_column(
+    column: Series, intervals: List[timedelta]
+) -> Dict[timedelta, TemporalConsistency]:
     column.index = DatetimeIndex(column)
+    return {interval: _get_temporal_consistency(column, interval) for interval in intervals}
+
+
+def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
     # TODO: Restrict to only the most abundant ones.
-    abundances = unique(list(column.resample(interval).count()))
+    abundances = column.resample(interval).count().unique()
     different_abundances = len(abundances)
     return TemporalConsistency(
-        interval=interval,
         stable=(different_abundances == 1),
         differentAbundancies=different_abundances,
         abundances=abundances.tolist(),
     )
 
 
-def compute_gaps(deltas: Series, interval: timedelta) -> int:
-    interval_timedelta = to_timedelta(interval)
-    over_interval_size = deltas > interval_timedelta
-    return count_nonzero(over_interval_size)
+def _get_gaps(columns: DataFrame, intervals: List[timedelta]) -> Series:
+    # TODO: Vectorize!
+    return Series({name: _get_gaps_per_column(column, intervals) for name, column in columns.items()})
 
 
-def compute_counts(column: Series) -> BaseColumnCounts:
-    non_null_count = column.count()
-    null_count = count_nonzero(column.isnull())
-    unique_count = column.unique().size
-    return BaseColumnCounts(nonNullCount=non_null_count, nullCount=null_count, numberUnique=unique_count)
+def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Dict[timedelta, int]:
+    deltas = column.sort_values().diff()
+    gaps: Dict[timedelta, int] = dict()
+    for interval in intervals:
+        over_interval_size = deltas > to_timedelta(interval)
+        gaps[interval] = count_nonzero(over_interval_size)
+    return gaps
 
 
-def _get_outliers(column: Series, lower_limit: float, upper_limit: float) -> int:
+def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
     is_outlier = (column < lower_limit) | (column > upper_limit)
-    return count_nonzero(is_outlier)
+    return is_outlier.count()
 
 
-def compute_percentiles(column: Series) -> Tuple[float, float, int]:
-    upper_percentile = column.quantile(0.99)
-    lower_percentile = column.quantile(0.01)
-    return upper_percentile, lower_percentile, _get_outliers(column, lower_percentile, upper_percentile)
+async def _get_distributions(
+    columns: DataFrame, fields: DataFrame, config: FittingConfig, distribution_threshold: int, workers: int
+) -> DataFrame:
 
+    values = [
+        await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
+        for name, column in columns.items()
+    ]
 
-def compute_standard_score(column: Series) -> Tuple[float, float, int]:
-    column_mean = column.mean()
-    column_std = column.std()
-    upper_z = column_mean + 3.0 * column_std
-    lower_z = column_mean - 3.0 * column_std
-    return upper_z, lower_z, _get_outliers(column, lower_z, upper_z)
-
-
-def compute_inter_quartile_range(column: Series) -> Tuple[float, float, float, float, float, int]:
-    upper_quantile = column.quantile(0.75)
-    lower_quantile = column.quantile(0.25)
-    inter_quartile_range = upper_quantile - lower_quantile
-    upper_iqr_limit = upper_quantile + 1.5 * inter_quartile_range
-    lower_iqr_limit = lower_quantile - 1.5 * inter_quartile_range
-    return (
-        upper_quantile,
-        lower_quantile,
-        inter_quartile_range,
-        upper_iqr_limit,
-        lower_iqr_limit,
-        _get_outliers(column, lower_iqr_limit, upper_iqr_limit),
+    data_frame = DataFrame(
+        values,
+        index=columns.columns,
+        columns=[_NUMERIC_DISTRIBUTION, _NUMERIC_DISTRIBUTION_PARAMETERS],
     )
+    return data_frame
+
+
+async def _get_distribution(
+    column: Series, fields: Series, config: FittingConfig, distribution_threshold: int, workers: int
+) -> Tuple[str, Dict]:
+    if fields[_COMMON_UNIQUE] <= 1:
+        return _Distributions.SingleValue.value, dict()
+
+    if fields[_COMMON_NON_NULL] < distribution_threshold:
+        return _Distributions.TooSmallDataset.value, dict()
+
+    return await _find_best_distribution(column, config, fields, workers)
+
+
+async def _plot_distribution(
+    column: Series,
+    column_fields: Series,
+    config: FittingConfig,
+    plot_name: str,
+    distribution_name: str,
+    distribution_parameters: dict,
+    output_context: OutputContext,
+):
+    x_min = column_fields[_NUMERIC_LOWER_DIST]
+    x_max = column_fields[_NUMERIC_UPPER_DIST]
+    x_limits = (x_min, x_max)
+    async with output_context.get_plot(plot_name) as (axes, reference):
+        axes.set_title(plot_name)
+        axes.set_xlim(x_min, x_max)
+        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=str(column.name))
+        x = linspace(x_min, x_max, 2048)
+        distribution = getattr(distributions, distribution_name)
+        distribution_y = distribution.pdf(x, **distribution_parameters)
+        axes.plot(x, distribution_y, label=distribution_name)
+        axes.legend()
+    return reference
+
+
+def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
+    """This is mostly a convenience wrapper due to poor pandas stubs."""
+    return data_frame.loc[str(row_name)]  # type: ignore
 
 
 def infer_type_and_convert(column: Series) -> Series:
@@ -420,11 +587,3 @@ def infer_type_and_convert(column: Series) -> Series:
         pass
 
     return column
-
-
-def _get_distribution_x_limits(
-    minimum: float, maximum: float, lower_iqr: float, upper_iqr: float
-) -> Tuple[float, float]:
-    combined_min = minimum if lower_iqr < minimum else lower_iqr
-    combined_max = maximum if upper_iqr > maximum else upper_iqr
-    return combined_min, combined_max

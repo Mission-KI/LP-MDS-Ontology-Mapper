@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from enum import Enum
+from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Union
 
@@ -56,7 +57,6 @@ class DataSetCompression(str, Enum):
 
 
 class TemporalConsistency(BaseModel):
-    interval: timedelta
     stable: bool
     differentAbundancies: int
     abundances: List
@@ -68,14 +68,10 @@ FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
 
-class BaseColumnCounts(BaseModel):
+class _BaseColumn(BaseModel):
     nonNullCount: int = Field(description="Number of non empty entries in the column")
     nullCount: int = Field(description="Number of empty entries in the column")
     numberUnique: int = Field(description="Number of unique values")
-
-
-class _BaseColumn(BaseColumnCounts):
-    images: ImageList = Field(default_factory=list, description="References to images representing this column")
 
 
 class NumericColumn(_BaseColumn):
@@ -97,6 +93,13 @@ class NumericColumn(_BaseColumn):
     iqr: Numeric = Field(description="Value of the inter quartile range")
     iqrOutlierCount: int = Field(description="Number of elements outside of the inter quartile range")
     distribution: str = Field(description="The best fitting distribution for the data in this column")
+    distributionGraph: Optional[FileReference] = Field(
+        default=None, description="Link to the combined histogram/distribution graph"
+    )
+    boxPlot: FileReference = Field(description="Link to the box plot of this column")
+    seasonalityGraph: Optional[FileReference] = Field(
+        default=None, description="Link to a seasonality graph of this column"
+    )
     dataType: str
 
 
@@ -107,7 +110,9 @@ class DateTimeColumn(_BaseColumn):
     monotonically_increasing: bool
     monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
-    temporalConsistencies: List[TemporalConsistency]
+    temporalConsistencies: Dict[timedelta, TemporalConsistency] = Field(
+        description="Temporal consistency at given timescale"
+    )
     gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
 
 
@@ -115,17 +120,18 @@ class StringColumn(_BaseColumn):
     pass
 
 
-Column = Union[NumericColumn, DateTimeColumn, StringColumn]
-
-
-class StructuredEDPDataSet(BaseModel):
+class StructuredDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
     )
-    columns: Dict[str, Column] = Field(description="The dataset's columns")
-
-
-Dataset = Union[StructuredEDPDataSet]
+    correlationGraph: Optional[FileReference] = Field(
+        default=None, description="Reference to a correlation graph of the data columns"
+    )
+    numericColumns: Dict[str, NumericColumn] = Field(description="Numeric columns in this dataset")
+    datetimeColumns: Dict[str, DateTimeColumn] = Field(description="Datetime columns in this dataset")
+    stringColumns: Dict[str, StringColumn] = Field(
+        description="Columns that could only be interpreted as string by the analysis"
+    )
 
 
 class Publisher(BaseModel):
@@ -133,7 +139,7 @@ class Publisher(BaseModel):
     name: str = Field(description="Name of the publisher")
 
 
-class UserProvidedAssetData(BaseModel):
+class UserProvidedEdpData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
     id: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
@@ -179,18 +185,19 @@ class Compression(BaseModel):
     extractedSize: int = Field(description="Size in bytes when all compressions got extracted")
 
 
-class ComputedAssetData(BaseModel):
+class ComputedEdpData(BaseModel):
+    edps_version: str = Field(default=get_version("edp"), description="Version of EDPS used to generate this EDP")
     volume: int = Field(description="Volume of the asset in MB")
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
 
-    datasets: Dict[str, Dataset] = Field(
+    structuredDatasets: Dict[str, StructuredDataSet] = Field(
         default_factory=dict,
-        description="Additional columns dependent on the type of the datasets",
+        description="Metadata for all datasets (files) detected to be structured (tables)",
     )
 
 
-class Asset(UserProvidedAssetData, ComputedAssetData):
+class ExtendedDatasetProfile(UserProvidedEdpData, ComputedEdpData):
     pass
 
 
@@ -201,7 +208,7 @@ def export_edp_schema():
         output /= "edsp_schema.json"
     adapter = TypeAdapter(Dict[str, Any])
     with open(output, "wb") as file:
-        file.write(adapter.dump_json(Asset.model_json_schema()))
+        file.write(adapter.dump_json(ExtendedDatasetProfile.model_json_schema()))
 
 
 def _get_args():

@@ -24,7 +24,7 @@ class TextWriter(ABC):
     async def write(self, text: str) -> None: ...
 
 
-class TextFileWrite(TextWriter):
+class TextFileWriter(TextWriter):
     def __init__(self, io_wrapper: TextIOWrapper) -> None:
         self._wrapper = io_wrapper
 
@@ -53,7 +53,7 @@ class OutputLocalFilesContext(OutputContext):
     def __init__(self, path: Path, text_encoding: str = "utf-8") -> None:
         self._logger = getLogger(__name__)
         if path.exists() and not path.is_dir():
-            self._logger.info('Output path "%s" must be a directory!', path)
+            raise RuntimeError(f'Output path "{path}" must be a directory!')
         if not path.exists():
             self._logger.info('Creating output path "%s"', path)
             path.mkdir(parents=True)
@@ -67,7 +67,7 @@ class OutputLocalFilesContext(OutputContext):
     async def get_text_file(self, name: str):
         save_path = self._prepare_save_path(name, ".json")
         with open(save_path, "wt", encoding=self.text_encoding) as io_wrapper:
-            yield TextFileWrite(io_wrapper), PurePosixPath(save_path.relative_to(self.path))
+            yield TextFileWriter(io_wrapper), PurePosixPath(save_path.relative_to(self.path))
         self._logger.debug('Generated text file "%s"', save_path)
 
     @asynccontextmanager

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Union
 
 from edp.context import OutputContext
-from edp.types import Dataset, DataSetType
+from edp.types import DataSetType, StructuredDataSet
 
 
 class Analyzer(ABC):
@@ -9,4 +10,4 @@ class Analyzer(ABC):
     @abstractmethod
     def data_set_type(self) -> DataSetType: ...
     @abstractmethod
-    async def analyze(self, output_context: OutputContext) -> Dataset: ...
+    async def analyze(self, output_context: OutputContext) -> Union[StructuredDataSet]: ...
