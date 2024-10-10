@@ -4,7 +4,7 @@ from pickle import load
 
 from pandas import DataFrame
 
-from edp.analyzers import PandasStructure
+from edp.analyzers import PandasAnalyzer
 from edp.file import File
 
 
@@ -16,6 +16,6 @@ async def pickle(file: File):
         data_object = await loop.run_in_executor(None, load, opened_file)
     if isinstance(data_object, DataFrame):
         logger.info("Finished reading object, object recognized as pandas data frame")
-        return PandasStructure(data_object, file)
+        return PandasAnalyzer(data_object, file)
 
     raise NotImplementedError(f'Type "{type(data_object)}" not yet supported')

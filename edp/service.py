@@ -75,9 +75,9 @@ class Service:
             extracted_size += child_files.size
             if not file_type in self._importers:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
-            structure = await self._importers[file_type](child_files)
-            data_structures.add(structure.data_set_type)
-            dataset_result = await structure.analyze(output_context)
+            analyzer = await self._importers[file_type](child_files)
+            data_structures.add(analyzer.data_set_type)
+            dataset_result = await analyzer.analyze(output_context)
             if not isinstance(dataset_result, StructuredDataSet):
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
             datasets[str(child_files)] = dataset_result
