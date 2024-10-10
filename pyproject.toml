@@ -60,6 +60,8 @@ exclude = ["test*"]
 
 [tool.isort]
 profile = 'black'
+skip = ['.conda']
+skip_gitignore = true
 
 [tool.black]
 line-length = 120
