@@ -24,7 +24,7 @@ class TextWriter(ABC):
     async def write(self, text: str) -> None: ...
 
 
-class TextFileWrite(TextWriter):
+class TextFileWriter(TextWriter):
     def __init__(self, io_wrapper: TextIOWrapper) -> None:
         self._wrapper = io_wrapper
 
@@ -67,7 +67,7 @@ class OutputLocalFilesContext(OutputContext):
     async def get_text_file(self, name: str):
         save_path = self._prepare_save_path(name, ".json")
         with open(save_path, "wt", encoding=self.text_encoding) as io_wrapper:
-            yield TextFileWrite(io_wrapper), PurePosixPath(save_path.relative_to(self.path))
+            yield TextFileWriter(io_wrapper), PurePosixPath(save_path.relative_to(self.path))
         self._logger.debug('Generated text file "%s"', save_path)
 
     @asynccontextmanager
