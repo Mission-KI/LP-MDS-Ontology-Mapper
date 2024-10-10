@@ -31,7 +31,26 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(self, path: Path, user_data: UserProvidedAssetData, output_context: OutputContext) -> None:
+    async def analyse_asset(
+        self, path: Path, user_data: UserProvidedAssetData, output_context: OutputContext
+    ) -> FileReference:
+        """Let the service analyse the given asset
+
+        Parameters
+        ----------
+        path : Path
+             Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
+        user_data : UserProvidedAssetData
+            The meta information about the asset supplied by the data space. These can not get calculated and must be supplied
+            by the user.
+        output_context : OutputContext
+            An instance of "OutputContext" child class. These determine, where and how the generated data gets stored.
+
+        Returns
+        -------
+        FileReference
+            File path or URL to the generated EDP.
+        """
         computed_data = await self._compute_asset(path, output_context)
         asset = Asset(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
