@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "argparse",
+    "boto3",
     "filetype",
     "fitter",
     "matplotlib",
@@ -31,9 +32,8 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
-    "boto3",
-    "requests",
     "seaborn",
+    "requests",
 ]
 
 [project.scripts]
@@ -41,6 +41,7 @@ export_edps_schema = "edp.types:export_edp_schema"
 
 [project.optional-dependencies]
 test = [
+    "boto3-stubs[boto3]",
     "pytest",
     "pytest-asyncio",
     "bandit",
@@ -49,7 +50,7 @@ test = [
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
-    "boto3-stubs[full]",
+    "types-seaborn",
     "types-requests",
 ]
 dev = ["edp[test]"]
