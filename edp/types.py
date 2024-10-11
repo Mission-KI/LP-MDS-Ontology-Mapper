@@ -142,7 +142,7 @@ class Publisher(BaseModel):
 class UserProvidedEdpData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
-    id: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
+    assetId: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
     name: str = Field(description="Name of the asset")
     url: str = Field(description="The URL via which the asset can be found in the published data room")
     dataCategory: str = Field(
@@ -152,7 +152,7 @@ class UserProvidedEdpData(BaseModel):
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
     publisher: Publisher = Field(description="Provider that placed the asset in the data room")
     publishDate: datetime = Field(description="Date on which this asset has been published")
-    licenseId: int = Field(
+    licenseId: str = Field(
         description="Identifier, which describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)",
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
