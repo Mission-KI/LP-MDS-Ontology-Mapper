@@ -8,6 +8,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
+from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
 from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
@@ -21,7 +22,7 @@ from pandas import (
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
-from seaborn import diverging_palette, heatmap
+from seaborn import heatmap
 
 from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
@@ -501,7 +502,6 @@ async def _get_correlation_graph(
         index=filtered_columns.columns,
     )
     mask = triu(ones_like(correlation, dtype=bool))
-    colormap = diverging_palette(230, 20, as_cmap=True)
     async with output_context.get_plot(plot_name) as (axes, reference):
         figure = axes.figure
         if isinstance(figure, Figure):
@@ -515,12 +515,12 @@ async def _get_correlation_graph(
             mask=mask,
             fmt=".2f",
             vmin=-1.0,
+            center=0.0,
             vmax=1.0,
-            center=0,
             square=True,
             linewidths=0.5,
             cbar_kws={"shrink": 0.5},
-            cmap=colormap,
+            cmap=get_cmap(),
             ax=axes,
         )
     logger.debug("Finished computing correlations")
