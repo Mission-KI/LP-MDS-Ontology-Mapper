@@ -67,3 +67,13 @@ async def test_analyse_pickle(output_context):
 async def test_analyse_csv(output_context, user_data):
     service = Service()
     await service.analyse_asset(CSV_PATH, user_data, output_context)
+
+
+@mark.asyncio
+async def test_raise_on_only_unknown_datasets(tmp_path, output_context, user_data):
+    service = Service()
+    file_path = tmp_path / "unsupported.txt"
+    with open(file_path, "wt", encoding="utf-8") as file:
+        file.write("This type is not supported")
+    with raises((RuntimeWarning, RuntimeError)):
+        await service.analyse_asset(tmp_path, user_data, output_context)
