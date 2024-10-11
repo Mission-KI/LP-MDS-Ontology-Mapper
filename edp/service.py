@@ -3,6 +3,7 @@ from logging import getLogger
 from pathlib import Path
 from shutil import rmtree
 from typing import AsyncIterator, Dict, List, Optional, Set
+from warnings import warn
 
 from pydantic import BaseModel
 
@@ -74,7 +75,10 @@ class Service:
             file_type = child_file.type
             extracted_size += child_file.size
             if not file_type in self._importers:
-                raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
+                text = f'Import for "{file_type}" not yet supported'
+                self._logger.warning(text)
+                warn(text, RuntimeWarning)
+                continue
             analyzer = await self._importers[file_type](child_file)
             data_structures.add(analyzer.data_set_type)
             dataset_result = await analyzer.analyze(output_context)
@@ -88,6 +92,8 @@ class Service:
         else:
             compression = Compression(algorithms=compressions, extractedSize=extracted_size)
 
+        if len(datasets) == 0:
+            raise RuntimeError("Was not able to analyze any datasets in this asset")
         return ComputedEdpData(
             volume=calculate_size(path),
             compression=compression,

@@ -9,12 +9,19 @@ from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
 
 from boto3 import resource as aws_resource
+from matplotlib import colormaps, use
 from matplotlib.axes import Axes
-from matplotlib.pyplot import subplots
+from matplotlib.colors import Colormap, LinearSegmentedColormap
+from matplotlib.pyplot import close as close_figure
+from matplotlib.pyplot import set_cmap, subplots
+from matplotlib.style import use as use_style
 from pydantic import HttpUrl
 from requests import post
+from seaborn import reset_orig
 
 from edp.types import FileReference
+
+DEFAULT_STYLE_PATH = Path(__file__).parent / "styles/plot.mplstyle"
 
 
 class TextWriter(ABC):
@@ -47,10 +54,26 @@ class OutputContext(ABC):
     def get_plot(self, name: str) -> AsyncIterator[Tuple[Axes, FileReference]]: ...
 
 
+def _get_default_colormap() -> Colormap:
+    BLUE = "#43ACFF"
+    PINK = "#FF3FFF"
+    # GRAY = "#D9D9D9"
+    colormap = LinearSegmentedColormap.from_list("daseen", [BLUE, PINK])
+    colormaps.register(colormap)
+    return colormap
+
+
 class OutputLocalFilesContext(OutputContext):
     """This supplies functions to generate output files and graphs."""
 
-    def __init__(self, path: Path, text_encoding: str = "utf-8") -> None:
+    def __init__(
+        self,
+        path: Path,
+        text_encoding: str = "utf-8",
+        matplotlib_backend: str = "AGG",
+        default_plot_format: str = "png",
+        colormap: Colormap = _get_default_colormap(),
+    ) -> None:
         self._logger = getLogger(__name__)
         if path.exists() and not path.is_dir():
             raise RuntimeError(f'Output path "{path}" must be a directory!')
@@ -59,6 +82,11 @@ class OutputLocalFilesContext(OutputContext):
             path.mkdir(parents=True)
         self.path = path
         self.text_encoding = text_encoding
+        use(matplotlib_backend)
+        self._default_plot_format = default_plot_format
+        reset_orig()
+        use_style(DEFAULT_STYLE_PATH)
+        set_cmap(colormap)
 
     def build_full_path(self, relative_path: PurePosixPath):
         return PurePosixPath(self.path / relative_path)
@@ -72,10 +100,11 @@ class OutputLocalFilesContext(OutputContext):
 
     @asynccontextmanager
     async def get_plot(self, name: str):
-        save_path = self._prepare_save_path(name, ".png")
+        save_path = self._prepare_save_path(name, "." + self._default_plot_format)
         figure, axes = subplots()
         yield axes, PurePosixPath(save_path.relative_to(self.path))
         figure.savefig(save_path)
+        close_figure(figure)
         self._logger.debug('Generated plot "%s"', save_path)
 
     def _prepare_save_path(self, name: str, suffix: str):

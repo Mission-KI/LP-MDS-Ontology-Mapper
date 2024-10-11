@@ -1,13 +1,16 @@
 from asyncio import get_running_loop
+from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
-from logging import getLogger
+from logging import Logger, getLogger
 from multiprocessing import cpu_count
-from typing import Dict, Hashable, Iterator, List, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
-from fitter import Fitter
+from fitter import Fitter, get_common_distributions
+from matplotlib.figure import Figure
+from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
-from numpy import count_nonzero, linspace
+from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -19,6 +22,7 @@ from pandas import (
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
+from seaborn import heatmap
 
 from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
@@ -37,113 +41,15 @@ from edp.types import (
 DATE_TIME_FORMAT = "ISO8601"
 
 
-def _default_distributions() -> List[str]:
-    return [
-        "anglit",
-        "arcsine",
-        "argus",
-        "beta",
-        "betaprime",
-        "bradford",
-        "burr",
-        "burr12",
-        "cauchy",
-        "chi",
-        "chi2",
-        "cosine",
-        "crystalball",
-        "dgamma",
-        "dweibull",
-        "erlang",
-        "expon",
-        "exponnorm",
-        "exponpow",
-        "exponweib",
-        "f",
-        "fatiguelife",
-        "fisk",
-        "foldcauchy",
-        "foldnorm",
-        "gamma",
-        "gausshyper",
-        "genexpon",
-        "genextreme",
-        "gengamma",
-        "genhalflogistic",
-        "geninvgauss",
-        "genlogistic",
-        "gennorm",
-        "genpareto",
-        "gompertz",
-        "gumbel_l",
-        "gumbel_r",
-        "halfcauchy",
-        "halfgennorm",
-        "halfnorm",
-        "hypsecant",
-        "invgamma",
-        "invgauss",
-        "invweibull",
-        "johnsonsb",
-        "johnsonsu",
-        "kappa3",
-        "kappa4",
-        "ksone",
-        "kstwobign",
-        "laplace",
-        "levy",
-        "levy_l",
-        "levy_stable",
-        "loggamma",
-        "logistic",
-        "loglaplace",
-        "lognorm",
-        "loguniform",
-        "lomax",
-        "maxwell",
-        "mielke",
-        "moyal",
-        "nakagami",
-        "ncf",
-        "nct",
-        "ncx2",
-        "norm",
-        "norminvgauss",
-        "pareto",
-        "pearson3",
-        "powerlaw",
-        "powerlognorm",
-        "powernorm",
-        "rayleigh",
-        "rdist",
-        "recipinvgauss",
-        "reciprocal",
-        "rice",
-        "semicircular",
-        "skewnorm",
-        "t",
-        "trapz",
-        "triang",
-        "truncexpon",
-        "truncnorm",
-        "tukeylambda",
-        "uniform",
-        "vonmises",
-        "vonmises_line",
-        "wald",
-        "weibull_max",
-        "weibull_min",
-        "wrapcauchy",
-    ]
-
-
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(minutes=1), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
     bins: int = Field(default=100, description="Number of bins to use for the fitting")
-    distributions: List[str] = Field(default_factory=_default_distributions, description="Distributions to try to fit")
+    distributions: List[str] = Field(
+        default_factory=get_common_distributions, description="Distributions to try to fit"
+    )
 
 
 class _ColumnType(str, Enum):
@@ -215,9 +121,9 @@ class Pandas(Analyzer):
         columns_by_type = await self._determine_types()
         common_fields = await self._compute_common_fields()
 
-        numeric_column_ids = columns_by_type[_ColumnType.Numeric]
-        numeric_columns = self._data[numeric_column_ids]
-        numeric_common_fields = common_fields.loc[numeric_column_ids]
+        numeric_ids = columns_by_type[_ColumnType.Numeric]
+        numeric_columns = self._data[numeric_ids]
+        numeric_common_fields = common_fields.loc[numeric_ids]
         numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
@@ -235,22 +141,35 @@ class Pandas(Analyzer):
             await self._transform_numeric_results(
                 numeric_columns[name], _get_single_row(name, numeric_fields), output_context
             )
-            for name in numeric_column_ids
+            for name in numeric_ids
         ]
         transformed_datetime_columns = [
             await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
-            for name in columns_by_type[_ColumnType.DateTime]
+            for name in datetime_ids
         ]
         transformed_string_columns = [
             await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
-            for name in columns_by_type[_ColumnType.String]
+            for name in string_ids
         ]
+
+        correlation_ids = numeric_ids
+        correlation_columns = self._data[correlation_ids]
+        correlation_fields = common_fields.loc[correlation_ids]
+        correlation_graph = await _get_correlation_graph(
+            self._logger,
+            self._file.output_reference + "_correlations",
+            correlation_columns,
+            correlation_fields,
+            output_context,
+        )
+
         return StructuredDataSet(
             name=self._file.output_reference,
             rowCount=row_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
+            correlationGraph=correlation_graph,
         )
 
     async def _compute_common_fields(self) -> DataFrame:
@@ -291,10 +210,14 @@ class Pandas(Analyzer):
         fields.loc[fields[_NUMERIC_LOWER_IQR] < fields[_NUMERIC_MIN], _NUMERIC_LOWER_DIST] = fields[_NUMERIC_MIN]
         fields[_NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_IQR]
         fields.loc[fields[_NUMERIC_UPPER_IQR] > fields[_NUMERIC_MAX], _NUMERIC_UPPER_DIST] = fields[_NUMERIC_MAX]
+        upper_equals_lower = fields[_NUMERIC_LOWER_DIST] == fields[_NUMERIC_UPPER_DIST]
+        fields.loc[upper_equals_lower, _NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_DIST] * 0.9
+        fields.loc[upper_equals_lower, _NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_DIST] * 1.1
         fields = concat(
             [
                 fields,
                 await _get_distributions(
+                    self._logger,
                     columns,
                     concat([common_fields, fields], axis=1),
                     self._fitting_config,
@@ -435,29 +358,6 @@ async def _generate_box_plot(plot_name: str, column: Series, output_context: Out
     return reference
 
 
-async def _find_best_distribution(
-    column: Series, config: FittingConfig, column_fields: Series, workers: int
-) -> Tuple[str, dict]:
-    loop = get_running_loop()
-    fitter = Fitter(
-        column,
-        xmin=column_fields[_NUMERIC_LOWER_DIST],
-        xmax=column_fields[_NUMERIC_UPPER_DIST],
-        timeout=config.timeout.total_seconds(),
-        bins=config.bins,
-        distributions=config.distributions,
-    )
-
-    def runner():
-        return fitter.fit(max_workers=workers)
-
-    await loop.run_in_executor(None, runner)
-    # According to documentation, this ony ever contains one entry.
-    best_distribution_dict = fitter.get_best(method=config.error_function)
-    distribution_name, parameters = next(iter(best_distribution_dict.items()))
-    return str(distribution_name), parameters
-
-
 def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) -> Series:
     # TODO: Vectorize this!
     return Series({name: _get_temporal_consistencies_for_column(column, intervals) for name, column in columns.items()})
@@ -500,16 +400,23 @@ def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -
 
 
 async def _get_distributions(
-    columns: DataFrame, fields: DataFrame, config: FittingConfig, distribution_threshold: int, workers: int
+    logger: Logger,
+    columns: DataFrame,
+    fields: DataFrame,
+    config: FittingConfig,
+    distribution_threshold: int,
+    workers: int,
 ) -> DataFrame:
-
-    values = [
-        await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
-        for name, column in columns.items()
-    ]
+    distributions: List[Tuple[str, Dict]] = []
+    for index, values in enumerate(columns.items(), start=1):
+        name, column = values
+        distributions.append(
+            await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
+        )
+        logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
     data_frame = DataFrame(
-        values,
+        distributions,
         index=columns.columns,
         columns=[_NUMERIC_DISTRIBUTION, _NUMERIC_DISTRIBUTION_PARAMETERS],
     )
@@ -526,6 +433,29 @@ async def _get_distribution(
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(column, config, fields, workers)
+
+
+async def _find_best_distribution(
+    column: Series, config: FittingConfig, column_fields: Series, workers: int
+) -> Tuple[str, dict]:
+    loop = get_running_loop()
+    fitter = Fitter(
+        column,
+        xmin=column_fields[_NUMERIC_LOWER_DIST],
+        xmax=column_fields[_NUMERIC_UPPER_DIST],
+        timeout=config.timeout.total_seconds(),
+        bins=config.bins,
+        distributions=config.distributions,
+    )
+
+    def runner():
+        return fitter.fit(max_workers=workers)
+
+    await loop.run_in_executor(None, runner)
+    # According to documentation, this ony ever contains one entry.
+    best_distribution_dict = fitter.get_best(method=config.error_function)
+    distribution_name, parameters = next(iter(best_distribution_dict.items()))
+    return str(distribution_name), parameters
 
 
 async def _plot_distribution(
@@ -555,6 +485,46 @@ async def _plot_distribution(
 def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
     """This is mostly a convenience wrapper due to poor pandas stubs."""
     return data_frame.loc[str(row_name)]  # type: ignore
+
+
+async def _get_correlation_graph(
+    logger: Logger, plot_name: str, columns: DataFrame, fields: DataFrame, output_context: OutputContext
+) -> Optional[FileReference]:
+    filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
+    if len(filtered_column_names) < 2:
+        return None
+    filtered_columns = columns[filtered_column_names]
+    logger.debug("Computing correlation between columns %s", filtered_columns.columns)
+    correlation_matrix = corrcoef(filtered_columns.values, rowvar=False)
+    correlation = DataFrame(
+        correlation_matrix,
+        columns=filtered_columns.columns,
+        index=filtered_columns.columns,
+    )
+    mask = triu(ones_like(correlation, dtype=bool))
+    async with output_context.get_plot(plot_name) as (axes, reference):
+        figure = axes.figure
+        if isinstance(figure, Figure):
+            width_offset = 3
+            height_offset = 3
+            figure_size = (correlation.shape[0] + width_offset, correlation.shape[1] + height_offset)
+            figure.set_size_inches(figure_size)
+        heatmap(
+            correlation,
+            annot=True,
+            mask=mask,
+            fmt=".2f",
+            vmin=-1.0,
+            center=0.0,
+            vmax=1.0,
+            square=True,
+            linewidths=0.5,
+            cbar_kws={"shrink": 0.5},
+            cmap=get_cmap(),
+            ax=axes,
+        )
+    logger.debug("Finished computing correlations")
+    return reference
 
 
 def infer_type_and_convert(column: Series) -> Series:

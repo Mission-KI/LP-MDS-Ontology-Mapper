@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edp"
-version = "0.5.0"
+version = "0.6.0"
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
     { name = "Daniel Eckstein", email = "de@beebucket.de" },
@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "argparse",
+    "boto3",
     "filetype",
     "fitter",
     "matplotlib",
@@ -31,7 +32,7 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
-    "boto3",
+    "seaborn",
     "requests",
 ]
 
@@ -40,6 +41,7 @@ export_edps_schema = "edp.types:export_edp_schema"
 
 [project.optional-dependencies]
 test = [
+    "boto3-stubs[boto3]",
     "pytest",
     "pytest-asyncio",
     "bandit",
@@ -48,7 +50,7 @@ test = [
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
-    "boto3-stubs[full]",
+    "types-seaborn",
     "types-requests",
 ]
 dev = ["edp[test]"]
@@ -68,10 +70,13 @@ line-length = 120
 
 [tool.pytest.ini_options]
 log_cli = true
-log_cli_level = "WARNING"
-addopts = "-W error"
+log_cli_level = "INFO"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+filterwarnings = [
+    "error",
+    "ignore::matplotlib._api.deprecation.MatplotlibDeprecationWarning",
+]
 
 [tool.bandit]
 exclude_dirs = ['tests']
