@@ -1,11 +1,12 @@
 from asyncio import get_running_loop
+from csv import Sniffer
 from logging import getLogger
 
 from pandas import read_csv
 
 from edp.analyzers.pandas import Pandas
 from edp.file import File
-from csv import Sniffer
+
 
 async def csv(file: File):
     logger = getLogger("CSV Importer")
@@ -16,6 +17,7 @@ async def csv(file: File):
         csv_snippet = open_file.read(5000)
 
     dialect = sniffer.sniff(csv_snippet)
+
     def runner():
         return read_csv(file.path.absolute(), sep=dialect.delimiter)
 

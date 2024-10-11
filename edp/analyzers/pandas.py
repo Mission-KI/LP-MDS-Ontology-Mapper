@@ -463,9 +463,7 @@ def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) 
     return Series({name: _get_temporal_consistencies_for_column(column, intervals) for name, column in columns.items()})
 
 
-def _get_temporal_consistencies_for_column(
-    column: Series, intervals: List[timedelta]
-) -> List[TemporalConsistency]:
+def _get_temporal_consistencies_for_column(column: Series, intervals: List[timedelta]) -> List[TemporalConsistency]:
     column.index = DatetimeIndex(column)
     return [_get_temporal_consistency(column, interval) for interval in intervals]
 
@@ -484,7 +482,8 @@ def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalCo
 
 def _get_gaps(columns: DataFrame, intervals: List[timedelta]) -> Series:
     # TODO: Vectorize!
-    return Series([_get_gaps_per_column(column, intervals) for name, column in columns.items()])
+    gaps = [list(_get_gaps_per_column(column, intervals)) for _, column in columns.items()]
+    return Series(gaps, index=columns.columns)
 
 
 def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Iterator[Gap]:
@@ -492,7 +491,8 @@ def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Iterator
     for interval in intervals:
         over_interval_size = deltas > to_timedelta(interval)
         gap_count = count_nonzero(over_interval_size)
-        yield Gap(timeScale=over_interval_size, numberOfGaps=gap_count)
+        yield Gap(timeScale=interval, numberOfGaps=gap_count)
+
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
     is_outlier = (column < lower_limit) | (column > upper_limit)

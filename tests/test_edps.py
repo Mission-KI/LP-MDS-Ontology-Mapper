@@ -46,12 +46,18 @@ async def test_analyse_pickle(output_context):
     service = Service()
     computed_data = await service._compute_asset(PICKLE_PATH, output_context)
     assert len(computed_data.structuredDatasets) == 1
-    assert len(computed_data.structuredDatasets["test.pickle"].datetimeColumns) == 2
-    assert len(computed_data.structuredDatasets["test.pickle"].numericColumns) == 2
-    assert len(computed_data.structuredDatasets["test.pickle"].stringColumns) == 1
-    dataset = computed_data.structuredDatasets["test.pickle"]
-    assert dataset.numericColumns["aufenthalt"].dataType == "uint32"
-    assert dataset.numericColumns["parkhaus"].dataType == "uint8"
+
+    dataset = computed_data.structuredDatasets[0]
+    assert len(dataset.datetimeColumns) == 2
+    assert len(dataset.numericColumns) == 2
+    assert len(dataset.stringColumns) == 1
+
+    aufenthalt = next(item for item in dataset.numericColumns if item.name == "aufenthalt")
+    assert aufenthalt.dataType == "uint32"
+
+    parkhaus = next(item for item in dataset.numericColumns if item.name == "parkhaus")
+    assert parkhaus.dataType == "uint8"
+
     assert len(computed_data.dataTypes) == 1
     assert DataSetType.structured in computed_data.dataTypes
 

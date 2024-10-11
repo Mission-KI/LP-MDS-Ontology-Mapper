@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
 from shutil import rmtree
-from typing import AsyncIterator, Dict, Optional, Set
+from typing import AsyncIterator, Dict, List, Optional, Set
 
 from pydantic import BaseModel
 

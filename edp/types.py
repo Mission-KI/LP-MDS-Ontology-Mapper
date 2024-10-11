@@ -68,9 +68,11 @@ Numeric = Union[int, float, timedelta, complex]
 FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
+
 class Gap(BaseModel):
     timeScale: timedelta = Field(description="Timescale for which gaps are given")
-    numberOfGaps: int  = Field(description="Number of gaps at the given timescale")
+    numberOfGaps: int = Field(description="Number of gaps at the given timescale")
+
 
 class _BaseColumn(BaseModel):
     name: str = Field(description="Name of the column")
@@ -115,9 +117,7 @@ class DateTimeColumn(_BaseColumn):
     monotonically_increasing: bool
     monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
-    temporalConsistencies: List[TemporalConsistency] = Field(
-        description="Temporal consistency at given timescale"
-    )
+    temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
     gaps: List[Gap] = Field(description="Number of gaps at given timescale")
 
 
