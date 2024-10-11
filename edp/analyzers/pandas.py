@@ -6,7 +6,7 @@ from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from fitter import Fitter
+from fitter import Fitter, get_common_distributions
 from numpy import any as numpy_any
 from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
@@ -39,113 +39,15 @@ from edp.types import (
 DATE_TIME_FORMAT = "ISO8601"
 
 
-def _default_distributions() -> List[str]:
-    return [
-        "anglit",
-        "arcsine",
-        "argus",
-        "beta",
-        "betaprime",
-        "bradford",
-        "burr",
-        "burr12",
-        "cauchy",
-        "chi",
-        "chi2",
-        "cosine",
-        "crystalball",
-        "dgamma",
-        "dweibull",
-        "erlang",
-        "expon",
-        "exponnorm",
-        "exponpow",
-        "exponweib",
-        "f",
-        "fatiguelife",
-        "fisk",
-        "foldcauchy",
-        "foldnorm",
-        "gamma",
-        "gausshyper",
-        "genexpon",
-        "genextreme",
-        "gengamma",
-        "genhalflogistic",
-        "geninvgauss",
-        "genlogistic",
-        "gennorm",
-        "genpareto",
-        "gompertz",
-        "gumbel_l",
-        "gumbel_r",
-        "halfcauchy",
-        "halfgennorm",
-        "halfnorm",
-        "hypsecant",
-        "invgamma",
-        "invgauss",
-        "invweibull",
-        "johnsonsb",
-        "johnsonsu",
-        "kappa3",
-        "kappa4",
-        "ksone",
-        "kstwobign",
-        "laplace",
-        "levy",
-        "levy_l",
-        "levy_stable",
-        "loggamma",
-        "logistic",
-        "loglaplace",
-        "lognorm",
-        "loguniform",
-        "lomax",
-        "maxwell",
-        "mielke",
-        "moyal",
-        "nakagami",
-        "ncf",
-        "nct",
-        "ncx2",
-        "norm",
-        "norminvgauss",
-        "pareto",
-        "pearson3",
-        "powerlaw",
-        "powerlognorm",
-        "powernorm",
-        "rayleigh",
-        "rdist",
-        "recipinvgauss",
-        "reciprocal",
-        "rice",
-        "semicircular",
-        "skewnorm",
-        "t",
-        "trapz",
-        "triang",
-        "truncexpon",
-        "truncnorm",
-        "tukeylambda",
-        "uniform",
-        "vonmises",
-        "vonmises_line",
-        "wald",
-        "weibull_max",
-        "weibull_min",
-        "wrapcauchy",
-    ]
-
-
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(minutes=1), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
     bins: int = Field(default=100, description="Number of bins to use for the fitting")
-    distributions: List[str] = Field(default_factory=_default_distributions, description="Distributions to try to fit")
+    distributions: List[str] = Field(
+        default_factory=get_common_distributions, description="Distributions to try to fit"
+    )
 
 
 class _ColumnType(str, Enum):
@@ -310,6 +212,7 @@ class Pandas(Analyzer):
             [
                 fields,
                 await _get_distributions(
+                    self._logger,
                     columns,
                     concat([common_fields, fields], axis=1),
                     self._fitting_config,
@@ -515,16 +418,23 @@ def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -
 
 
 async def _get_distributions(
-    columns: DataFrame, fields: DataFrame, config: FittingConfig, distribution_threshold: int, workers: int
+    logger: Logger,
+    columns: DataFrame,
+    fields: DataFrame,
+    config: FittingConfig,
+    distribution_threshold: int,
+    workers: int,
 ) -> DataFrame:
-
-    values = [
-        await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
-        for name, column in columns.items()
-    ]
+    distributions: List[Tuple[str, Dict]] = []
+    for index, values in enumerate(columns.items(), start=1):
+        name, column = values
+        distributions.append(
+            await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
+        )
+        logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
     data_frame = DataFrame(
-        values,
+        distributions,
         index=columns.columns,
         columns=[_NUMERIC_DISTRIBUTION, _NUMERIC_DISTRIBUTION_PARAMETERS],
     )
