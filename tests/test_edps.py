@@ -27,7 +27,7 @@ def user_data():
         dataCategory="TestDataCategory",
         dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
         publisher=Publisher(id="0815-1234", name="beebucket"),
-        licenseId="",
+        licenseId="my-very-own-license-id",
         description="Our very first test edp",
         publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
         version="2.3.1",
