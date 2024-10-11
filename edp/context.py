@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from boto3 import resource as aws_resource
 from matplotlib import use
 from matplotlib.axes import Axes
+from matplotlib.pyplot import close as close_figure
 from matplotlib.pyplot import subplots
 from pydantic import HttpUrl
 from requests import post
@@ -85,6 +86,7 @@ class OutputLocalFilesContext(OutputContext):
         figure, axes = subplots()
         yield axes, PurePosixPath(save_path.relative_to(self.path))
         figure.savefig(save_path)
+        close_figure(figure)
         self._logger.debug('Generated plot "%s"', save_path)
 
     def _prepare_save_path(self, name: str, suffix: str):
