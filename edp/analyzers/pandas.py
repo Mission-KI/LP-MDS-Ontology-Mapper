@@ -2,13 +2,13 @@ from asyncio import get_running_loop
 from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
-from logging import getLogger
+from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
-from numpy import count_nonzero, linspace, ones_like, triu
+from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -248,11 +248,15 @@ class Pandas(Analyzer):
             for name in string_ids
         ]
 
-        correlation_ids = numeric_ids + datetime_ids
+        correlation_ids = numeric_ids
         correlation_columns = self._data[correlation_ids]
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
-            self._file.output_reference + "_correlations", correlation_columns, correlation_fields, output_context
+            self._logger,
+            self._file.output_reference + "_correlations",
+            correlation_columns,
+            correlation_fields,
+            output_context,
         )
 
         return StructuredDataSet(
@@ -569,11 +573,19 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
 
 
 async def _get_correlation_graph(
-    plot_name: str, columns: DataFrame, fields: DataFrame, output_context: OutputContext
+    logger: Logger, plot_name: str, columns: DataFrame, fields: DataFrame, output_context: OutputContext
 ) -> Optional[FileReference]:
-    filtered_column_names = (fields[_COMMON_UNIQUE] > 1).index
+    filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
+    if len(filtered_column_names) < 2:
+        return None
     filtered_columns = columns[filtered_column_names]
-    correlation = filtered_columns.corr(numeric_only=False)
+    logger.debug("Computing correlation between columns %s", filtered_columns.columns)
+    correlation_matrix = corrcoef(filtered_columns.values, rowvar=False)
+    correlation = DataFrame(
+        correlation_matrix,
+        columns=filtered_columns.columns,
+        index=filtered_columns.columns,
+    )
     mask = triu(ones_like(correlation, dtype=bool))
     colormap = diverging_palette(230, 20, as_cmap=True)
     async with output_context.get_plot(plot_name) as (axes, reference):
@@ -582,7 +594,8 @@ async def _get_correlation_graph(
             annot=True,
             mask=mask,
             fmt=".2f",
-            vmax=0.3,
+            vmin=-1.0,
+            vmax=1.0,
             center=0,
             square=True,
             linewidths=0.5,
@@ -590,6 +603,7 @@ async def _get_correlation_graph(
             cmap=colormap,
             ax=axes,
         )
+    logger.debug("Finished computing correlations")
     return reference
 
 

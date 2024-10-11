@@ -5,18 +5,12 @@ from pydantic import HttpUrl
 from pytest import fixture, mark, raises
 
 from edp import Service
-from edp.context import OutputLocalFilesContext
 from edp.types import DataSetType, DataSpace, Publisher, UserProvidedEdpData
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
 CSV_PATH = DIR / "data/test.csv"
 PICKLE_PATH = DIR / "data/test.pickle"
-
-
-@fixture
-def output_context(output_directory):
-    return OutputLocalFilesContext(output_directory)
 
 
 @fixture
