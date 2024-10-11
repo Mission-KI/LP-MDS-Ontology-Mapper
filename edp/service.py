@@ -66,21 +66,21 @@ class Service:
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
         extracted_size = 0
-        datasets: Dict[str, StructuredDataSet] = {}
+        datasets: List[StructuredDataSet] = []
         data_structures: Set[DataSetType] = set()
         base_path = path if path.is_dir() else path.parent
 
-        async for child_files in self._walk_all_files(base_path, path, compressions):
-            file_type = child_files.type
-            extracted_size += child_files.size
+        async for child_file in self._walk_all_files(base_path, path, compressions):
+            file_type = child_file.type
+            extracted_size += child_file.size
             if not file_type in self._importers:
                 raise NotImplementedError(f'Import for "{file_type}" not yet implemented')
-            analyzer = await self._importers[file_type](child_files)
+            analyzer = await self._importers[file_type](child_file)
             data_structures.add(analyzer.data_set_type)
             dataset_result = await analyzer.analyze(output_context)
             if not isinstance(dataset_result, StructuredDataSet):
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
-            datasets[str(child_files)] = dataset_result
+            datasets.append(dataset_result)
 
         compression: Optional[Compression]
         if len(compressions) == 0:

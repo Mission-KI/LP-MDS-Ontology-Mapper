@@ -57,6 +57,7 @@ class DataSetCompression(str, Enum):
 
 
 class TemporalConsistency(BaseModel):
+    timeScale: timedelta
     stable: bool
     differentAbundancies: int
     abundances: List
@@ -67,8 +68,12 @@ Numeric = Union[int, float, timedelta, complex]
 FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
+class Gap(BaseModel):
+    timeScale: timedelta = Field(description="Timescale for which gaps are given")
+    numberOfGaps: int  = Field(description="Number of gaps at the given timescale")
 
 class _BaseColumn(BaseModel):
+    name: str = Field(description="Name of the column")
     nonNullCount: int = Field(description="Number of non empty entries in the column")
     nullCount: int = Field(description="Number of empty entries in the column")
     numberUnique: int = Field(description="Number of unique values")
@@ -110,10 +115,10 @@ class DateTimeColumn(_BaseColumn):
     monotonically_increasing: bool
     monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
-    temporalConsistencies: Dict[timedelta, TemporalConsistency] = Field(
+    temporalConsistencies: List[TemporalConsistency] = Field(
         description="Temporal consistency at given timescale"
     )
-    gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
+    gaps: List[Gap] = Field(description="Number of gaps at given timescale")
 
 
 class StringColumn(_BaseColumn):
@@ -121,15 +126,16 @@ class StringColumn(_BaseColumn):
 
 
 class StructuredDataSet(BaseModel):
+    name: str = Field(description="Name of the structured dataset")
     rowCount: int = Field(
         description="Number of row",
     )
     correlationGraph: Optional[FileReference] = Field(
         default=None, description="Reference to a correlation graph of the data columns"
     )
-    numericColumns: Dict[str, NumericColumn] = Field(description="Numeric columns in this dataset")
-    datetimeColumns: Dict[str, DateTimeColumn] = Field(description="Datetime columns in this dataset")
-    stringColumns: Dict[str, StringColumn] = Field(
+    numericColumns: List[NumericColumn] = Field(description="Numeric columns in this dataset")
+    datetimeColumns: List[DateTimeColumn] = Field(description="Datetime columns in this dataset")
+    stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
 
@@ -191,8 +197,8 @@ class ComputedEdpData(BaseModel):
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
 
-    structuredDatasets: Dict[str, StructuredDataSet] = Field(
-        default_factory=dict,
+    structuredDatasets: List[StructuredDataSet] = Field(
+        default_factory=list,
         description="Metadata for all datasets (files) detected to be structured (tables)",
     )
 

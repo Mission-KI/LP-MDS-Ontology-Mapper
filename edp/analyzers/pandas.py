@@ -3,7 +3,7 @@ from datetime import timedelta
 from enum import Enum
 from logging import getLogger
 from multiprocessing import cpu_count
-from typing import Dict, Hashable, List, Tuple
+from typing import Dict, Hashable, Iterator, List, Tuple
 
 from fitter import Fitter
 from numpy import any as numpy_any
@@ -27,6 +27,7 @@ from edp.types import (
     DataSetType,
     DateTimeColumn,
     FileReference,
+    Gap,
     NumericColumn,
     StringColumn,
     StructuredDataSet,
@@ -230,21 +231,22 @@ class Pandas(Analyzer):
         string_columns = self._data[string_ids]
         string_fields = common_fields.loc[string_ids]
 
-        transformed_numeric_columns = {
-            name: await self._transform_numeric_results(
+        transformed_numeric_columns = [
+            await self._transform_numeric_results(
                 numeric_columns[name], _get_single_row(name, numeric_fields), output_context
             )
             for name in numeric_column_ids
-        }
-        transformed_datetime_columns = {
-            name: await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
+        ]
+        transformed_datetime_columns = [
+            await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
             for name in columns_by_type[_ColumnType.DateTime]
-        }
-        transformed_string_columns = {
-            name: await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
+        ]
+        transformed_string_columns = [
+            await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
             for name in columns_by_type[_ColumnType.String]
-        }
+        ]
         return StructuredDataSet(
+            name=self._file.output_reference,
             rowCount=row_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,
@@ -359,6 +361,7 @@ class Pandas(Analyzer):
         column_plot_base = self._file.output_reference + "_" + str(object=column.name)
         box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
         column_result = NumericColumn(
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -402,6 +405,7 @@ class Pandas(Analyzer):
         self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
 
         return DateTimeColumn(
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -417,6 +421,7 @@ class Pandas(Analyzer):
     async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
         self._logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -460,9 +465,9 @@ def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) 
 
 def _get_temporal_consistencies_for_column(
     column: Series, intervals: List[timedelta]
-) -> Dict[timedelta, TemporalConsistency]:
+) -> List[TemporalConsistency]:
     column.index = DatetimeIndex(column)
-    return {interval: _get_temporal_consistency(column, interval) for interval in intervals}
+    return [_get_temporal_consistency(column, interval) for interval in intervals]
 
 
 def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
@@ -470,6 +475,7 @@ def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalCo
     abundances = column.resample(interval).count().unique()
     different_abundances = len(abundances)
     return TemporalConsistency(
+        timeScale=interval,
         stable=(different_abundances == 1),
         differentAbundancies=different_abundances,
         abundances=abundances.tolist(),
@@ -478,17 +484,15 @@ def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalCo
 
 def _get_gaps(columns: DataFrame, intervals: List[timedelta]) -> Series:
     # TODO: Vectorize!
-    return Series({name: _get_gaps_per_column(column, intervals) for name, column in columns.items()})
+    return Series([_get_gaps_per_column(column, intervals) for name, column in columns.items()])
 
 
-def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Dict[timedelta, int]:
+def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Iterator[Gap]:
     deltas = column.sort_values().diff()
-    gaps: Dict[timedelta, int] = dict()
     for interval in intervals:
         over_interval_size = deltas > to_timedelta(interval)
-        gaps[interval] = count_nonzero(over_interval_size)
-    return gaps
-
+        gap_count = count_nonzero(over_interval_size)
+        yield Gap(timeScale=over_interval_size, numberOfGaps=gap_count)
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
     is_outlier = (column < lower_limit) | (column > upper_limit)
