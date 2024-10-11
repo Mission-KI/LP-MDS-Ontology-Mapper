@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import HttpUrl
 from pytest import fixture, mark, raises
 
 from edp import Service
