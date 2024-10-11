@@ -7,6 +7,7 @@ from multiprocessing import cpu_count
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from fitter import Fitter, get_common_distributions
+from matplotlib.figure import Figure
 from numpy import any as numpy_any
 from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
@@ -502,6 +503,12 @@ async def _get_correlation_graph(
     mask = triu(ones_like(correlation, dtype=bool))
     colormap = diverging_palette(230, 20, as_cmap=True)
     async with output_context.get_plot(plot_name) as (axes, reference):
+        figure = axes.figure
+        if isinstance(figure, Figure):
+            width_offset = 3
+            height_offset = 3
+            figure_size = (correlation.shape[0] + width_offset, correlation.shape[1] + height_offset)
+            figure.set_size_inches(figure_size)
         heatmap(
             correlation,
             annot=True,
