@@ -1,19 +1,23 @@
 from asyncio import get_running_loop
 from collections.abc import Hashable
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import AsyncIterator, Dict, Iterator, List, Optional, Tuple
+from warnings import warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
 from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
+from numpy.typing import ArrayLike
 from pandas import (
     DataFrame,
     DatetimeIndex,
+    Period,
     Series,
     concat,
     to_datetime,
@@ -23,6 +27,7 @@ from pandas import (
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
 from seaborn import heatmap
+from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edp.analyzers.base import Analyzer
 from edp.context import OutputContext
@@ -85,6 +90,7 @@ _NUMERIC_IQR = "inter-quartile-range"
 _NUMERIC_IQR_OUTLIERS = "iqr-outlier-count"
 _NUMERIC_DISTRIBUTION = "distribution"
 _NUMERIC_DISTRIBUTION_PARAMETERS = "distribution-parameters"
+_NUMERIC_SEASONALITY = "seasonality"
 
 _DATETIME_EARLIEST = "earliest"
 _DATETIME_LATEST = "latest"
@@ -110,6 +116,13 @@ class Pandas(Analyzer):
         self._max_elements_per_column = 100000
         self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
         self._computed_data = DataFrame(index=self._data.columns)
+        self._intervals = [
+            timedelta(seconds=1),
+            timedelta(minutes=1),
+            timedelta(hours=1),
+            timedelta(days=1),
+            timedelta(weeks=1),
+        ]
 
     @property
     def data_set_type(self):
@@ -121,17 +134,21 @@ class Pandas(Analyzer):
         columns_by_type = await self._determine_types()
         common_fields = await self._compute_common_fields()
 
-        numeric_ids = columns_by_type[_ColumnType.Numeric]
-        numeric_columns = self._data[numeric_ids]
-        numeric_common_fields = common_fields.loc[numeric_ids]
-        numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
-        numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
-
         datetime_ids = columns_by_type[_ColumnType.DateTime]
-        datetime_columns = self._data[datetime_ids]
+        datetime_columns = self._data.loc[:, datetime_ids]
         datetime_common_fields = common_fields.loc[datetime_ids]
         datetime_fields = await self._compute_datetime_fields(datetime_columns)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
+        datetime_index = await _determine_datetime_index(self._logger, datetime_columns)
+        if datetime_index is not None:
+            self._logger.info('Using "%s" as index', datetime_index.name)
+            self._data.set_index(datetime_index, inplace=True)
+
+        numeric_ids = columns_by_type[_ColumnType.Numeric]
+        numeric_columns = self._data.loc[:, numeric_ids]
+        numeric_common_fields = common_fields.loc[numeric_ids]
+        numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
+        numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
         string_ids = columns_by_type[_ColumnType.String]
         string_columns = self._data[string_ids]
@@ -153,7 +170,7 @@ class Pandas(Analyzer):
         ]
 
         correlation_ids = numeric_ids
-        correlation_columns = self._data[correlation_ids]
+        correlation_columns = self._data.loc[:, correlation_ids]
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
             self._logger,
@@ -231,16 +248,11 @@ class Pandas(Analyzer):
             ],
             axis=1,
         )
+        if isinstance(columns.index, DatetimeIndex):
+            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(self._logger, columns)
         return fields
 
     async def _compute_datetime_fields(self, columns: DataFrame) -> DataFrame:
-        INTERVALS = [
-            timedelta(seconds=1),
-            timedelta(minutes=1),
-            timedelta(hours=1),
-            timedelta(days=1),
-            timedelta(weeks=1),
-        ]
         computed = DataFrame(index=columns.columns)
         computed[_DATETIME_EARLIEST] = columns.min()
         computed[_DATETIME_LATEST] = columns.max()
@@ -252,8 +264,8 @@ class Pandas(Analyzer):
         computed[_DATETIME_MONOTONIC_DECREASING] = Series(
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
-        computed[_DATETIME_TEMPORAL_CONSISTENCY] = _get_temporal_consistencies(columns, INTERVALS)
-        computed[_DATETIME_GAPS] = _get_gaps(columns, INTERVALS)
+        computed[_DATETIME_TEMPORAL_CONSISTENCY] = _get_temporal_consistencies(columns, self._intervals)
+        computed[_DATETIME_GAPS] = _get_gaps(columns, self._intervals)
         return computed
 
     async def _determine_types(self) -> Dict[_ColumnType, List[str]]:
@@ -326,6 +338,15 @@ class Pandas(Analyzer):
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
                 output_context,
             )
+        if _NUMERIC_SEASONALITY in computed_fields.index:
+            column_result.seasonalityGraphs = [
+                graph
+                async for graph in _plot_seasonality(
+                    column_plot_base + "_seasonality",
+                    computed_fields[_NUMERIC_SEASONALITY],
+                    output_context,
+                )
+            ]
         return column_result
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
@@ -529,6 +550,118 @@ async def _get_correlation_graph(
         )
     logger.debug("Finished computing correlations")
     return reference
+
+
+async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optional[DatetimeIndex]:
+    frequency = "infer"
+    number_columns = len(columns.columns)
+    if number_columns == 0:
+        return None
+
+    if number_columns == 1:
+        return DatetimeIndex(data=columns.iloc[:, 0], freq=frequency)
+
+    for _, column in columns.items():
+        if column.is_monotonic_increasing:
+            return DatetimeIndex(data=column, freq=frequency)
+
+    for _, column in columns.items():
+        if column.is_monotonic_decreasing:
+            return DatetimeIndex(data=column, freq=frequency)
+
+    first_column = columns.iloc[:, 0]
+    warning_text = f'Did not find a monotonic datetime column, will use "{first_column.name}" as index'
+    logger.warning(warning_text)
+    warn(warning_text, RuntimeWarning)
+    return DatetimeIndex(data=first_column, freq=frequency)
+
+
+async def _get_seasonalities(logger: Logger, columns: DataFrame) -> Series:
+    row_count = len(columns.index)
+    logger.info("Starting seasonality analysis on %d rows", row_count)
+    prepared_columns: DataFrame = columns.sort_index(ascending=True)
+
+    # Remove null entries in datetime index
+    prepared_columns = prepared_columns[prepared_columns.index.notnull()]  # type: ignore
+    new_count = len(prepared_columns.index)
+    if new_count < row_count:
+        empty_index_count = row_count - new_count
+        message = f"Filtered out {empty_index_count} rows, because their index was empty"
+        logger.warning(message)
+        warn(message)
+        row_count = new_count
+
+    # Drop duplicate index rows
+    prepared_columns = prepared_columns[~prepared_columns.index.duplicated(keep="first")]
+    new_count = len(prepared_columns.index)
+    if new_count < row_count:
+        duplicate_count = row_count - new_count
+        message = f"Filtered out {duplicate_count} rows with duplicate index"
+        logger.warning(message)
+        warn(message)
+        row_count = new_count
+
+    deltas = prepared_columns.index.to_series().dt
+    periods = ["s", "min", "h", "d", "W", "M", "Y"]
+    ts = DataFrame({period: deltas.to_period(period).dt.to_timestamp() for period in periods})
+    ts_previous = ts.shift(periods=1)
+    ts_next = DataFrame({period: column + Period(freq=str(period)) for period, column in ts_previous.items()})
+    is_not_equal = (ts != ts_previous) & (ts != ts_next)
+    gaps = is_not_equal.sum()
+    distincts = ts.nunique()
+    diff = distincts - gaps.abs()
+    periodicity = diff.idxmax()
+    prepared_columns.index = ts[periodicity]  # type: ignore
+    period = int(distincts[periodicity].item() / 2)
+    series: Series = Series(
+        {name: _seasonal_decompose_column(column, period) for name, column in prepared_columns.items()}
+    )
+    logger.info("Finished seasonality analysis, found highest periodicity at %s level", periodicity)
+    return series
+
+
+def _seasonal_decompose_column(column: Series, period: int) -> Optional[DecomposeResult]:
+    non_null_column = column[column.notnull()]
+    if len(non_null_column) < 1:
+        return None
+    return seasonal_decompose(non_null_column, model="additive", period=period)
+
+
+async def _plot_seasonality(
+    plot_name: str,
+    seasonality: Optional[DecomposeResult],
+    output_context: OutputContext,
+) -> AsyncIterator[FileReference]:
+    if seasonality is None:
+        return
+
+    xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
+
+    @asynccontextmanager
+    async def get_plot(suffix: str):
+        async with output_context.get_plot(plot_name + "_" + suffix) as (axes, reference):
+            if axes.figure:
+                axes.set_xlim(xlim)
+            if isinstance(axes.figure, Figure):
+                axes.figure.set_figwidth(20)
+            yield axes, reference
+
+    async with get_plot("trend") as (axes, reference):
+        seasonality.trend.plot(ax=axes)
+        yield reference
+
+    async with get_plot("seasonal") as (axes, reference):
+        seasonality.seasonal.plot(ax=axes)
+        yield reference
+
+    async with get_plot("residual") as (axes, reference):
+        seasonality.resid.plot(ax=axes, marker="o", linestyle="none")
+        axes.plot(xlim, (0, 0), zorder=-3)
+        yield reference
+
+    async with get_plot("weights") as (axes, reference):
+        seasonality.weights.plot(ax=axes)
+        yield reference
 
 
 def infer_type_and_convert(column: Series) -> Series:

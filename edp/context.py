@@ -85,6 +85,7 @@ class OutputLocalFilesContext(OutputContext):
     async def get_plot(self, name: str):
         save_path = self._prepare_save_path(name, "." + self._default_plot_format)
         figure, axes = subplots()
+        axes.autoscale(True)
         yield axes, PurePosixPath(save_path.relative_to(self.path))
         figure.tight_layout()
         figure.savefig(save_path)
