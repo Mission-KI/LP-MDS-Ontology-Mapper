@@ -356,29 +356,6 @@ async def _generate_box_plot(plot_name: str, column: Series, output_context: Out
     return reference
 
 
-async def _find_best_distribution(
-    column: Series, config: FittingConfig, column_fields: Series, workers: int
-) -> Tuple[str, dict]:
-    loop = get_running_loop()
-    fitter = Fitter(
-        column,
-        xmin=column_fields[_NUMERIC_LOWER_DIST],
-        xmax=column_fields[_NUMERIC_UPPER_DIST],
-        timeout=config.timeout.total_seconds(),
-        bins=config.bins,
-        distributions=config.distributions,
-    )
-
-    def runner():
-        return fitter.fit(max_workers=workers)
-
-    await loop.run_in_executor(None, runner)
-    # According to documentation, this ony ever contains one entry.
-    best_distribution_dict = fitter.get_best(method=config.error_function)
-    distribution_name, parameters = next(iter(best_distribution_dict.items()))
-    return str(distribution_name), parameters
-
-
 def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) -> Series:
     # TODO: Vectorize this!
     return Series({name: _get_temporal_consistencies_for_column(column, intervals) for name, column in columns.items()})
@@ -454,6 +431,29 @@ async def _get_distribution(
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(column, config, fields, workers)
+
+
+async def _find_best_distribution(
+    column: Series, config: FittingConfig, column_fields: Series, workers: int
+) -> Tuple[str, dict]:
+    loop = get_running_loop()
+    fitter = Fitter(
+        column,
+        xmin=column_fields[_NUMERIC_LOWER_DIST],
+        xmax=column_fields[_NUMERIC_UPPER_DIST],
+        timeout=config.timeout.total_seconds(),
+        bins=config.bins,
+        distributions=config.distributions,
+    )
+
+    def runner():
+        return fitter.fit(max_workers=workers)
+
+    await loop.run_in_executor(None, runner)
+    # According to documentation, this ony ever contains one entry.
+    best_distribution_dict = fitter.get_best(method=config.error_function)
+    distribution_name, parameters = next(iter(best_distribution_dict.items()))
+    return str(distribution_name), parameters
 
 
 async def _plot_distribution(
