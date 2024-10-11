@@ -54,9 +54,9 @@ class Service:
         """
         computed_data = await self._compute_asset(path, output_context)
         asset = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
-        json_name = user_data.id + ("_" + user_data.version if user_data.version else "")
+        json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
-        json_name += ".json"
+
         async with output_context.get_text_file(json_name) as (output, reference):
             await output.write(asset.model_dump_json())
         return reference

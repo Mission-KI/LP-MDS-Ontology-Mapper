@@ -78,10 +78,8 @@ class OutputLocalFilesContext(OutputContext):
         figure.savefig(save_path)
         self._logger.debug('Generated plot "%s"', save_path)
 
-    def _prepare_save_path(self, name: str, default_suffix: str):
-        save_path = self.path / name
-        if not save_path.suffix:
-            save_path = save_path.with_suffix(default_suffix)
+    def _prepare_save_path(self, name: str, suffix: str):
+        save_path = self.path / (name.replace(":", "").replace(" ", "") + suffix)
         if save_path.exists():
             self._logger.warning('The path "%s" already exists, will overwrite!', save_path)
             save_path.unlink()
@@ -150,8 +148,11 @@ class OutputDaseenContext(OutputContext):
         url = f"{self.elastic_url}/_create/{docid}"
         headers = {"Authorization": f"ApiKey {self.elastic_apikey}"}
         # We expect a JSON file, so Elastic Search can handle it.
+        self._logger.info(f"Loading file {file_full_path} for insertion into Elastic")
+        print(f"Loading file {file_full_path} for insertion into Elastic")
         with open(file_full_path, "r") as file:
             json_data = json_load(file)
         response = post(url=url, json=json_data, headers=headers, timeout=self.request_timeout)
+        print(response.text)
         response.raise_for_status()
         self._logger.info(f"Uploaded {file_full_path} to Elastic Search with ID {docid}: {download_url}")
