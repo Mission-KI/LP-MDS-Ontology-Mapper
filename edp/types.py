@@ -57,6 +57,7 @@ class DataSetCompression(str, Enum):
 
 
 class TemporalConsistency(BaseModel):
+    timeScale: timedelta
     stable: bool
     differentAbundancies: int
     abundances: List
@@ -68,7 +69,13 @@ FileReference = Union[PurePosixPath, AnyUrl]
 ImageList = List[FileReference]
 
 
+class Gap(BaseModel):
+    timeScale: timedelta = Field(description="Timescale for which gaps are given")
+    numberOfGaps: int = Field(description="Number of gaps at the given timescale")
+
+
 class _BaseColumn(BaseModel):
+    name: str = Field(description="Name of the column")
     nonNullCount: int = Field(description="Number of non empty entries in the column")
     nullCount: int = Field(description="Number of empty entries in the column")
     numberUnique: int = Field(description="Number of unique values")
@@ -110,10 +117,8 @@ class DateTimeColumn(_BaseColumn):
     monotonically_increasing: bool
     monotonically_decreasing: bool
     granularity: Optional[int] = Field(default=None)
-    temporalConsistencies: Dict[timedelta, TemporalConsistency] = Field(
-        description="Temporal consistency at given timescale"
-    )
-    gaps: Dict[timedelta, int] = Field(description="Number of gaps at given timescale")
+    temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
+    gaps: List[Gap] = Field(description="Number of gaps at given timescale")
 
 
 class StringColumn(_BaseColumn):
@@ -121,15 +126,16 @@ class StringColumn(_BaseColumn):
 
 
 class StructuredDataSet(BaseModel):
+    name: str = Field(description="Name of the structured dataset")
     rowCount: int = Field(
         description="Number of row",
     )
     correlationGraph: Optional[FileReference] = Field(
         default=None, description="Reference to a correlation graph of the data columns"
     )
-    numericColumns: Dict[str, NumericColumn] = Field(description="Numeric columns in this dataset")
-    datetimeColumns: Dict[str, DateTimeColumn] = Field(description="Datetime columns in this dataset")
-    stringColumns: Dict[str, StringColumn] = Field(
+    numericColumns: List[NumericColumn] = Field(description="Numeric columns in this dataset")
+    datetimeColumns: List[DateTimeColumn] = Field(description="Datetime columns in this dataset")
+    stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
 
@@ -142,7 +148,7 @@ class Publisher(BaseModel):
 class UserProvidedEdpData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
-    id: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
+    assetId: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
     name: str = Field(description="Name of the asset")
     url: str = Field(description="The URL via which the asset can be found in the published data room")
     dataCategory: str = Field(
@@ -152,7 +158,7 @@ class UserProvidedEdpData(BaseModel):
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
     publisher: Publisher = Field(description="Provider that placed the asset in the data room")
     publishDate: datetime = Field(description="Date on which this asset has been published")
-    licenseId: int = Field(
+    licenseId: str = Field(
         description="Identifier, which describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)",
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
@@ -191,8 +197,8 @@ class ComputedEdpData(BaseModel):
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
 
-    structuredDatasets: Dict[str, StructuredDataSet] = Field(
-        default_factory=dict,
+    structuredDatasets: List[StructuredDataSet] = Field(
+        default_factory=list,
         description="Metadata for all datasets (files) detected to be structured (tables)",
     )
 
