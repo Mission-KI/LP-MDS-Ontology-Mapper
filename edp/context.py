@@ -103,6 +103,7 @@ class OutputLocalFilesContext(OutputContext):
         save_path = self._prepare_save_path(name, "." + self._default_plot_format)
         figure, axes = subplots()
         yield axes, PurePosixPath(save_path.relative_to(self.path))
+        figure.tight_layout()
         figure.savefig(save_path)
         close_figure(figure)
         self._logger.debug('Generated plot "%s"', save_path)
