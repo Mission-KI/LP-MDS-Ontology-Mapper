@@ -130,6 +130,9 @@ class StructuredDataSet(BaseModel):
     rowCount: int = Field(
         description="Number of row",
     )
+    columnCount: int = Field(
+        description="Number of columns",
+    )
     correlationGraph: Optional[FileReference] = Field(
         default=None, description="Reference to a correlation graph of the data columns"
     )

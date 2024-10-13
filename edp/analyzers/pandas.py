@@ -163,9 +163,13 @@ class Pandas(Analyzer):
             output_context,
         )
 
+        column_count = (
+            len(transformed_numeric_columns) + len(transformed_datetime_columns) + len(transformed_string_columns)
+        )
         return StructuredDataSet(
             name=self._file.output_reference,
             rowCount=row_count,
+            columnCount=column_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
@@ -281,7 +285,7 @@ class Pandas(Analyzer):
         self, column: Series, computed_fields: Series, output_context: OutputContext
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = self._file.output_reference + "_" + str(object=column.name)
+        column_plot_base = str(object=column.name)
         box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
         column_result = NumericColumn(
             name=str(column.name),
@@ -354,7 +358,7 @@ class Pandas(Analyzer):
 async def _generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
     async with output_context.get_plot(plot_name) as (axes, reference):
         axes.set_title(plot_name)
-        axes.boxplot(column, notch=True, tick_labels=[str(column.name)])
+        axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
     return reference
 
 
