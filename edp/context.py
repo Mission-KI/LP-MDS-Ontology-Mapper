@@ -56,9 +56,9 @@ class OutputContext(ABC):
 
 def _get_default_colormap() -> Colormap:
     BLUE = "#43ACFF"
+    GRAY = "#D9D9D9"
     PINK = "#FF3FFF"
-    # GRAY = "#D9D9D9"
-    colormap = LinearSegmentedColormap.from_list("daseen", [BLUE, PINK])
+    colormap = LinearSegmentedColormap.from_list("daseen", [BLUE, GRAY, PINK])
     colormaps.register(colormap)
     return colormap
 
