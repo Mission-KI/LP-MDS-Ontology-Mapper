@@ -34,6 +34,7 @@ dependencies = [
     "pydantic",
     "seaborn",
     "requests",
+    "fastapi[standard]"
 ]
 
 [project.scripts]
