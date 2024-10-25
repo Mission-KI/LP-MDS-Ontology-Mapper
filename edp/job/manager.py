@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from logging import getLogger
+from shutil import copyfileobj
 from uuid import uuid4
 
-from fastapi import Request
+from fastapi import Request, UploadFile
 
 from edp.config import app_config
 from edp.context import OutputLocalFilesContext
@@ -28,6 +29,14 @@ class AnalysisJobManager(ABC):
     async def upload_file(self, job: Job, filename: str, request: Request):
         """Upload job data which will be analyzed later.
         The raw data is extracted from the 'request' and saved to a file named 'filename' in the job working dir.
+        This must be called exactly once when in state 'WAITING_FOR_DATA'. This needs to be repeated if an error occurs.
+        After successul upload the state changes to 'QUEUED'.
+        """
+        ...
+
+    @abstractmethod
+    async def upload_file_multipart(self, job: Job, upload_file: UploadFile):
+        """Upload job data which will be analyzed later.
         This must be called exactly once when in state 'WAITING_FOR_DATA'. This needs to be repeated if an error occurs.
         After successul upload the state changes to 'QUEUED'.
         """
@@ -100,11 +109,36 @@ class InMemoryJobManager(AnalysisJobManager):
             data_path.unlink()
             raise
 
+        job.state = JobState.QUEUED
+
         self._logger.info(
             f"File upload for job {job.job_id} is complete: {data_path} ({data_path.stat().st_size} bytes)"
         )
 
+    async def upload_file_multipart(self, job: Job, upload_file: UploadFile):
+        if job.state != JobState.WAITING_FOR_DATA:
+            raise RuntimeError(f"Job doesn't accept any file uploads because it's in state {job.state}.")
+        if not upload_file.filename:
+            raise RuntimeError("Filename is missing")
+
+        job.input_data_dir.mkdir(parents=True, exist_ok=True)
+        data_file_path = job.input_data_dir / upload_file.filename
+
+        try:
+            with data_file_path.open("wb") as dest:
+                copyfileobj(upload_file.file, dest)
+        except:
+            # If there is an error delete the file.
+            data_file_path.unlink()
+            raise
+        finally:
+            await upload_file.close()
+
         job.state = JobState.QUEUED
+
+        self._logger.info(
+            f"File upload for job {job.job_id} is complete: {data_file_path} ({data_file_path.stat().st_size} bytes)"
+        )
 
     async def process_jobs(self):
         self._logger.debug(f"Checking for queued jobs")

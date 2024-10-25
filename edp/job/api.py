@@ -1,6 +1,6 @@
 from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from edp.job.manager import job_manager
@@ -46,6 +46,22 @@ async def upload_analysis_data(job_id: str, request: Request, filename: str) -> 
 
     job = await job_manager.get_job(job_id)
     await job_manager.upload_file(job, filename, request)
+    return job
+
+
+@router.post(
+    "/analysisjob/{job_id}/data",
+    summary="Upload data for new analysis job as multipart form data",
+    tags=[Tags.analysisjob],
+)
+async def upload_analysis_data_multipart(job_id: str, upload_file: UploadFile) -> JobView:
+    """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
+
+    Returns infos about the job.
+    """
+
+    job = await job_manager.get_job(job_id)
+    await job_manager.upload_file_multipart(job, upload_file)
     return job
 
 
