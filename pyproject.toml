@@ -32,6 +32,7 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
+    "pydantic-settings",
     "seaborn",
     "requests",
     "fastapi[standard]"
