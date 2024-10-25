@@ -39,15 +39,14 @@ app = FastAPI(lifespan=process_jobs_in_background)
 app.include_router(job_api_router, prefix="/v1/dataspace")
 
 
-# TODO mka: Do we need this or just use the CLI?
-# def start_server():
-#     """As an alternative to the FastAPI CLI we can start and configure the server programmatically."""
+def main():
+    """As an alternative to the FastAPI CLI we can start and configure the server programmatically."""
 
-#     _logger.info("Starting server..")
-#     # To bind to all network interfaces add host="0.0.0.0".
-#     server_run(app, port=8000)
-#     _logger.info("Shutting down.")
+    _logger.info("Starting server..")
+    # To bind to all network interfaces add host="0.0.0.0".
+    server_run(app, port=8000, host="0.0.0.0")
+    _logger.info("Shutting down.")
 
 
-# if __name__ == "__main__":
-#     start_server()
+if __name__ == "__main__":
+    main()

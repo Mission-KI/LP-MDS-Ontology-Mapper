@@ -66,7 +66,7 @@ class OutputLocalFilesContext(OutputContext):
         use(matplotlib_backend)
         self._default_plot_format = default_plot_format
         reset_orig()
-        use_style(DEFAULT_STYLE_PATH)
+        use_style(str(DEFAULT_STYLE_PATH))
         set_cmap(colormap)
 
     def build_full_path(self, relative_path: PurePosixPath):
