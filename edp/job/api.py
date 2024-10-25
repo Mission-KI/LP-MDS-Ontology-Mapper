@@ -1,86 +1,59 @@
 from enum import Enum
-from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
 
-from edp.types import UserProvidedEdpData
+from edp.job.manager import job_manager
+from edp.types import JobState, JobView, UserProvidedEdpData
 
 
 class Tags(Enum):
     analysisjob: str = "Analysis job for dataspace"
 
 
-class JobState(str, Enum):
-    NOT_FOUND = "NOT_FOUND"
-    WAITING_FOR_DATA = "WAITING_FOR_DATA"
-    QUEUED = "QUEUED"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
-class JobInfo(BaseModel):
-    job_id: str = Field(description="Job ID")
-    state: JobState = Field(
-        description="""Job state:\n
-- NOT_FOUND: job with given ID doesn't exist\n
-- WAITING_FOR_DATA: job is waiting for data upload\n
-- QUEUED: job is queued for analyzation\n
-- PROCESSING: job is processing data\n
-- COMPLETED: job has completed successfully\n
-- FAILED: job has failed
-"""
-    )
-    detail_message: str | None = Field(description="Detailed message", default=None)
-
-
 router = APIRouter()
 
 
 @router.post("/analysisjob", tags=[Tags.analysisjob], summary="Create analysis job")
-async def create_analysis_job(userdata: UserProvidedEdpData) -> JobInfo:
+async def create_analysis_job(userdata: UserProvidedEdpData) -> JobView:
     """Create an analysis job based on the user provided EDP data.
     This must be followed by uploading the actual data.
 
     Returns infos about the job including an ID.
     """
-    return JobInfo(job_id=str(uuid4()), state=JobState.WAITING_FOR_DATA, detail_message="Waiting for data upload..")
+
+    return await job_manager.create_job(userdata)
 
 
+# TODO mka: Is the filename needed for the analysis? Or the type (File.type) derived only by the content? -> Filename is needed for identifying the type!
+# TODO mka: We can use an explicit parameter (filename:str or type:str), the mime-type or use multipart/form-data. Or put the type in the userdata.
 @router.post(
-    "/analysisjob/{job_id}/data",
+    "/analysisjob/{job_id}/data/{filename}",
     summary="Upload data for new analysis job",
     tags=[Tags.analysisjob],
     openapi_extra={
         "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}
     },
 )
-async def upload_analysis_data(job_id: str, request: Request) -> JobInfo:
+async def upload_analysis_data(job_id: str, request: Request, filename: str) -> JobView:
     """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
 
     Returns infos about the job.
     """
+
     if request.headers.get("Content-Type") != "application/octet-stream":
         raise HTTPException(status_code=415, detail="Unsupported Media Type. Expected 'application/octet-stream'.")
 
-    file_size = 0
-    file_name = f"output/{job_id}.bin"
-    with open(file_name, mode="wb") as file:
-        async for chunk in request.stream():
-            file_size += len(chunk)
-            file.write(chunk)
-            print(f"Received chunk of size: {len(chunk)} bytes")
-    print(f"Writing file {file_name} completed (size: {file_size}).")
-
-    return JobInfo(job_id=job_id, state=JobState.QUEUED, detail_message="Queued")
+    job = await job_manager.get_job(job_id)
+    await job_manager.upload_file(job, filename, request)
+    return job
 
 
 @router.get("/analysisjob/{job_id}/status", tags=[Tags.analysisjob], summary="Get analysis job status")
-async def get_status(job_id: str) -> JobInfo:
+async def get_status(job_id: str) -> JobView:
     """Returns infos about the job."""
-    return JobInfo(job_id=job_id, state=JobState.PROCESSING, detail_message="Processing")
+
+    return await job_manager.get_job(job_id)
 
 
 @router.get(
@@ -97,9 +70,11 @@ async def get_status(job_id: str) -> JobInfo:
 )
 async def get_result(job_id: str):
     """If an analysis job has reached state COMPLETED, this call returns the zipped EDP including images."""
-    # raise NotImplementedError()
-    file_name = f"output/{job_id}.zip"
-    return FileResponse(file_name, media_type="application/zip", filename="downloaded_file.zip")
+
+    job = await job_manager.get_job(job_id)
+    if job.state != JobState.COMPLETED:
+        raise RuntimeError(f"There is no result for job {job.job_id}")
+    return FileResponse(job.zip_path, media_type="application/zip", filename=job.zip_path.name)
 
 
 @router.get(

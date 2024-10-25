@@ -210,6 +210,39 @@ class ExtendedDatasetProfile(UserProvidedEdpData, ComputedEdpData):
     pass
 
 
+# TODO mka: Do we want the Job model (and view) here are put it separately?
+
+
+class JobState(str, Enum):
+    WAITING_FOR_DATA = "WAITING_FOR_DATA"
+    QUEUED = "QUEUED"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class JobView(BaseModel):
+    job_id: str = Field(description="Job ID")
+    state: JobState = Field(
+        description="""Job state:\n
+- WAITING_FOR_DATA: job is waiting for data upload\n
+- QUEUED: job is queued for analyzation\n
+- PROCESSING: job is processing data\n
+- COMPLETED: job has completed successfully\n
+- FAILED: job has failed
+"""
+    )
+    state_detail: str | None = Field(description="State details", default=None)
+
+
+# TODO mka: Should the internal Job model extend the view model?
+class Job(JobView):
+    user_data: UserProvidedEdpData
+    input_data_dir: Path
+    result_dir: Path
+    zip_path: Path
+
+
 def export_edp_schema():
     args = _get_args()
     output: Path = args.output

@@ -1,6 +1,5 @@
 from logging import INFO as LOGGING_INFO
 from logging import basicConfig as loggingBasicConfig
-from logging import getLogger
 from pathlib import Path
 
 from pydantic import Field
@@ -23,6 +22,3 @@ class AppConfig(BaseSettings):
 
 # Prevent MyPy check to allow required settings without default.
 app_config = AppConfig()  # type: ignore
-
-_logger = getLogger(__name__)
-_logger.info(f"App configuration:\n{app_config.model_dump()}")
