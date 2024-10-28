@@ -161,6 +161,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# Let's encrypt certificate file
+.letsencrypt/acme.json
+
 .vscode
 output/
 work/

@@ -17,7 +17,7 @@ class AppConfig(BaseSettings):
     # api_key: str = Field(description="API key", exclude=True)     # example for required secret setting
 
     class Config:
-        env_file = ".env"
+        env_file = "edp/.env"
 
 
 # Prevent MyPy check to allow required settings without default.
