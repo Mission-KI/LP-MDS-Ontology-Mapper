@@ -8,11 +8,14 @@ env:
     EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
     OPENAPI_SCHEMA: edps_openapi_${{ github.ref_name }}.json
     IMAGE_PATH: beebucket/edps
+    WHEEL_NAME: edps.whl
     
 jobs:
-    generate_schemas:
+    build_wheel:
         runs-on: ubuntu-24.04
-        name: Generate Schemas
+        name: Build Release Wheel
+        env:
+            DISTRIBUTION_DIR: "${{ github.workspace }}/dist"
         steps:
         -   uses: actions/checkout@v4
             with:
@@ -21,8 +24,35 @@ jobs:
             with:
                 python-version: 3.12
                 cache: 'pip'
-        -   name: Install Application
-            run: pip install .
+        -   name: Build Wheel
+            run: |
+                echo "${{ github.ref_name }}" >> VERSION.txt
+                mkdir -p ${{ env.DISTRIBUTION_DIR }}
+                pip wheel build --no-deps --no-input --no-binary :all: --wheel-dir ${{ env.DISTRIBUTION_DIR }} .
+        -   uses: actions/upload-artifact@v4
+            with:
+                name: ${{ env.WHEEL_NAME }}
+                path: "${{ env.DISTRIBUTION_DIR }}/edp*.whl"
+                if-no-files-found: error
+
+    generate_schemas:
+        runs-on: ubuntu-24.04
+        name: Generate Schemas
+        needs:
+        -   build_wheel
+        steps:
+        -   uses: actions/checkout@v4
+        -   uses: actions/setup-python@v5
+            with:
+                python-version: 3.12
+                cache: 'pip'
+        -   uses: actions/download-artifact@v4
+            id: download_wheel
+            with:
+                name: ${{ env.WHEEL_NAME }}
+                path: ${{ github.workspace }}
+        -   name: Install
+            run: pip install ${{ steps.download_wheel.outputs.download-path }}
         -   name: Generate EDPS Schema
             run: export_edps_schema --output ${{ env.EDPS_SCHEMA }}
         -   uses: actions/upload-artifact@v4
@@ -39,6 +69,8 @@ jobs:
     build_and_release_docker:
         runs-on: ubuntu-24.04
         name: Build and Push EDPS docker image
+        needs:
+        -   build_wheel
         timeout-minutes: 1440
         env:
             REGISTRY: docker.io
@@ -51,11 +83,11 @@ jobs:
                 username: cicdcorebeebucket
                 password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         -   uses: actions/checkout@v4
+        -   uses: actions/download-artifact@v4
+            id: download_wheel
             with:
-                repository: ${{ github.repository }}
-                token: ${{ secrets.GIT_HUB_API_KEY }}
-                lfs: true
-                submodules: recursive
+                name: ${{ env.WHEEL_NAME }}
+                path: ${{ github.workspace }}/wheels
         -   uses: docker/setup-qemu-action@v3
         -   uses: docker/setup-buildx-action@v3
         -   name: Extract Docker metadata
@@ -73,13 +105,13 @@ jobs:
             id: build-and-push
             uses: docker/build-push-action@v6
             with:
-                secrets: |
-                    REPO_TOKEN=${{ secrets.GIT_HUB_API_KEY }}
                 context: .
                 file: docker/Dockerfile
                 platforms: |
                     linux/arm64,
                     linux/amd64
+                build-args: |
+                    VERSION=${{ github.ref_name }}
                 push: True
                 tags: ${{ steps.meta.outputs.tags }}
                 labels: ${{ steps.meta.outputs.labels }}
@@ -90,25 +122,32 @@ jobs:
         runs-on: ubuntu-24.04
         name: Create Release
         needs:
+        -   build_wheel
         -   generate_schemas
         -   build_and_release_docker
+        env:
+            ARTIFACTS_DIR: ${{ github.workspace }}/release_artifacts
         steps:
+        -   name: Create Directory for artifacts
+            run: mkdir -p ${{ env.ARTIFACTS_DIR }}
         -   uses: actions/download-artifact@v4
             with:
                 name: ${{ env.EDPS_SCHEMA }}
-                path: ${{ github.workspace }}
+                path: ${{ env.ARTIFACTS_DIR }}
+        -   uses: actions/download-artifact@v4
+            with:
+                name: ${{ env.WHEEL_NAME }}
+                path: ${{ env.ARTIFACTS_DIR }}
         -   uses: actions/download-artifact@v4
             with:
                 name: ${{ env.OPENAPI_SCHEMA }}
-                path: ${{ github.workspace }}
+                path: ${{ env.ARTIFACTS_DIR }}
         -   name: Release
             uses: softprops/action-gh-release@v2
             with:
                 body:
                     "Dockerhub Reference (private): ${{ needs.build_and_release_docker.outputs.dockerhub_reference }}\n"
-                files: |
-                    ${{ github.workspace }}/${{ env.EDPS_SCHEMA }}
-                    ${{ github.workspace }}/${{ env.OPENAPI_SCHEMA }}
+                files: ${{ env.ARTIFACTS_DIR }}/*
                 fail_on_unmatched_files: true
                 draft: true
                 generate_release_notes: true

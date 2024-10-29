@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edp"
-version = "0.13.0"
+dynamic = ["version"]
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
     { name = "Daniel Eckstein", email = "de@beebucket.de" },
@@ -62,6 +62,9 @@ dev = ["edp[test]"]
 where = ["."]
 include = ["edp*"]
 exclude = ["test*"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION.txt" }
 
 [tool.isort]
 profile = 'black'
