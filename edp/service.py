@@ -57,10 +57,7 @@ class Service:
         asset = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
-
-        async with output_context.get_text_file(json_name) as (output, reference):
-            await output.write(asset.model_dump_json())
-        return reference
+        return await output_context.write_edp(json_name, asset)
 
     async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedEdpData:
         if not path.exists():

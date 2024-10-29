@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from asyncio import get_running_loop
 from contextlib import asynccontextmanager
-from io import TextIOWrapper
-from json import load as json_load
 from logging import getLogger
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Tuple
@@ -19,25 +17,9 @@ from pydantic import HttpUrl
 from requests import post
 from seaborn import reset_orig
 
-from edp.types import FileReference
+from edp.types import ExtendedDatasetProfile, FileReference
 
 DEFAULT_STYLE_PATH = Path(__file__).parent / "styles/plot.mplstyle"
-
-
-class TextWriter(ABC):
-    """Abstract class for object that supports async writes with text"""
-
-    @abstractmethod
-    async def write(self, text: str) -> None: ...
-
-
-class TextFileWriter(TextWriter):
-    def __init__(self, io_wrapper: TextIOWrapper) -> None:
-        self._wrapper = io_wrapper
-
-    async def write(self, text: str) -> None:
-        loop = get_running_loop()
-        await loop.run_in_executor(None, self._wrapper.write, text)
 
 
 class OutputContext(ABC):
@@ -46,8 +28,7 @@ class OutputContext(ABC):
     Depending on the implementation, these files will be stored locally or in the cloud."""
 
     @abstractmethod
-    @asynccontextmanager
-    def get_text_file(self, name: str) -> AsyncIterator[Tuple[TextWriter, FileReference]]: ...
+    async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference: ...
 
     @abstractmethod
     @asynccontextmanager
@@ -91,12 +72,14 @@ class OutputLocalFilesContext(OutputContext):
     def build_full_path(self, relative_path: PurePosixPath):
         return PurePosixPath(self.path / relative_path)
 
-    @asynccontextmanager
-    async def get_text_file(self, name: str):
+    async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> PurePosixPath:
         save_path = self._prepare_save_path(name, ".json")
         with open(save_path, "wt", encoding=self.text_encoding) as io_wrapper:
-            yield TextFileWriter(io_wrapper), PurePosixPath(save_path.relative_to(self.path))
+            json: str = edp.model_dump_json()
+            loop = get_running_loop()
+            await loop.run_in_executor(None, io_wrapper.write, json)
         self._logger.debug('Generated text file "%s"', save_path)
+        return PurePosixPath(save_path.relative_to(self.path))
 
     @asynccontextmanager
     async def get_plot(self, name: str):
@@ -139,13 +122,12 @@ class OutputDaseenContext(OutputContext):
         self.elastic_apikey = elastic_apikey
         self.request_timeout = request_timeout
 
-    @asynccontextmanager
-    async def get_text_file(self, name: str):
-        async with self.output_local_context.get_text_file(name) as (textFileWrite, rel_path):
-            docid: UUID = uuid4()
-            download_url = self._build_elastic_download_url(docid)
-            yield textFileWrite, download_url
-        self._upload_to_elastic(rel_path, docid, download_url)
+    async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference:
+        await self.output_local_context.write_edp(name, edp)
+        docid: UUID = uuid4()
+        download_url = self._build_elastic_download_url(docid)
+        self._upload_to_elastic(edp, docid, download_url)
+        return download_url
 
     @asynccontextmanager
     async def get_plot(self, name: str):
@@ -173,14 +155,10 @@ class OutputDaseenContext(OutputContext):
     def _build_elastic_download_url(self, docid: UUID) -> FileReference:
         return HttpUrl(f"{self.elastic_url}/_doc/{docid}")
 
-    def _upload_to_elastic(self, file_rel_path: PurePosixPath, docid: UUID, download_url: FileReference):
-        file_full_path = self.output_local_context.build_full_path(file_rel_path)
+    def _upload_to_elastic(self, edp: ExtendedDatasetProfile, docid: UUID, download_url: FileReference):
         url = f"{self.elastic_url}/_create/{docid}"
-        headers = {"Authorization": f"ApiKey {self.elastic_apikey}"}
-        # We expect a JSON file, so Elastic Search can handle it.
-        self._logger.info(f"Loading file {file_full_path} for insertion into Elastic")
-        with open(file_full_path, "r") as file:
-            json_data = json_load(file)
-        response = post(url=url, json=json_data, headers=headers, timeout=self.request_timeout)
+        headers = {"Authorization": f"ApiKey {self.elastic_apikey}", "Content-Type": "application/json"}
+        json: str = edp.model_dump_json()
+        response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
         response.raise_for_status()
-        self._logger.info(f"Uploaded {file_full_path} to Elastic Search with ID {docid}: {download_url}")
+        self._logger.info(f"Uploaded EDP to Elastic Search with ID {docid}: {download_url}")
