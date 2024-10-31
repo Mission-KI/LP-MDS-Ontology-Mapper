@@ -65,7 +65,8 @@ exclude = ["test*"]
 
 [tool.isort]
 profile = 'black'
-skip = ['.conda']
+src_paths = ["edp", "tests"]
+skip = ['.conda', '.mypy_cache']
 skip_gitignore = true
 
 [tool.black]
