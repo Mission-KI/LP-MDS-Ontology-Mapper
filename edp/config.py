@@ -1,12 +1,7 @@
-from logging import INFO as LOGGING_INFO
-from logging import basicConfig as loggingBasicConfig
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
-
-# Set the global (root) log level
-loggingBasicConfig(level=LOGGING_INFO, format="%(asctime)s | %(levelname)s | %(name)s - %(message)s")
 
 
 # App config is read from .env file and validate on app startup.
@@ -20,5 +15,6 @@ class AppConfig(BaseSettings):
         env_file = "edp/.env"
 
 
-# Prevent MyPy check to allow required settings without default.
-app_config = AppConfig()  # type: ignore
+def get_app_config():
+    # Prevent MyPy check to allow required settings without default.
+    return AppConfig()  # type: ignore
