@@ -1,10 +1,5 @@
 # First Stage: Build environment
 FROM python:3.12-slim AS build
-
-# Install required build dependencies for Python packages
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
-    rm -rf /var/lib/apt/lists/*
     
 # Set up a virtual environment and
 # Install directly from pyproject.toml
@@ -18,6 +13,9 @@ RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
 
 # Second Stage: Production environment
 FROM python:3.12-slim AS runner
+
+LABEL ai.beebucket.maintainer="beebucket GmbH <hello@beebucket.ai>"
+LABEL ai.beebucket.version=${VERSION}
 
 # Copy virtual environment from build stage
 COPY --from=build /venv /venv
