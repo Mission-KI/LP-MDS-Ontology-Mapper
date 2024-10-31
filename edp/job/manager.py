@@ -8,8 +8,8 @@ from fastapi import Request, UploadFile
 
 from edp.config import AppConfig
 from edp.context import OutputLocalFilesContext
+from edp.job.types import Job, JobState, UserProvidedEdpData
 from edp.service import Service
-from edp.types import Job, JobState, UserProvidedEdpData
 from edp.zip import zip_directory
 
 

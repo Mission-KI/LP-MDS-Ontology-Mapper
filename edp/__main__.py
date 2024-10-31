@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from uvicorn import run as server_run
 
 from edp.config import get_app_config
-from edp.job.api import get_job_api_router
+from edp.job import get_job_api_router
 
 
 def main():

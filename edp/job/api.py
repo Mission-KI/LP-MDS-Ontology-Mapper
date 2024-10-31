@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 
 from edp.config import AppConfig
 from edp.job.manager import AnalysisJobManager, InMemoryJobManager
-from edp.types import JobState, JobView, UserProvidedEdpData
+from edp.job.types import JobState, JobView, UserProvidedEdpData
 
 
 class Tags(str, Enum):
