@@ -26,7 +26,7 @@ def main():
     logger = getLogger(__name__)
     logger.info("Starting server..")
     # To bind to all network interfaces add host="0.0.0.0".
-    server_run(app, port=8000, host="0.0.0.0")
+    server_run(app, port=8000, host=app_config.host)
     logger.info("Shutting down.")
 
 

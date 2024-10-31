@@ -20,6 +20,8 @@ services:
     #   - "8000:8000"
     volumes:
       - edp_work:/work
+    environment:
+      HOST: "0.0.0.0"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.edp.rule=Host(`${HOSTNAME}`)"
