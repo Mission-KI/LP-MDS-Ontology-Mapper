@@ -1,3 +1,4 @@
+import logging
 from logging import getLogger
 
 from fastapi import FastAPI
@@ -7,8 +8,14 @@ from edp.config import get_app_config
 from edp.job import get_job_api_router
 
 
+def config_logging():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s - %(message)s")
+
+
 def main():
-    """As an alternative to the FastAPI CLI we can start and configure the server programmatically."""
+    """We start and configure the server programmatically as an alternative to the FastAPI CLI."""
+
+    config_logging()
 
     app_config = get_app_config()
     job_api_router = get_job_api_router(app_config)
