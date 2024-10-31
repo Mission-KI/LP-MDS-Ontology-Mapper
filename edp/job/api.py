@@ -8,15 +8,15 @@ from edp.job.manager import AnalysisJobManager, InMemoryJobManager
 from edp.types import JobState, JobView, UserProvidedEdpData
 
 
-class Tags(Enum):
-    analysisjob: str = "Analysis job for dataspace"
+class Tags(str, Enum):
+    AnalysisJob = "Analysis job for dataspace"
 
 
 def get_job_api_router(app_config: AppConfig):
     job_manager: AnalysisJobManager = InMemoryJobManager(app_config)
     router = APIRouter()
 
-    @router.post("/analysisjob", tags=[Tags.analysisjob], summary="Create analysis job")
+    @router.post("/analysisjob", tags=[Tags.AnalysisJob], summary="Create analysis job")
     async def create_analysis_job(userdata: UserProvidedEdpData) -> JobView:
         """Create an analysis job based on the user provided EDP data.
         This must be followed by uploading the actual data.
@@ -31,7 +31,7 @@ def get_job_api_router(app_config: AppConfig):
     @router.post(
         "/analysisjob/{job_id}/data/{filename}",
         summary="Upload data for new analysis job",
-        tags=[Tags.analysisjob],
+        tags=[Tags.AnalysisJob],
         openapi_extra={
             "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}
         },
@@ -52,7 +52,7 @@ def get_job_api_router(app_config: AppConfig):
     @router.post(
         "/analysisjob/{job_id}/data",
         summary="Upload data for new analysis job as multipart form data",
-        tags=[Tags.analysisjob],
+        tags=[Tags.AnalysisJob],
     )
     async def upload_analysis_data_multipart(job_id: str, upload_file: UploadFile) -> JobView:
         """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
@@ -64,7 +64,7 @@ def get_job_api_router(app_config: AppConfig):
         await job_manager.upload_file_multipart(job, upload_file)
         return job
 
-    @router.get("/analysisjob/{job_id}/status", tags=[Tags.analysisjob], summary="Get analysis job status")
+    @router.get("/analysisjob/{job_id}/status", tags=[Tags.AnalysisJob], summary="Get analysis job status")
     async def get_status(job_id: str) -> JobView:
         """Returns infos about the job."""
 
@@ -72,7 +72,7 @@ def get_job_api_router(app_config: AppConfig):
 
     @router.get(
         "/analysisjob/{job_id}/result",
-        tags=[Tags.analysisjob],
+        tags=[Tags.AnalysisJob],
         summary="Return zipped EDP after completed analysis",
         response_class=Response,
         responses={
@@ -92,7 +92,7 @@ def get_job_api_router(app_config: AppConfig):
 
     @router.get(
         "/analysisjob/{job_id}/report",
-        tags=[Tags.analysisjob],
+        tags=[Tags.AnalysisJob],
         summary="Return PDF report after completed analysis",
         response_class=Response,
         responses={
