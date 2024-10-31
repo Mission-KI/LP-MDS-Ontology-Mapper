@@ -75,7 +75,7 @@ class InMemoryJobManager(AnalysisJobManager):
         )
         self._jobs[job_id] = job
 
-        self._logger.info(f"Job created: {job.job_id}")
+        self._logger.info("Job created: %s", job.job_id)
         return job
 
     async def get_job(self, job_id: str):
@@ -87,7 +87,7 @@ class InMemoryJobManager(AnalysisJobManager):
         if job.state != JobState.QUEUED:
             raise RuntimeError(f"Job can't be processed because it's in state {job.state}.")
 
-        self._logger.info(f"Starting job {job.job_id}...")
+        self._logger.info("Starting job %s...", job.job_id)
         job.state = JobState.PROCESSING
 
         try:
@@ -96,12 +96,12 @@ class InMemoryJobManager(AnalysisJobManager):
             await service.analyse_asset(job.input_data_dir, job.user_data, output_context)
             zip_directory(job.result_dir, job.zip_path)
             job.state = JobState.COMPLETED
-            self._logger.info(f"Job {job.job_id} completed.")
+            self._logger.info("Job %s completed.", job.job_id)
 
-        except Exception as e:
+        except Exception as exception:
             job.state = JobState.FAILED
-            job.state_detail = f"Processing failed: {e}"
-            self._logger.error(f"Job {job.job_id} has failed: {e}")
+            job.state_detail = f"Processing failed: {exception}"
+            self._logger.error("Job %s has failed: %s", job.job_id, exception)
 
     async def upload_file(self, job: Job, filename: str, request: Request):
         if job.state != JobState.WAITING_FOR_DATA:
@@ -129,7 +129,7 @@ class InMemoryJobManager(AnalysisJobManager):
         job.state = JobState.QUEUED
 
         self._logger.info(
-            f"File upload for job {job.job_id} is complete: {data_path} ({data_path.stat().st_size} bytes)"
+            "File upload for job %s is complete: %s (%s bytes)", job.job_id, data_path, data_path.stat().st_size
         )
 
         ensure_future(self.process_job(job))
@@ -156,7 +156,10 @@ class InMemoryJobManager(AnalysisJobManager):
         job.state = JobState.QUEUED
 
         self._logger.info(
-            f"File upload for job {job.job_id} is complete: {data_file_path} ({data_file_path.stat().st_size} bytes)"
+            "File upload for job %s is complete: %s (%s bytes)",
+            job.job_id,
+            data_file_path,
+            data_file_path.stat().st_size,
         )
 
         ensure_future(self.process_job(job))
