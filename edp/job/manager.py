@@ -57,6 +57,7 @@ class InMemoryJobManager(AnalysisJobManager):
         self._jobs = dict[str, Job]()
         self._logger = getLogger(__name__)
         self._app_config = app_config
+        self._service = Service()
 
     async def create_job(self, userdata: UserProvidedEdpData) -> Job:
         job_id = str(uuid4())
@@ -91,9 +92,8 @@ class InMemoryJobManager(AnalysisJobManager):
         job.state = JobState.PROCESSING
 
         try:
-            service = Service()
             output_context = OutputLocalFilesContext(job.result_dir)
-            await service.analyse_asset(job.input_data_dir, job.user_data, output_context)
+            await self._service.analyse_asset(job.input_data_dir, job.user_data, output_context)
             zip_directory(job.result_dir, job.zip_path)
             job.state = JobState.COMPLETED
             self._logger.info("Job %s completed.", job.job_id)
