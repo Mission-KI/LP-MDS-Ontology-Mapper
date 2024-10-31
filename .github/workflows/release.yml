@@ -6,7 +6,8 @@ on:
 
 env:
     EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
-
+    IMAGE_PATH: beebucket/edps
+    
 jobs:
     generate_schemas:
         runs-on: ubuntu-24.04
@@ -27,12 +28,63 @@ jobs:
             with:
                 name: ${{ env.EDPS_SCHEMA }}
                 path: ${{ env.EDPS_SCHEMA }}
-        
+
+    build_and_release_docker:
+        runs-on: ubuntu-24.04
+        name: Build and Push EDPS docker image
+        timeout-minutes: 1440
+        env:
+            REGISTRY: docker.io
+        outputs:
+            dockerhub_reference: "${{ steps.meta.outputs.tags }}"
+        steps:
+        -   uses: docker/login-action@v3
+            with:
+                registry: ${{ env.REGISTRY }}
+                username: cicdcorebeebucket
+                password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        -   uses: actions/checkout@v4
+            with:
+                repository: ${{ github.repository }}
+                token: ${{ secrets.GIT_HUB_API_KEY }}
+                lfs: true
+                submodules: recursive
+        -   uses: docker/setup-qemu-action@v3
+        -   uses: docker/setup-buildx-action@v3
+        -   name: Extract Docker metadata
+            id: meta
+            uses: docker/metadata-action@v5.5.1
+            with:
+                images: ${{ env.REGISTRY }}/${{ env.IMAGE_PATH }}
+                flavor: latest=false
+                tags: |
+                    type=ref,event=branch
+                    type=ref,event=tag
+                    type=ref,event=pr
+                    type=semver,pattern={{version}}
+        -   name: Build and push Docker image
+            id: build-and-push
+            uses: docker/build-push-action@v6
+            with:
+                secrets: |
+                    REPO_TOKEN=${{ secrets.GIT_HUB_API_KEY }}
+                context: .
+                file: docker/Dockerfile
+                platforms: |
+                    linux/arm64,
+                    linux/amd64
+                push: True
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
+
     create_release:
         runs-on: ubuntu-24.04
         name: Create Release
         needs:
         -   generate_schemas
+        -   build_and_release_docker
         env:
             EDPS_SCHEMA: edps_schema_${{ github.ref_name }}.json
         steps:
@@ -43,6 +95,8 @@ jobs:
         -   name: Release
             uses: softprops/action-gh-release@v2
             with:
+                body:
+                    "Dockerhub Reference (private): ${{ needs.build_and_release_docker.outputs.dockerhub_reference }}\n"
                 files: |
                     ${{ github.workspace }}/${{ env.EDPS_SCHEMA }}
                 fail_on_unmatched_files: true
