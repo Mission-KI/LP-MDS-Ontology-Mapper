@@ -1,0 +1,11 @@
+/.conda
+/.git
+/.github
+/.mypy_cache
+/.pytest_cache
+/.vscode
+/build
+/tests
+/output
+/work
+__pycache__

@@ -32,12 +32,15 @@ dependencies = [
     "pandas",
     "pathlib",
     "pydantic",
+    "pydantic-settings",
     "seaborn",
     "requests",
+    "fastapi[standard]"
 ]
 
 [project.scripts]
 export_edps_schema = "edp.types:export_edp_schema"
+edps = "edp.__main__:main"
 
 [project.optional-dependencies]
 test = [
@@ -62,7 +65,8 @@ exclude = ["test*"]
 
 [tool.isort]
 profile = 'black'
-skip = ['.conda']
+src_paths = ["edp", "tests"]
+skip = ['.conda', '.mypy_cache']
 skip_gitignore = true
 
 [tool.black]

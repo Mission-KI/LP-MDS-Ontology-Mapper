@@ -1,0 +1,59 @@
+services:
+  edp:
+    image: edp
+    build: .
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "10"
+    #       memory: "20G"
+    # security_opt:
+    #   - no-new-privileges:true
+    #   - seccomp=default.json
+    # read_only: true
+    # logging:
+    #   driver: "json-file"
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      - edp_work:/work
+    environment:
+      HOST: "0.0.0.0"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.edp.rule=Host(`${HOSTNAME}`)"
+      - "traefik.http.routers.edp.entrypoints=websecure"
+      - "traefik.http.routers.edp.tls=true"
+      - "traefik.http.routers.edp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.edp.loadbalancer.server.port=8000"
+
+  traefik:
+    image: traefik:v3.1.6
+    command:
+      - "--log.level=INFO"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      # alternative challenge mechanism via http
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${CERT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./.letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+volumes:
+  edp_work:

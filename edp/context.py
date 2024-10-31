@@ -66,7 +66,7 @@ class OutputLocalFilesContext(OutputContext):
         use(matplotlib_backend)
         self._default_plot_format = default_plot_format
         reset_orig()
-        use_style(DEFAULT_STYLE_PATH)
+        use_style(str(DEFAULT_STYLE_PATH))
         set_cmap(colormap)
 
     def build_full_path(self, relative_path: PurePosixPath):
@@ -150,7 +150,7 @@ class OutputDaseenContext(OutputContext):
     def _upload_to_s3(self, file_rel_path: PurePosixPath, upload_key: str, download_url: FileReference):
         file_full_path = self.output_local_context.build_full_path(file_rel_path)
         self.s3_bucket.upload_file(file_full_path, upload_key)
-        self._logger.info(f"Uploaded {file_full_path} to S3: {download_url}")
+        self._logger.info("Uploaded %s to S3: %s", file_full_path, download_url)
 
     def _build_elastic_download_url(self, docid: UUID) -> FileReference:
         return HttpUrl(f"{self.elastic_url}/_doc/{docid}")
@@ -161,4 +161,4 @@ class OutputDaseenContext(OutputContext):
         json: str = edp.model_dump_json()
         response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
         response.raise_for_status()
-        self._logger.info(f"Uploaded EDP to Elastic Search with ID {docid}: {download_url}")
+        self._logger.info("Uploaded EDP to Elastic Search with ID %s: %s", docid, download_url)
