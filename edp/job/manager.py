@@ -107,7 +107,7 @@ class InMemoryJobManager(AnalysisJobManager):
         if job.state != JobState.WAITING_FOR_DATA:
             raise RuntimeError(f"Job doesn't accept any file uploads because it's in state {job.state}.")
 
-        self._logger.info(f"File upload for job {job.job_id} started.")
+        self._logger.info("File upload for job %s started.", job.job_id)
         job.input_data_dir.mkdir(parents=True, exist_ok=True)
         data_path = job.input_data_dir / filename
         # Security: filename is not allowed to escape input_data_dir!
