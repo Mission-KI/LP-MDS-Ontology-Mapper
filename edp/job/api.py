@@ -1,6 +1,13 @@
 from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 
 from edp.config import AppConfig
@@ -36,7 +43,9 @@ def get_job_api_router(app_config: AppConfig):
             "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}
         },
     )
-    async def upload_analysis_data(job_id: str, request: Request, filename: str) -> JobView:
+    async def upload_analysis_data(
+        job_id: str, request: Request, filename: str, background_tasks: BackgroundTasks
+    ) -> JobView:
         """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
 
         Returns infos about the job.
@@ -47,6 +56,7 @@ def get_job_api_router(app_config: AppConfig):
 
         job = await job_manager.get_job(job_id)
         await job_manager.upload_file(job, filename, request)
+        background_tasks.add_task(job_manager.process_job, job)
         return job
 
     @router.post(
@@ -54,7 +64,9 @@ def get_job_api_router(app_config: AppConfig):
         summary="Upload data for new analysis job as multipart form data",
         tags=[Tags.AnalysisJob],
     )
-    async def upload_analysis_data_multipart(job_id: str, upload_file: UploadFile) -> JobView:
+    async def upload_analysis_data_multipart(
+        job_id: str, upload_file: UploadFile, background_tasks: BackgroundTasks
+    ) -> JobView:
         """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
 
         Returns infos about the job.
@@ -62,6 +74,7 @@ def get_job_api_router(app_config: AppConfig):
 
         job = await job_manager.get_job(job_id)
         await job_manager.upload_file_multipart(job, upload_file)
+        background_tasks.add_task(job_manager.process_job, job)
         return job
 
     @router.get("/analysisjob/{job_id}/status", tags=[Tags.AnalysisJob], summary="Get analysis job status")
