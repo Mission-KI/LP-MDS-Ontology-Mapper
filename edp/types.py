@@ -148,6 +148,11 @@ class Publisher(BaseModel):
     name: str = Field(description="Name of the publisher")
 
 
+class License(BaseModel):
+    name: str = Field(description="Name of the license")
+    url: Optional[str] = Field(default=None, description="URL describing the license")
+
+
 class UserProvidedEdpData(BaseModel):
     """The part of the EDP dataset that can not be automatically generated, but needs to be provided by the user."""
 
@@ -161,8 +166,8 @@ class UserProvidedEdpData(BaseModel):
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
     publisher: Publisher = Field(description="Provider that placed the asset in the data room")
     publishDate: datetime = Field(description="Date on which this asset has been published")
-    licenseId: str = Field(
-        description="Identifier, which describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)",
+    license: License = Field(
+        description="Describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)"
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
     tags: Optional[List[str]] = Field(default_factory=list, description="Optional list of tags")

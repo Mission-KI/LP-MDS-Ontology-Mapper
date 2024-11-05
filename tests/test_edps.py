@@ -5,7 +5,7 @@ from pydantic import HttpUrl
 from pytest import fixture, mark, raises
 
 from edp import Service
-from edp.types import DataSetType, DataSpace, Publisher, UserProvidedEdpData
+from edp.types import DataSetType, DataSpace, License, Publisher, UserProvidedEdpData
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -22,7 +22,7 @@ def user_data():
         dataCategory="TestDataCategory",
         dataSpace=DataSpace(dataSpaceId=1, name="TestDataSpace", url="https://beebucket.ai/en/"),
         publisher=Publisher(id="0815-1234", name="beebucket"),
-        licenseId="my-very-own-license-id",
+        license=License(name="my-very-own-license-id"),
         description="Our very first test edp",
         publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
         version="2.3.1",
