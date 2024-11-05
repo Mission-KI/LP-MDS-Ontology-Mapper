@@ -1,6 +1,6 @@
 services:
   edp:
-    image: edp
+    image: beebucket/edps:latest
     build:
       context: ..
       dockerfile: docker/Dockerfile
