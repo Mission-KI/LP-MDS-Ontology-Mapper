@@ -1,13 +1,16 @@
 # First Stage: Build environment
 FROM python:3.12-slim AS build
     
-# Set up a virtual environment and
-# Install directly from pyproject.toml
+# Set up a virtual environment and install dependencies from pyproject.toml
 ARG SOURCE_DIR="/source"
 RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
-    --mount=type=bind,src=./,target=${SOURCE_DIR},readwrite \
+    --mount=type=bind,src=./pyproject.toml,target=${SOURCE_DIR}/pyproject.toml,readwrite \
     python3 -m venv /venv && \
     /venv/bin/pip install --upgrade pip && \
+    /venv/bin/pip install ${SOURCE_DIR}
+# Install the app in a new layer (therefore optimizing caching)
+RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
+    --mount=type=bind,src=./,target=${SOURCE_DIR},readwrite \
     /venv/bin/pip install ${SOURCE_DIR}
 
 

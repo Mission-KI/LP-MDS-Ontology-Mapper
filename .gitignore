@@ -163,7 +163,7 @@ cython_debug/
 #.idea/
 
 # Let's encrypt certificate file
-.letsencrypt/acme.json
+docker/.letsencrypt/
 
 .vscode
 output/
