@@ -104,8 +104,8 @@ class NumericColumn(_BaseColumn):
         default=None, description="Link to the combined histogram/distribution graph"
     )
     boxPlot: FileReference = Field(description="Link to the box plot of this column")
-    seasonalityGraph: Optional[FileReference] = Field(
-        default=None, description="Link to a seasonality graph of this column"
+    seasonalityGraphs: List[FileReference] = Field(
+        default_factory=list, description="Link to a seasonality graph of this column"
     )
     dataType: str
 
