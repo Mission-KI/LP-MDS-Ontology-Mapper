@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from asyncio import ensure_future
 from logging import getLogger
 from shutil import copyfileobj
 from uuid import uuid4
@@ -132,8 +131,6 @@ class InMemoryJobManager(AnalysisJobManager):
             "File upload for job %s is complete: %s (%s bytes)", job.job_id, data_path, data_path.stat().st_size
         )
 
-        ensure_future(self.process_job(job))
-
     async def upload_file_multipart(self, job: Job, upload_file: UploadFile):
         if job.state != JobState.WAITING_FOR_DATA:
             raise RuntimeError(f"Job doesn't accept any file uploads because it's in state {job.state}.")
@@ -161,5 +158,3 @@ class InMemoryJobManager(AnalysisJobManager):
             data_file_path,
             data_file_path.stat().st_size,
         )
-
-        ensure_future(self.process_job(job))
