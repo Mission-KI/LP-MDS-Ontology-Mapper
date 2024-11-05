@@ -1,7 +1,9 @@
 services:
   edp:
     image: edp
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     # deploy:
     #   resources:
     #     limits:
