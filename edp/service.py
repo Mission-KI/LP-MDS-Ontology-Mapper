@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
 from shutil import rmtree
-from typing import AsyncIterator, Dict, List, Optional, Set
+from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
 from pydantic import BaseModel
@@ -12,13 +12,15 @@ from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
 from edp.types import (
+    AugmentedColumn,
     Compression,
     ComputedEdpData,
+    Config,
     DataSetType,
     ExtendedDatasetProfile,
     FileReference,
     StructuredDataSet,
-    UserProvidedEdpData,
+    _BaseColumn,
 )
 
 
@@ -33,17 +35,15 @@ class Service:
         implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
 
-    async def analyse_asset(
-        self, path: Path, user_data: UserProvidedEdpData, output_context: OutputContext
-    ) -> FileReference:
+    async def analyse_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> FileReference:
         """Let the service analyse the given asset
 
         Parameters
         ----------
         path : Path
              Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
-        user_data : UserProvidedAssetData
-            The meta information about the asset supplied by the data space. These can not get calculated and must be supplied
+        config_data : Config
+            The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
             by the user.
         output_context : OutputContext
             An instance of "OutputContext" child class. These determine, where and how the generated data gets stored.
@@ -53,13 +53,14 @@ class Service:
         FileReference
             File path or URL to the generated EDP.
         """
-        computed_data = await self._compute_asset(path, output_context)
-        asset = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
+        computed_data = await self._compute_asset(path, config_data, output_context)
+        user_data = config_data.userProvidedEdpData
+        edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
-        return await output_context.write_edp(json_name, asset)
+        return await output_context.write_edp(json_name, edp)
 
-    async def _compute_asset(self, path: Path, output_context: OutputContext) -> ComputedEdpData:
+    async def _compute_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
@@ -91,12 +92,14 @@ class Service:
 
         if len(datasets) == 0:
             raise RuntimeError("Was not able to analyze any datasets in this asset")
-        return ComputedEdpData(
+        computed_edp_data = ComputedEdpData(
             volume=calculate_size(path),
             compression=compression,
             dataTypes=data_structures,
             structuredDatasets=datasets,
         )
+        computed_edp_data = await self._add_augmentation(config_data, computed_edp_data)
+        return computed_edp_data
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""
@@ -136,6 +139,47 @@ class Service:
             yield directory
         finally:
             rmtree(directory.absolute())
+
+    async def _add_augmentation(self, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
+        structured_datasets = {dataset.name: dataset.get_columns_dict() for dataset in edp.structuredDatasets}
+
+        def _get_all_matching_columns(name: str) -> Iterator[_BaseColumn]:
+            for columns in structured_datasets.values():
+                if name in columns:
+                    yield columns[name]
+
+        def augment_column_in_all_files(augmented_column: AugmentedColumn) -> None:
+            columns = list(_get_all_matching_columns(augmented_column.name))
+            if len(columns) == 0:
+                message = f'No column "{augmented_column.name}" found in any dataset!'
+                warn(message)
+                self._logger.warning(message)
+                return
+            for column in columns:
+                column.augmentation = augmented_column.augmentation
+
+        def augment_column_in_file(augmented_column: AugmentedColumn, dataset: Dict[str, _BaseColumn]) -> None:
+            try:
+                dataset[augmented_column.name].augmentation = augmented_column.augmentation
+            except KeyError:
+                message = f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.file}'
+                self._logger.warning(message)
+                warn(message)
+
+        for augmented_column in config_data.augmentedColumns:
+            if augmented_column.file is None:
+                augment_column_in_all_files(augmented_column)
+            else:
+                try:
+                    dataset = structured_datasets[augmented_column.file]
+                except KeyError:
+                    message = f'"{augmented_column}" is not a known structured dataset!"'
+                    warn(message)
+                    self._logger.warning(message)
+                    continue
+                augment_column_in_file(augmented_column, dataset)
+
+        return edp
 
 
 def _create_importers() -> Dict[str, Importer]:

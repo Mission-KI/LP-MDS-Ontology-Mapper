@@ -5,7 +5,16 @@ from pydantic import HttpUrl
 from pytest import fixture, mark, raises
 
 from edp import Service
-from edp.types import DataSetType, DataSpace, License, Publisher, UserProvidedEdpData
+from edp.types import (
+    Augmentation,
+    AugmentedColumn,
+    Config,
+    DataSetType,
+    DataSpace,
+    License,
+    Publisher,
+    UserProvidedEdpData,
+)
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
@@ -14,7 +23,7 @@ PICKLE_PATH = DIR / "data/test.pickle"
 
 
 @fixture
-def user_data():
+def user_provided_data():
     return UserProvidedEdpData(
         assetId="my-dataset-id",
         name="dataset-dummy-name",
@@ -30,16 +39,24 @@ def user_data():
     )
 
 
+@fixture
+def config_data(user_provided_data):
+    augmented_columns = [
+        AugmentedColumn(name="aufenthalt", augmentation=Augmentation(sourceColumns=["einfahrt", "ausfahrt"]))
+    ]
+    return Config(userProvidedEdpData=user_provided_data, augmentedColumns=augmented_columns)
+
+
 @mark.asyncio
-async def test_load_unknown_dir(output_context):
+async def test_load_unknown_dir(output_context, config_data):
     service = Service()
     with raises(FileNotFoundError):
-        await service._compute_asset(Path("/does/not/exist/"), output_context)
+        await service._compute_asset(Path("/does/not/exist/"), config_data, output_context)
 
 
-async def test_analyse_pickle(output_context):
+async def test_analyse_pickle(output_context, config_data):
     service = Service()
-    computed_data = await service._compute_asset(PICKLE_PATH, output_context)
+    computed_data = await service._compute_asset(PICKLE_PATH, config_data, output_context)
     assert len(computed_data.structuredDatasets) == 1
 
     dataset = computed_data.structuredDatasets[0]
@@ -49,6 +66,7 @@ async def test_analyse_pickle(output_context):
 
     aufenthalt = next(item for item in dataset.numericColumns if item.name == "aufenthalt")
     assert aufenthalt.dataType == "uint32"
+    assert aufenthalt.augmentation == config_data.augmentedColumns[0].augmentation
 
     parkhaus = next(item for item in dataset.numericColumns if item.name == "parkhaus")
     assert parkhaus.dataType == "uint8"
@@ -58,16 +76,16 @@ async def test_analyse_pickle(output_context):
 
 
 @mark.asyncio
-async def test_analyse_csv(output_context, user_data):
+async def test_analyse_csv(output_context, config_data):
     service = Service()
-    await service.analyse_asset(CSV_PATH, user_data, output_context)
+    await service.analyse_asset(CSV_PATH, config_data, output_context)
 
 
 @mark.asyncio
-async def test_raise_on_only_unknown_datasets(tmp_path, output_context, user_data):
+async def test_raise_on_only_unknown_datasets(tmp_path, output_context, config_data):
     service = Service()
     file_path = tmp_path / "unsupported.txt"
     with open(file_path, "wt", encoding="utf-8") as file:
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):
-        await service.analyse_asset(tmp_path, user_data, output_context)
+        await service.analyse_asset(tmp_path, config_data, output_context)
