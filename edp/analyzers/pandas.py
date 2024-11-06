@@ -317,7 +317,7 @@ class Pandas(Analyzer):
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = str(object=column.name)
+        column_plot_base = self._file.output_reference + "_" + str(column.name)
         box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
         column_result = NumericColumn(
             name=str(column.name),
