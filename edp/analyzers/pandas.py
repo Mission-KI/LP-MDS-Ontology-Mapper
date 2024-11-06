@@ -405,7 +405,8 @@ class Pandas(Analyzer):
 
 async def _generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.set_title(plot_name)
+        if isinstance(axes.figure, Figure):
+            axes.figure.set_figwidth(3.0)
         axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
     return reference
 
