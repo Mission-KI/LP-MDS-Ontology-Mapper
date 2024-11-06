@@ -525,13 +525,15 @@ async def _plot_distribution(
     x_max = column_fields[_NUMERIC_UPPER_DIST]
     x_limits = (x_min, x_max)
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.set_title(plot_name)
+        axes.set_title(f"Distribution of {column.name}")
+        axes.set_xlabel(f"Value of {column.name}")
+        axes.set_ylabel("Relative Density")
         axes.set_xlim(x_min, x_max)
-        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=str(column.name))
+        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=f"{column.name} Value Distribution")
         x = linspace(x_min, x_max, 2048)
         distribution = getattr(distributions, distribution_name)
         distribution_y = distribution.pdf(x, **distribution_parameters)
-        axes.plot(x, distribution_y, label=distribution_name)
+        axes.plot(x, distribution_y, label=f"Best Fit Model Distribution {distribution_name}")
         axes.legend()
     return reference
 
