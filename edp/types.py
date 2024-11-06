@@ -81,6 +81,11 @@ class _BaseColumn(BaseModel):
     numberUnique: int = Field(description="Number of unique values")
 
 
+class TimeBasedGraph(BaseModel):
+    timeBaseColumn: str
+    file: FileReference
+
+
 class NumericColumn(_BaseColumn):
     min: Numeric
     max: Numeric
@@ -104,8 +109,17 @@ class NumericColumn(_BaseColumn):
         default=None, description="Link to the combined histogram/distribution graph"
     )
     boxPlot: FileReference = Field(description="Link to the box plot of this column")
-    seasonalityGraphs: List[FileReference] = Field(
-        default_factory=list, description="Link to a seasonality graph of this column"
+    seasonalities: List[TimeBasedGraph] = Field(
+        default_factory=list, description="Seasonality graphs oer all available date time columns"
+    )
+    trends: List[TimeBasedGraph] = Field(
+        default_factory=list, description="Trend graphs over all available date time columns"
+    )
+    residuals: List[TimeBasedGraph] = Field(
+        default_factory=list, description="Residual graphs over all available date time columns"
+    )
+    weights: List[TimeBasedGraph] = Field(
+        default_factory=list, description="Weights graphs over all available date time columns"
     )
     dataType: str
 
