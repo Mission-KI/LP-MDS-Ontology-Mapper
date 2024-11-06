@@ -48,7 +48,7 @@ DATE_TIME_FORMAT = "ISO8601"
 
 
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(seconds=30), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
