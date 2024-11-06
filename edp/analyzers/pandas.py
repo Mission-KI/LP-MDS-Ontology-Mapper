@@ -5,19 +5,18 @@ from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
-from typing import AsyncIterator, Dict, Iterator, List, Optional, Tuple
-from warnings import warn
+from typing import Dict, Iterator, List, Optional, Tuple
+from warnings import catch_warnings, warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
-from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
-from numpy.typing import ArrayLike
+from numpy import array, corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
+    DateOffset,
     DatetimeIndex,
-    Period,
     Series,
     concat,
     to_datetime,
@@ -635,29 +634,59 @@ async def _get_seasonalities(logger: Logger, columns: DataFrame) -> Series:
         row_count = new_count
 
     deltas = prepared_columns.index.to_series().dt
-    periods = ["s", "min", "h", "d", "W", "M", "Y"]
-    ts = DataFrame({period: deltas.to_period(period).dt.to_timestamp() for period in periods})
-    ts_previous = ts.shift(periods=1)
-    ts_next = DataFrame({period: column + Period(freq=str(period)) for period, column in ts_previous.items()})
-    is_not_equal = (ts != ts_previous) & (ts != ts_next)
+    granularities = ["s", "min", "h", "d", "W", "M", "Y"]
+    granularity_offsets = array(
+        [
+            DateOffset(seconds=1),
+            DateOffset(minutes=1),
+            DateOffset(hours=1),
+            DateOffset(days=1),
+            DateOffset(weeks=1),
+            DateOffset(months=1),
+            DateOffset(years=1),
+        ]
+    )
+    timestamp = DataFrame(
+        {granularity: deltas.to_period(granularity).dt.to_timestamp() for granularity in granularities}
+    )
+    timestamp_previous = timestamp.shift(periods=1)
+
+    # Remove first value, it in invalid
+    timestamp = timestamp[1:]
+    timestamp_previous = timestamp_previous[1:]
+    prepared_columns = prepared_columns[1:]
+
+    # This warns about using an object type array (granularity_offsets) for adding.
+    # But since there is no proper type to represent Period with different frequencies,
+    # we just ignore the warning.
+    with catch_warnings(action="ignore"):
+        timestamp_next = timestamp_previous + granularity_offsets
+
+    is_not_equal = (timestamp != timestamp_previous) & (timestamp != timestamp_next)
     gaps = is_not_equal.sum()
-    distincts = ts.nunique()
+    distincts = timestamp.nunique()
     diff = distincts - gaps.abs()
     periodicity = diff.idxmax()
-    prepared_columns.index = ts[periodicity]  # type: ignore
-    period = int(distincts[periodicity].item() / 2)
+    distinct_count = distincts[periodicity].item()
     series: Series = Series(
-        {name: _seasonal_decompose_column(column, period) for name, column in prepared_columns.items()}
+        {
+            name: _seasonal_decompose_column(column=column, distinct_count=distinct_count)
+            for name, column in prepared_columns.items()
+        }
     )
     logger.info("Finished seasonality analysis, found highest periodicity at %s level", periodicity)
     return series
 
 
-def _seasonal_decompose_column(column: Series, period: int) -> Optional[DecomposeResult]:
+def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[DecomposeResult]:
     non_null_column = column[column.notnull()]
-    if len(non_null_column) < 1:
+    number_non_null = len(non_null_column)
+    if number_non_null < 1:
         return None
-    return seasonal_decompose(non_null_column, model="additive", period=period)
+    divider = min(16, number_non_null)
+    period = int(distinct_count / divider)
+    period = max(1, period)
+    return seasonal_decompose(non_null_column, period=period, model="additive")
 
 
 async def _get_seasonality_graphs(
