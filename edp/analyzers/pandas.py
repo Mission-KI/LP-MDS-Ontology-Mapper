@@ -41,6 +41,7 @@ from edp.types import (
     StringColumn,
     StructuredDataSet,
     TemporalConsistency,
+    TimeBasedGraph,
 )
 
 DATE_TIME_FORMAT = "ISO8601"
@@ -106,6 +107,20 @@ class _Distributions(str, Enum):
     TooSmallDataset = "dataset too small to determine distribution"
 
 
+class _PerTimeBaseSeasonalityGraphs:
+    def __init__(
+        self,
+        trend: TimeBasedGraph,
+        seasonality: TimeBasedGraph,
+        residual: TimeBasedGraph,
+        weights: TimeBasedGraph,
+    ) -> None:
+        self.trend = trend
+        self.seasonality = seasonality
+        self.residual = residual
+        self.weight = weights
+
+
 class Pandas(Analyzer):
     def __init__(self, data: DataFrame, file: File):
         self._logger = getLogger(__name__)
@@ -143,6 +158,7 @@ class Pandas(Analyzer):
         if datetime_index is not None:
             self._logger.info('Using "%s" as index', datetime_index.name)
             self._data.set_index(datetime_index, inplace=True)
+        datetime_column_name: Optional[str] = str(datetime_index.name) if datetime_index is not None else None
 
         numeric_ids = columns_by_type[_ColumnType.Numeric]
         numeric_columns = self._data.loc[:, numeric_ids]
@@ -156,7 +172,7 @@ class Pandas(Analyzer):
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
-                numeric_columns[name], _get_single_row(name, numeric_fields), output_context
+                numeric_columns[name], _get_single_row(name, numeric_fields), output_context, datetime_column_name
             )
             for name in numeric_ids
         ]
@@ -294,7 +310,11 @@ class Pandas(Analyzer):
             return _ColumnType.String
 
     async def _transform_numeric_results(
-        self, column: Series, computed_fields: Series, output_context: OutputContext
+        self,
+        column: Series,
+        computed_fields: Series,
+        output_context: OutputContext,
+        datetime_index_column: Optional[str],
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         column_plot_base = str(object=column.name)
@@ -338,15 +358,22 @@ class Pandas(Analyzer):
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
                 output_context,
             )
-        if _NUMERIC_SEASONALITY in computed_fields.index:
-            column_result.seasonalityGraphs = [
-                graph
-                async for graph in _plot_seasonality(
-                    column_plot_base + "_seasonality",
-                    computed_fields[_NUMERIC_SEASONALITY],
-                    output_context,
-                )
-            ]
+
+        if (
+            (_NUMERIC_SEASONALITY in computed_fields.index)
+            and (computed_fields[_NUMERIC_SEASONALITY] is not None)
+            and (datetime_index_column is not None)
+        ):
+            seasonality_graphs = await _get_seasonality_graphs(
+                column_plot_base + "_seasonality",
+                datetime_index_column,
+                computed_fields[_NUMERIC_SEASONALITY],
+                output_context,
+            )
+            column_result.trends = [seasonality_graphs.trend]
+            column_result.seasonalities = [seasonality_graphs.seasonality]
+            column_result.residuals = [seasonality_graphs.residual]
+            column_result.weights = [seasonality_graphs.weight]
         return column_result
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
@@ -553,6 +580,8 @@ async def _get_correlation_graph(
 
 
 async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optional[DatetimeIndex]:
+    # TODO: Remove this function. In future release, there will not be any single primary date time column.
+    #       All date time columns will be evaluated against all numeric rows rows for analysis.
     frequency = "infer"
     number_columns = len(columns.columns)
     if number_columns == 0:
@@ -627,14 +656,12 @@ def _seasonal_decompose_column(column: Series, period: int) -> Optional[Decompos
     return seasonal_decompose(non_null_column, model="additive", period=period)
 
 
-async def _plot_seasonality(
+async def _get_seasonality_graphs(
     plot_name: str,
-    seasonality: Optional[DecomposeResult],
+    time_base_column: str,
+    seasonality: DecomposeResult,
     output_context: OutputContext,
-) -> AsyncIterator[FileReference]:
-    if seasonality is None:
-        return
-
+) -> _PerTimeBaseSeasonalityGraphs:
     xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
 
     @asynccontextmanager
@@ -646,22 +673,25 @@ async def _plot_seasonality(
                 axes.figure.set_figwidth(20)
             yield axes, reference
 
-    async with get_plot("trend") as (axes, reference):
+    async with get_plot("trend") as (axes, trend_reference):
         seasonality.trend.plot(ax=axes)
-        yield reference
 
-    async with get_plot("seasonal") as (axes, reference):
+    async with get_plot("seasonal") as (axes, seasonal_reference):
         seasonality.seasonal.plot(ax=axes)
-        yield reference
 
-    async with get_plot("residual") as (axes, reference):
+    async with get_plot("residual") as (axes, residual_reference):
         seasonality.resid.plot(ax=axes, marker="o", linestyle="none")
         axes.plot(xlim, (0, 0), zorder=-3)
-        yield reference
 
-    async with get_plot("weights") as (axes, reference):
+    async with get_plot("weights") as (axes, weights_reference):
         seasonality.weights.plot(ax=axes)
-        yield reference
+
+    return _PerTimeBaseSeasonalityGraphs(
+        trend=TimeBasedGraph(timeBaseColumn=time_base_column, file=trend_reference),
+        seasonality=TimeBasedGraph(timeBaseColumn=time_base_column, file=seasonal_reference),
+        residual=TimeBasedGraph(timeBaseColumn=time_base_column, file=residual_reference),
+        weights=TimeBasedGraph(timeBaseColumn=time_base_column, file=weights_reference),
+    )
 
 
 def infer_type_and_convert(column: Series) -> Series:
