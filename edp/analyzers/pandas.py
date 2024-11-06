@@ -365,7 +365,8 @@ class Pandas(Analyzer):
             and (datetime_index_column is not None)
         ):
             seasonality_graphs = await _get_seasonality_graphs(
-                column_plot_base + "_seasonality",
+                str(column.name),
+                column_plot_base,
                 datetime_index_column,
                 computed_fields[_NUMERIC_SEASONALITY],
                 output_context,
@@ -658,7 +659,8 @@ def _seasonal_decompose_column(column: Series, period: int) -> Optional[Decompos
 
 
 async def _get_seasonality_graphs(
-    plot_name: str,
+    column_name: str,
+    column_plot_base: str,
     time_base_column: str,
     seasonality: DecomposeResult,
     output_context: OutputContext,
@@ -666,26 +668,29 @@ async def _get_seasonality_graphs(
     xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
 
     @asynccontextmanager
-    async def get_plot(suffix: str):
-        async with output_context.get_plot(plot_name + "_" + suffix) as (axes, reference):
+    async def get_plot(plot_type: str):
+        async with output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
+            axes.set_title(f"{plot_type} of {column_name} over {time_base_column}")
+            axes.set_xlabel(time_base_column)
+            axes.set_ylabel(f"{plot_type} of {column_name}")
             if axes.figure:
                 axes.set_xlim(xlim)
             if isinstance(axes.figure, Figure):
                 axes.figure.set_figwidth(20)
             yield axes, reference
 
-    async with get_plot("trend") as (axes, trend_reference):
-        seasonality.trend.plot(ax=axes)
+    async with get_plot("Trend") as (axes, trend_reference):
+        axes.plot(seasonality.trend)
 
-    async with get_plot("seasonal") as (axes, seasonal_reference):
-        seasonality.seasonal.plot(ax=axes)
+    async with get_plot("Seasonality") as (axes, seasonal_reference):
+        axes.plot(seasonality.seasonal)
 
-    async with get_plot("residual") as (axes, residual_reference):
-        seasonality.resid.plot(ax=axes, marker="o", linestyle="none")
+    async with get_plot("Residual") as (axes, residual_reference):
+        axes.plot(seasonality.resid, marker="o", linestyle="none")
         axes.plot(xlim, (0, 0), zorder=-3)
 
-    async with get_plot("weights") as (axes, weights_reference):
-        seasonality.weights.plot(ax=axes)
+    async with get_plot("Weights") as (axes, weights_reference):
+        axes.plot(seasonality.weights)
 
     return _PerTimeBaseSeasonalityGraphs(
         trend=TimeBasedGraph(timeBaseColumn=time_base_column, file=trend_reference),
