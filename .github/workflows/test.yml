@@ -2,6 +2,9 @@ name: Build container
 
 on: [pull_request]
 
+env:
+    PYTHON_VERSION: 3.12
+
 jobs:
     linter:
         runs-on: ubuntu-24.04
@@ -12,7 +15,7 @@ jobs:
                 lfs: true
         -   uses: actions/setup-python@v5
             with:
-                python-version: "3.12"
+                python-version: ${{ env.PYTHON_VERSION }}
                 cache: "pip"
         -   name: Install
             run: |
@@ -25,10 +28,7 @@ jobs:
                 bandit --configfile pyproject.toml -r .
 
     unit-tests:
-        runs-on: ubuntu-20.04
-        strategy:
-            matrix:
-                PYTHON_VERSION: ["3.10", "3.11", "3.12"]
+        runs-on: ubuntu-24.04
         name: Perform unit tests
         steps:
         -   uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
                 lfs: true
         -   uses: actions/setup-python@v5
             with:
-                python-version: ${{ matrix.PYTHON_VERSION}}
+                python-version: ${{ env.PYTHON_VERSION }}
                 cache: "pip"
         -   name: Install
             run: |

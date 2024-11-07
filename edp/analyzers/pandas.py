@@ -5,19 +5,18 @@ from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
-from typing import AsyncIterator, Dict, Iterator, List, Optional, Tuple
-from warnings import warn
+from typing import Dict, Iterator, List, Optional, Tuple
+from warnings import catch_warnings, warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
-from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
-from numpy.typing import ArrayLike
+from numpy import array, corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
+    DateOffset,
     DatetimeIndex,
-    Period,
     Series,
     concat,
     to_datetime,
@@ -48,7 +47,7 @@ DATE_TIME_FORMAT = "ISO8601"
 
 
 class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=10), description="Timeout to use for the fitting")
+    timeout: timedelta = Field(default=timedelta(seconds=30), description="Timeout to use for the fitting")
     error_function: str = Field(
         default="sumsquare_error", description="Error function to use to measure performance of the fits"
     )
@@ -317,7 +316,7 @@ class Pandas(Analyzer):
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = str(object=column.name)
+        column_plot_base = self._file.output_reference + "_" + str(column.name)
         box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
         column_result = NumericColumn(
             name=str(column.name),
@@ -365,7 +364,8 @@ class Pandas(Analyzer):
             and (datetime_index_column is not None)
         ):
             seasonality_graphs = await _get_seasonality_graphs(
-                column_plot_base + "_seasonality",
+                str(column.name),
+                column_plot_base,
                 datetime_index_column,
                 computed_fields[_NUMERIC_SEASONALITY],
                 output_context,
@@ -405,7 +405,8 @@ class Pandas(Analyzer):
 
 async def _generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.set_title(plot_name)
+        if isinstance(axes.figure, Figure):
+            axes.figure.set_figwidth(3.0)
         axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
     return reference
 
@@ -523,13 +524,15 @@ async def _plot_distribution(
     x_max = column_fields[_NUMERIC_UPPER_DIST]
     x_limits = (x_min, x_max)
     async with output_context.get_plot(plot_name) as (axes, reference):
-        axes.set_title(plot_name)
+        axes.set_title(f"Distribution of {column.name}")
+        axes.set_xlabel(f"Value of {column.name}")
+        axes.set_ylabel("Relative Density")
         axes.set_xlim(x_min, x_max)
-        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=str(column.name))
+        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=f"{column.name} Value Distribution")
         x = linspace(x_min, x_max, 2048)
         distribution = getattr(distributions, distribution_name)
         distribution_y = distribution.pdf(x, **distribution_parameters)
-        axes.plot(x, distribution_y, label=distribution_name)
+        axes.plot(x, distribution_y, label=f"Best Fit Model Distribution {distribution_name}")
         axes.legend()
     return reference
 
@@ -631,33 +634,64 @@ async def _get_seasonalities(logger: Logger, columns: DataFrame) -> Series:
         row_count = new_count
 
     deltas = prepared_columns.index.to_series().dt
-    periods = ["s", "min", "h", "d", "W", "M", "Y"]
-    ts = DataFrame({period: deltas.to_period(period).dt.to_timestamp() for period in periods})
-    ts_previous = ts.shift(periods=1)
-    ts_next = DataFrame({period: column + Period(freq=str(period)) for period, column in ts_previous.items()})
-    is_not_equal = (ts != ts_previous) & (ts != ts_next)
+    granularities = ["s", "min", "h", "d", "W", "M", "Y"]
+    granularity_offsets = array(
+        [
+            DateOffset(seconds=1),
+            DateOffset(minutes=1),
+            DateOffset(hours=1),
+            DateOffset(days=1),
+            DateOffset(weeks=1),
+            DateOffset(months=1),
+            DateOffset(years=1),
+        ]
+    )
+    timestamp = DataFrame(
+        {granularity: deltas.to_period(granularity).dt.to_timestamp() for granularity in granularities}
+    )
+    timestamp_previous = timestamp.shift(periods=1)
+
+    # Remove first value, it in invalid
+    timestamp = timestamp[1:]
+    timestamp_previous = timestamp_previous[1:]
+    prepared_columns = prepared_columns[1:]
+
+    # This warns about using an object type array (granularity_offsets) for adding.
+    # But since there is no proper type to represent Period with different frequencies,
+    # we just ignore the warning.
+    with catch_warnings(action="ignore"):
+        timestamp_next = timestamp_previous + granularity_offsets
+
+    is_not_equal = (timestamp != timestamp_previous) & (timestamp != timestamp_next)
     gaps = is_not_equal.sum()
-    distincts = ts.nunique()
+    distincts = timestamp.nunique()
     diff = distincts - gaps.abs()
     periodicity = diff.idxmax()
-    prepared_columns.index = ts[periodicity]  # type: ignore
-    period = int(distincts[periodicity].item() / 2)
+    distinct_count = distincts[periodicity].item()
     series: Series = Series(
-        {name: _seasonal_decompose_column(column, period) for name, column in prepared_columns.items()}
+        {
+            name: _seasonal_decompose_column(column=column, distinct_count=distinct_count)
+            for name, column in prepared_columns.items()
+        }
     )
     logger.info("Finished seasonality analysis, found highest periodicity at %s level", periodicity)
     return series
 
 
-def _seasonal_decompose_column(column: Series, period: int) -> Optional[DecomposeResult]:
+def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[DecomposeResult]:
     non_null_column = column[column.notnull()]
-    if len(non_null_column) < 1:
+    number_non_null = len(non_null_column)
+    if number_non_null < 1:
         return None
-    return seasonal_decompose(non_null_column, model="additive", period=period)
+    divider = min(16, number_non_null)
+    period = int(distinct_count / divider)
+    period = max(1, period)
+    return seasonal_decompose(non_null_column, period=period, model="additive")
 
 
 async def _get_seasonality_graphs(
-    plot_name: str,
+    column_name: str,
+    column_plot_base: str,
     time_base_column: str,
     seasonality: DecomposeResult,
     output_context: OutputContext,
@@ -665,26 +699,29 @@ async def _get_seasonality_graphs(
     xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
 
     @asynccontextmanager
-    async def get_plot(suffix: str):
-        async with output_context.get_plot(plot_name + "_" + suffix) as (axes, reference):
+    async def get_plot(plot_type: str):
+        async with output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
+            axes.set_title(f"{plot_type} of {column_name} over {time_base_column}")
+            axes.set_xlabel(time_base_column)
+            axes.set_ylabel(f"{plot_type} of {column_name}")
             if axes.figure:
                 axes.set_xlim(xlim)
             if isinstance(axes.figure, Figure):
                 axes.figure.set_figwidth(20)
             yield axes, reference
 
-    async with get_plot("trend") as (axes, trend_reference):
-        seasonality.trend.plot(ax=axes)
+    async with get_plot("Trend") as (axes, trend_reference):
+        axes.plot(seasonality.trend)
 
-    async with get_plot("seasonal") as (axes, seasonal_reference):
-        seasonality.seasonal.plot(ax=axes)
+    async with get_plot("Seasonality") as (axes, seasonal_reference):
+        axes.plot(seasonality.seasonal)
 
-    async with get_plot("residual") as (axes, residual_reference):
-        seasonality.resid.plot(ax=axes, marker="o", linestyle="none")
+    async with get_plot("Residual") as (axes, residual_reference):
+        axes.plot(seasonality.resid, marker="o", linestyle="none")
         axes.plot(xlim, (0, 0), zorder=-3)
 
-    async with get_plot("weights") as (axes, weights_reference):
-        seasonality.weights.plot(ax=axes)
+    async with get_plot("Weights") as (axes, weights_reference):
+        axes.plot(seasonality.weights)
 
     return _PerTimeBaseSeasonalityGraphs(
         trend=TimeBasedGraph(timeBaseColumn=time_base_column, file=trend_reference),
