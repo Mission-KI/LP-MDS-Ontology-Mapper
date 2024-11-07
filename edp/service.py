@@ -7,7 +7,7 @@ from warnings import warn
 
 from pydantic import BaseModel
 
-from edp.compression import CompressionAlgorithm
+from edp.compression import DecompressionAlgorithm, ZipAlgorithm
 from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import Importer, csv_importer, pickle_importer
@@ -30,10 +30,10 @@ class Service:
         self._logger.info("Initializing")
 
         self._importers = _create_importers()
-        self._compressions = _create_compressions()
+        self._decompressions = _create_decompressions()
         self._logger.info("The following data types are supported: [%s]", ", ".join(self._importers))
-        implemented_compressions = [key for key, value in self._compressions.items() if value is not None]
-        self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_compressions))
+        implemented_decompressions = [key for key, value in self._decompressions.items() if value is not None]
+        self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
     async def analyse_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> FileReference:
         """Let the service analyse the given asset
@@ -106,7 +106,7 @@ class Service:
 
         if path.is_file():
             file = File(base_path, path)
-            if file.type not in self._compressions:
+            if file.type not in self._decompressions:
                 yield file
             else:
                 compressions.add(file.type)
@@ -123,18 +123,18 @@ class Service:
     @asynccontextmanager
     async def _extract(self, file: File) -> AsyncIterator[Path]:
         archive_type = file.type
-        if not archive_type in self._compressions:
+        if not archive_type in self._decompressions:
             raise RuntimeError(f'"{archive_type}" is not a know archive type')
-        compression = self._compressions[archive_type]
-        if compression is None:
-            raise NotImplementedError(f'Extractin "{archive_type}" is not implemented')
+        decompression = self._decompressions[archive_type]
+        if decompression is None:
+            raise NotImplementedError(f'Extracting "{archive_type}" is not implemented')
         archive_name = file.path.name
         directory = file.path.parent / archive_name.replace(".", "_")
         while directory.exists():
             directory /= "extracted"
 
         directory.mkdir()
-        await compression.extract(file.path, directory)
+        await decompression.extract(file.path, directory)
         try:
             yield directory
         finally:
@@ -186,13 +186,13 @@ def _create_importers() -> Dict[str, Importer]:
     return {"csv": csv_importer, "pickle": pickle_importer}
 
 
-def _create_compressions() -> Dict[str, Optional[CompressionAlgorithm]]:
+def _create_decompressions() -> Dict[str, Optional[DecompressionAlgorithm]]:
     return {
         "br": None,
         "rpm": None,
         "dcm": None,
         "epub": None,
-        "zip": None,
+        "zip": ZipAlgorithm(),
         "tar": None,
         "rar": None,
         "gz": None,
