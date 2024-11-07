@@ -7,10 +7,10 @@ from warnings import warn
 
 from pydantic import BaseModel
 
-from edp.compression import DecompressionAlgorithm, ZipAlgorithm
+from edp.compression import DECOMPRESSION_ALGORITHMS
 from edp.context import OutputContext
 from edp.file import File, calculate_size
-from edp.importers import Importer, csv_importer, pickle_importer
+from edp.importers import IMPORTERS
 from edp.types import (
     AugmentedColumn,
     Compression,
@@ -29,10 +29,8 @@ class Service:
         self._logger = getLogger(__name__)
         self._logger.info("Initializing")
 
-        self._importers = _create_importers()
-        self._decompressions = _create_decompressions()
-        self._logger.info("The following data types are supported: [%s]", ", ".join(self._importers))
-        implemented_decompressions = [key for key, value in self._decompressions.items() if value is not None]
+        self._logger.info("The following data types are supported: [%s]", ", ".join(IMPORTERS))
+        implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
     async def analyse_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> FileReference:
@@ -72,12 +70,12 @@ class Service:
         async for child_file in self._walk_all_files(base_path, path, compressions):
             file_type = child_file.type
             extracted_size += child_file.size
-            if not file_type in self._importers:
+            if not file_type in IMPORTERS:
                 text = f'Import for "{file_type}" not yet supported'
                 self._logger.warning(text)
                 warn(text, RuntimeWarning)
                 continue
-            analyzer = await self._importers[file_type](child_file)
+            analyzer = await IMPORTERS[file_type](child_file)
             data_structures.add(analyzer.data_set_type)
             dataset_result = await analyzer.analyze(output_context)
             if not isinstance(dataset_result, StructuredDataSet):
@@ -106,7 +104,7 @@ class Service:
 
         if path.is_file():
             file = File(base_path, path)
-            if file.type not in self._decompressions:
+            if file.type not in DECOMPRESSION_ALGORITHMS:
                 yield file
             else:
                 compressions.add(file.type)
@@ -123,10 +121,10 @@ class Service:
     @asynccontextmanager
     async def _extract(self, file: File) -> AsyncIterator[Path]:
         archive_type = file.type
-        if not archive_type in self._decompressions:
+        if not archive_type in DECOMPRESSION_ALGORITHMS:
             raise RuntimeError(f'"{archive_type}" is not a know archive type')
-        decompression = self._decompressions[archive_type]
-        if decompression is None:
+        decompressor = DECOMPRESSION_ALGORITHMS[archive_type]
+        if decompressor is None:
             raise NotImplementedError(f'Extracting "{archive_type}" is not implemented')
         archive_name = file.path.name
         directory = file.path.parent / archive_name.replace(".", "_")
@@ -134,7 +132,7 @@ class Service:
             directory /= "extracted"
 
         directory.mkdir()
-        await decompression.extract(file.path, directory)
+        await decompressor.extract(file.path, directory)
         try:
             yield directory
         finally:
@@ -180,43 +178,6 @@ class Service:
                 augment_column_in_file(augmented_column, dataset)
 
         return edp
-
-
-def _create_importers() -> Dict[str, Importer]:
-    return {"csv": csv_importer, "pickle": pickle_importer}
-
-
-def _create_decompressions() -> Dict[str, Optional[DecompressionAlgorithm]]:
-    return {
-        "br": None,
-        "rpm": None,
-        "dcm": None,
-        "epub": None,
-        "zip": ZipAlgorithm(),
-        "tar": None,
-        "rar": None,
-        "gz": None,
-        "bz2": None,
-        "7z": None,
-        "xz": None,
-        "pdf": None,
-        "exe": None,
-        "swf": None,
-        "rtf": None,
-        "eot": None,
-        "ps": None,
-        "sqlite": None,
-        "nes": None,
-        "crx": None,
-        "cab": None,
-        "deb": None,
-        "ar": None,
-        "Z": None,
-        "lzo": None,
-        "lz": None,
-        "lz4": None,
-        "zstd": None,
-    }
 
 
 def _as_dict(model: BaseModel):
