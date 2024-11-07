@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from pydantic import HttpUrl
 from pytest import fixture, mark, raises
 
 from edp import Service
@@ -11,6 +10,7 @@ from edp.types import (
     Config,
     DataSetType,
     DataSpace,
+    ExtendedDatasetProfile,
     License,
     Publisher,
     UserProvidedEdpData,
@@ -20,6 +20,7 @@ DIR = Path(__file__).parent
 ENCODING = "utf-8"
 CSV_PATH = DIR / "data/test.csv"
 PICKLE_PATH = DIR / "data/test.pickle"
+ZIP_PATH = DIR / "data/test.zip"
 
 
 @fixture
@@ -78,7 +79,19 @@ async def test_analyse_pickle(output_context, config_data):
 @mark.asyncio
 async def test_analyse_csv(output_context, config_data):
     service = Service()
-    await service.analyse_asset(CSV_PATH, config_data, output_context)
+    json_file = await service.analyse_asset(CSV_PATH, config_data, output_context)
+    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
+    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.compression is None
+
+
+@mark.asyncio
+async def test_analyse_zip(output_context, config_data):
+    service = Service()
+    json_file = await service.analyse_asset(ZIP_PATH, config_data, output_context)
+    edp = read_edp(output_context.build_full_path(json_file))
+    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert "zip" in edp.compression.algorithms
 
 
 @mark.asyncio
@@ -89,3 +102,9 @@ async def test_raise_on_only_unknown_datasets(tmp_path, output_context, config_d
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):
         await service.analyse_asset(tmp_path, config_data, output_context)
+
+
+def read_edp(json_file: PurePosixPath):
+    with open(json_file, "r") as file:
+        json_data = file.read()
+    return ExtendedDatasetProfile.model_validate_json(json_data)

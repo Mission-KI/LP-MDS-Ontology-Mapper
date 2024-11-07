@@ -5,12 +5,12 @@ from uuid import uuid4
 
 from fastapi import Request, UploadFile
 
+from edp.compression.zip import ZipAlgorithm
 from edp.config import AppConfig
 from edp.context import OutputLocalFilesContext
 from edp.job.types import Job, JobState, UserProvidedEdpData
 from edp.service import Service
 from edp.types import Config
-from edp.zip import zip_directory
 
 
 class AnalysisJobManager(ABC):
@@ -96,7 +96,7 @@ class InMemoryJobManager(AnalysisJobManager):
             await self._service.analyse_asset(
                 job.input_data_dir, Config(userProvidedEdpData=job.user_data), output_context
             )
-            zip_directory(job.result_dir, job.zip_path)
+            await ZipAlgorithm().compress(job.result_dir, job.zip_path)
             job.state = JobState.COMPLETED
             self._logger.info("Job %s completed.", job.job_id)
 
