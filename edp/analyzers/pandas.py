@@ -5,6 +5,7 @@ from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
+from pathlib import PurePosixPath
 from typing import Dict, Iterator, List, Optional, Tuple
 from warnings import catch_warnings, warn
 
@@ -202,7 +203,7 @@ class Pandas(Analyzer):
             transformed_numeric_column_count + transformed_date_time_column_count + transformed_string_column_count
         )
         return StructuredDataSet(
-            name=self._file.output_reference,
+            name=PurePosixPath(self._file.relative),
             rowCount=row_count,
             columnCount=column_count,
             numericColumnCount=transformed_numeric_column_count,

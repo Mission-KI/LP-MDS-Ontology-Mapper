@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, Iterator, List, Optional, Set, Union
 
 from pydantic import AnyUrl, BaseModel, Field, TypeAdapter
 
@@ -74,11 +74,32 @@ class Gap(BaseModel):
     numberOfGaps: int = Field(description="Number of gaps at the given timescale")
 
 
+class Augmentation(BaseModel):
+    sourceColumns: List[str] = Field(description="List of source columns on which the augmented column is based")
+    formula: Optional[str] = Field(
+        default=None,
+        description="The calculation that was applied to the source columns to create the augmented column",
+    )
+    parameters: List[str] = Field(default_factory=list, description="The parameters used for the calculation")
+
+
+class AugmentedColumn(BaseModel):
+    name: str = Field(description="Name of the augmented column")
+    file: Optional[PurePosixPath] = Field(
+        default=None,
+        description="Path of the augmented file this column was added. If augmentedFile is None, EDPS will assume that the augmented column contained in all files.",
+    )
+    augmentation: Augmentation = Field(description="Augmentation information")
+
+
 class _BaseColumn(BaseModel):
     name: str = Field(description="Name of the column")
     nonNullCount: int = Field(description="Number of non empty entries in the column")
     nullCount: int = Field(description="Number of empty entries in the column")
     numberUnique: int = Field(description="Number of unique values")
+    augmentation: Optional[Augmentation] = Field(
+        default=None, description="If this column was augmented this filed contains all releveant information"
+    )
 
 
 class TimeBasedGraph(BaseModel):
@@ -140,7 +161,7 @@ class StringColumn(_BaseColumn):
 
 
 class StructuredDataSet(BaseModel):
-    name: str = Field(description="Name of the structured dataset")
+    name: PurePosixPath = Field(description="Name of the structured dataset")
     rowCount: int = Field(
         description="Number of row",
     )
@@ -159,6 +180,15 @@ class StructuredDataSet(BaseModel):
     stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
+
+    @property
+    def all_columns(self) -> Iterator[_BaseColumn]:
+        yield from self.numericColumns
+        yield from self.datetimeColumns
+        yield from self.stringColumns
+
+    def get_columns_dict(self) -> Dict[str, _BaseColumn]:
+        return {column.name: column for column in self.all_columns}
 
 
 class Publisher(BaseModel):
@@ -211,6 +241,11 @@ class UserProvidedEdpData(BaseModel):
     )
     dpa: Optional[str] = Field(default=None, description="Identifier that describes or links a dpa")
     dataLog: Optional[str] = Field(default=None, description="Description or links to data log")
+
+
+class Config(BaseModel):
+    userProvidedEdpData: UserProvidedEdpData = Field(description="User provided EDP meta data")
+    augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
 
 
 class Compression(BaseModel):
