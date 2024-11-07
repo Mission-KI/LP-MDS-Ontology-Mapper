@@ -160,6 +160,7 @@ class StructuredDataSet(BaseModel):
 class Publisher(BaseModel):
     id: str = Field(description="Unique identifier of the publisher")
     name: str = Field(description="Name of the publisher")
+    url: Optional[str] = Field(default=None, description="URL to the publisher")
 
 
 class License(BaseModel):
