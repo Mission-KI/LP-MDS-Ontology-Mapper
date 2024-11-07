@@ -195,13 +195,19 @@ class Pandas(Analyzer):
             output_context,
         )
 
+        transformed_numeric_column_count = len(transformed_numeric_columns)
+        transformed_date_time_column_count = len(transformed_datetime_columns)
+        transformed_string_column_count = len(transformed_string_columns)
         column_count = (
-            len(transformed_numeric_columns) + len(transformed_datetime_columns) + len(transformed_string_columns)
+            transformed_numeric_column_count + transformed_date_time_column_count + transformed_string_column_count
         )
         return StructuredDataSet(
             name=self._file.output_reference,
             rowCount=row_count,
             columnCount=column_count,
+            numericColumnCount=transformed_numeric_column_count,
+            datetimeColumnCount=transformed_date_time_column_count,
+            stringColumnCount=transformed_string_column_count,
             numericColumns=transformed_numeric_columns,
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
