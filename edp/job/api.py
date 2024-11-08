@@ -11,7 +11,8 @@ from fastapi import (
 from fastapi.responses import FileResponse
 
 from edp.config import AppConfig
-from edp.job.manager import AnalysisJobManager, InMemoryJobManager
+from edp.job.manager import AnalysisJobManager
+from edp.job.repo import InMemoryJobRepository
 from edp.job.types import JobState, JobView, UserProvidedEdpData
 
 
@@ -20,7 +21,8 @@ class Tags(str, Enum):
 
 
 def get_job_api_router(app_config: AppConfig):
-    job_manager: AnalysisJobManager = InMemoryJobManager(app_config)
+    job_repo = InMemoryJobRepository()
+    job_manager = AnalysisJobManager(app_config, job_repo)
     router = APIRouter()
 
     @router.post("/analysisjob", tags=[Tags.AnalysisJob], summary="Create analysis job")
