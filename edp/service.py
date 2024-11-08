@@ -98,7 +98,8 @@ class Service:
             structuredDatasets=datasets,
         )
         computed_edp_data = await self._add_augmentation(config_data, computed_edp_data)
-        computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
+        if self._has_temporal_columns(computed_edp_data):
+            computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         return computed_edp_data
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
@@ -180,6 +181,13 @@ class Service:
                 augment_column_in_file(augmented_column, dataset)
 
         return edp
+
+    def _has_temporal_columns(self, edp: ComputedEdpData) -> bool:
+        for structured in edp.structuredDatasets:
+            if len(structured.datetimeColumns) > 0:
+                return True
+
+        return False
 
     def _get_overall_temporal_cover(self, edp: ComputedEdpData) -> TemporalCover:
         earliest = min(
