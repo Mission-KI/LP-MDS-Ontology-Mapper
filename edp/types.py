@@ -14,6 +14,13 @@ class DataSpace(BaseModel):
     url: str = Field(description="URL of the dataspace")
 
 
+class AssetProcessingStatus(str, Enum):
+    original_data = "Original Data"
+    processed_data = "Processed Data"
+    refined_data = "Refined Data"
+    ai_ml_result_data = "AI/ML Result Data"
+
+
 class DataSetVolume(str, Enum):
     kb = "KB"
     mb = "MB"
@@ -221,6 +228,9 @@ class UserProvidedEdpData(BaseModel):
     publishDate: datetime = Field(description="Date on which this asset has been published")
     license: License = Field(
         description="Describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)"
+    )
+    assetProcessingStatus: Optional[AssetProcessingStatus] = Field(
+        default="Original Data", description="Processing status of the asset"
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
     tags: Optional[List[str]] = Field(default_factory=list, description="Optional list of tags")
