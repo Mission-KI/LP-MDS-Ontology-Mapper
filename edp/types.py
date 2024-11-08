@@ -67,7 +67,6 @@ class TemporalConsistency(BaseModel):
     timeScale: timedelta
     stable: bool
     differentAbundancies: int
-    abundances: List
 
 
 Numeric = Union[int, float, timedelta, complex]
@@ -162,7 +161,6 @@ class DateTimeColumn(_BaseColumn):
     all_entries_are_unique: bool
     monotonically_increasing: bool
     monotonically_decreasing: bool
-    granularity: Optional[int] = Field(default=None)
     periodicity: Optional[str] = Field(default=None, description="The main periodicity found for this column")
     temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
     gaps: List[Gap] = Field(description="Number of gaps at given timescale")
@@ -191,6 +189,9 @@ class StructuredDataSet(BaseModel):
     datetimeColumns: List[DateTimeColumn] = Field(description="Datetime columns in this dataset")
     stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
+    )
+    primaryDatetimeColumn: Optional[str] = Field(
+        default=None, description="Name of the datetime column that was determined to be the primary one."
     )
 
     @property
@@ -275,6 +276,10 @@ class ComputedEdpData(BaseModel):
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
     temporalCover: Optional[TemporalCover] = Field(
         default=None, description="Earliest and latest dates contained in this asset"
+    )
+    periodicity: Optional[str] = Field(
+        default=None,
+        description="The periodicity of the index date time field of the first structured dataset",
     )
 
     structuredDatasets: List[StructuredDataSet] = Field(

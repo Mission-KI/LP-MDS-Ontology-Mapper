@@ -59,6 +59,7 @@ async def test_analyse_pickle(output_context, config_data):
     service = Service()
     computed_data = await service._compute_asset(PICKLE_PATH, config_data, output_context)
     assert len(computed_data.structuredDatasets) == 1
+    assert computed_data.periodicity == "h"
 
     dataset = computed_data.structuredDatasets[0]
     assert len(dataset.datetimeColumns) == 2

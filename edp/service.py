@@ -100,6 +100,7 @@ class Service:
         computed_edp_data = await self._add_augmentation(config_data, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
+        computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
@@ -201,6 +202,19 @@ class Service:
             for column in structured.datetimeColumns
         )
         return TemporalCover(earliest=earliest, latest=latest)
+
+    def _get_overall_temporal_consistency(self, edp: ComputedEdpData) -> Optional[str]:
+        for dataset in edp.structuredDatasets:
+            if dataset.primaryDatetimeColumn is not None:
+                try:
+                    column = next(
+                        (column for column in dataset.datetimeColumns if column.name == dataset.primaryDatetimeColumn)
+                    )
+                except StopIteration:
+                    continue
+                if column.periodicity:
+                    return column.periodicity
+        return None
 
 
 def _as_dict(model: BaseModel):

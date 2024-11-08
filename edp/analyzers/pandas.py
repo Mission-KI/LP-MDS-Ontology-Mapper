@@ -165,13 +165,13 @@ class Pandas(Analyzer):
         datetime_fields = await self._compute_datetime_fields(datetime_columns)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
         datetime_index = await _determine_datetime_index(self._logger, datetime_columns)
+        datetime_column_name: Optional[str] = None
+        datetime_column_periodicity: Optional[_PerDatetimeColumnPeriodicity] = None
         if datetime_index is not None:
             self._logger.info('Using "%s" as index', datetime_index.name)
             self._data.set_index(datetime_index, inplace=True)
-        datetime_column_name: Optional[str] = str(datetime_index.name) if datetime_index is not None else None
-        datetime_column_periodicity: Optional[_PerDatetimeColumnPeriodicity] = (
-            datetime_fields[_DATETIME_PERIODICITY][datetime_column_name] if datetime_column_name is not None else None
-        )
+            datetime_column_name = str(datetime_index.name)
+            datetime_column_periodicity = datetime_fields[_DATETIME_PERIODICITY][datetime_column_name]
 
         numeric_ids = columns_by_type[_ColumnType.Numeric]
         numeric_columns = self._data.loc[:, numeric_ids]
@@ -229,6 +229,7 @@ class Pandas(Analyzer):
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
             correlationGraph=correlation_graph,
+            primaryDatetimeColumn=datetime_column_name,
         )
 
     async def _compute_common_fields(self) -> DataFrame:
@@ -460,10 +461,7 @@ def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalCo
     abundances = column.resample(interval).count().unique()
     different_abundances = len(abundances)
     return TemporalConsistency(
-        timeScale=interval,
-        stable=(different_abundances == 1),
-        differentAbundancies=different_abundances,
-        abundances=abundances.tolist(),
+        timeScale=interval, stable=(different_abundances == 1), differentAbundancies=different_abundances
     )
 
 
