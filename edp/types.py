@@ -145,9 +145,13 @@ class NumericColumn(_BaseColumn):
     dataType: str
 
 
-class DateTimeColumn(_BaseColumn):
+class TemporalCover(BaseModel):
     earliest: datetime
     latest: datetime
+
+
+class DateTimeColumn(_BaseColumn):
+    temporalCover: TemporalCover
     all_entries_are_unique: bool
     monotonically_increasing: bool
     monotonically_decreasing: bool
@@ -258,6 +262,9 @@ class ComputedEdpData(BaseModel):
     volume: int = Field(description="Volume of the asset in MB")
     compression: Optional[Compression] = Field(default=None, description="Description of compressions used")
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
+    temporalCover: Optional[TemporalCover] = Field(
+        default=None, description="Earliest and latest dates contained in this asset"
+    )
 
     structuredDatasets: List[StructuredDataSet] = Field(
         default_factory=list,

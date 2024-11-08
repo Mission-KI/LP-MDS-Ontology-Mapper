@@ -20,6 +20,7 @@ from edp.types import (
     ExtendedDatasetProfile,
     FileReference,
     StructuredDataSet,
+    TemporalCover,
     _BaseColumn,
 )
 
@@ -97,6 +98,7 @@ class Service:
             structuredDatasets=datasets,
         )
         computed_edp_data = await self._add_augmentation(config_data, computed_edp_data)
+        computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         return computed_edp_data
 
     async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
@@ -178,6 +180,19 @@ class Service:
                 augment_column_in_file(augmented_column, dataset)
 
         return edp
+
+    def _get_overall_temporal_cover(self, edp: ComputedEdpData) -> TemporalCover:
+        earliest = min(
+            column.temporalCover.earliest
+            for structured in edp.structuredDatasets
+            for column in structured.datetimeColumns
+        )
+        latest = max(
+            column.temporalCover.latest
+            for structured in edp.structuredDatasets
+            for column in structured.datetimeColumns
+        )
+        return TemporalCover(earliest=earliest, latest=latest)
 
 
 def _as_dict(model: BaseModel):
