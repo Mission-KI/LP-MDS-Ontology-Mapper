@@ -162,7 +162,6 @@ class DateTimeColumn(_BaseColumn):
     all_entries_are_unique: bool
     monotonically_increasing: bool
     monotonically_decreasing: bool
-    granularity: Optional[int] = Field(default=None)
     periodicity: Optional[str] = Field(default=None, description="The main periodicity found for this column")
     temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
     gaps: List[Gap] = Field(description="Number of gaps at given timescale")
