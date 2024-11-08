@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
 from pytest import fixture, mark, raises
@@ -75,6 +75,7 @@ async def test_analyse_pickle(output_context, config_data):
     einfahrt = next(item for item in dataset.datetimeColumns if item.name == "einfahrt")
     assert einfahrt.temporalCover.earliest == datetime.fromisoformat("2016-01-01 00:03:14")
     assert einfahrt.temporalCover.latest == datetime.fromisoformat("2016-01-01 11:50:45")
+    assert einfahrt.periodicity == "h"
 
     assert len(computed_data.dataTypes) == 1
     assert DataSetType.structured in computed_data.dataTypes

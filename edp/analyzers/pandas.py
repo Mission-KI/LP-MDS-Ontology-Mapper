@@ -101,6 +101,7 @@ _DATETIME_MONOTONIC_INCREASING = "monotonically-increasing"
 _DATETIME_MONOTONIC_DECREASING = "monotonically-decreasing"
 _DATETIME_TEMPORAL_CONSISTENCY = "temporal-consistency"
 _DATETIME_GAPS = "gaps"
+_DATETIME_PERIODICITY = "periodicity"
 
 
 class _Distributions(str, Enum):
@@ -120,6 +121,14 @@ class _PerTimeBaseSeasonalityGraphs:
         self.seasonality = seasonality
         self.residual = residual
         self.weight = weights
+
+
+class _PerDatetimeColumnPeriodicity:
+    def __init__(self, period: str, distincts: int, gaps: int, cleaned_index: DatetimeIndex) -> None:
+        self.period = period
+        self.distincts = distincts
+        self.gaps = gaps
+        self.cleaned_index = cleaned_index
 
 
 class Pandas(Analyzer):
@@ -160,11 +169,16 @@ class Pandas(Analyzer):
             self._logger.info('Using "%s" as index', datetime_index.name)
             self._data.set_index(datetime_index, inplace=True)
         datetime_column_name: Optional[str] = str(datetime_index.name) if datetime_index is not None else None
+        datetime_column_periodicity: Optional[_PerDatetimeColumnPeriodicity] = (
+            datetime_fields[_DATETIME_PERIODICITY][datetime_column_name] if datetime_column_name is not None else None
+        )
 
         numeric_ids = columns_by_type[_ColumnType.Numeric]
         numeric_columns = self._data.loc[:, numeric_ids]
         numeric_common_fields = common_fields.loc[numeric_ids]
-        numeric_fields = await self._compute_numeric_fields(numeric_columns, numeric_common_fields)
+        numeric_fields = await self._compute_numeric_fields(
+            numeric_columns, numeric_common_fields, datetime_column_periodicity
+        )
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
         string_ids = columns_by_type[_ColumnType.String]
@@ -224,7 +238,12 @@ class Pandas(Analyzer):
         common_fields[_COMMON_UNIQUE] = self._data.nunique(dropna=True)
         return common_fields
 
-    async def _compute_numeric_fields(self, columns: DataFrame, common_fields: DataFrame) -> DataFrame:
+    async def _compute_numeric_fields(
+        self,
+        columns: DataFrame,
+        common_fields: DataFrame,
+        index_column_periodicity: Optional[_PerDatetimeColumnPeriodicity],
+    ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
         fields[_NUMERIC_MIN] = columns.min()
@@ -272,8 +291,8 @@ class Pandas(Analyzer):
             ],
             axis=1,
         )
-        if isinstance(columns.index, DatetimeIndex):
-            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(self._logger, columns)
+        if isinstance(columns.index, DatetimeIndex) and (index_column_periodicity is not None):
+            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(self._logger, columns, index_column_periodicity)
         return fields
 
     async def _compute_datetime_fields(self, columns: DataFrame) -> DataFrame:
@@ -289,7 +308,10 @@ class Pandas(Analyzer):
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
         computed[_DATETIME_TEMPORAL_CONSISTENCY] = _get_temporal_consistencies(columns, self._intervals)
+        # TODO: Merge _get_gaps() and _compute_periodicity(), since they do nearly the same.
+        #       To be clarified with Daniel.
         computed[_DATETIME_GAPS] = _get_gaps(columns, self._intervals)
+        computed[_DATETIME_PERIODICITY] = await _compute_periodicity(self._logger, columns)
         return computed
 
     async def _determine_types(self) -> Dict[_ColumnType, List[str]]:
@@ -387,6 +409,7 @@ class Pandas(Analyzer):
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
         self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
+        periodicity: _PerDatetimeColumnPeriodicity = computed_fields[_DATETIME_PERIODICITY]
 
         return DateTimeColumn(
             name=str(column.name),
@@ -401,6 +424,7 @@ class Pandas(Analyzer):
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=computed_fields[_DATETIME_TEMPORAL_CONSISTENCY],
             gaps=computed_fields[_DATETIME_GAPS],
+            periodicity=periodicity.period,
         )
 
     async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
@@ -455,6 +479,63 @@ def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Iterator
         over_interval_size = deltas > to_timedelta(interval)
         gap_count = count_nonzero(over_interval_size)
         yield Gap(timeScale=interval, numberOfGaps=gap_count)
+
+
+async def _compute_periodicity(logger: Logger, columns: DataFrame) -> Series:
+    return Series(
+        {name: _compute_periodicity_for_column(logger, DatetimeIndex(columns[name])) for name in columns.columns}
+    )
+
+
+def _compute_periodicity_for_column(logger: Logger, index: DatetimeIndex) -> _PerDatetimeColumnPeriodicity:
+    index = index.sort_values(ascending=True)
+    row_count = len(index)
+
+    # Remove null entries
+    index = index[index.notnull()]  # type: ignore
+    new_count = len(index)
+    if new_count < row_count:
+        empty_index_count = row_count - new_count
+        message = f"Filtered out {empty_index_count} rows, because their index was empty"
+        logger.warning(message)
+        warn(message)
+        row_count = new_count
+
+    deltas = index.to_series().dt
+    granularities = ["s", "min", "h", "d", "W", "M", "Y"]
+    granularity_offsets = array(
+        [
+            DateOffset(seconds=1),
+            DateOffset(minutes=1),
+            DateOffset(hours=1),
+            DateOffset(days=1),
+            DateOffset(weeks=1),
+            DateOffset(months=1),
+            DateOffset(years=1),
+        ]
+    )
+    timestamp = DataFrame(
+        {granularity: deltas.to_period(granularity).dt.to_timestamp() for granularity in granularities}
+    )
+    timestamp_previous = timestamp.shift(periods=1)
+
+    # Remove first value, it in invalid
+    timestamp = timestamp[1:]
+    timestamp_previous = timestamp_previous[1:]
+
+    # This warns about using an object type array (granularity_offsets) for adding.
+    # But since there is no proper type to represent Period with different frequencies,
+    # we just ignore the warning.
+    with catch_warnings(action="ignore"):
+        timestamp_next = timestamp_previous + granularity_offsets
+
+    is_not_equal = (timestamp != timestamp_previous) & (timestamp != timestamp_next)
+    gaps = is_not_equal.sum()
+    distincts = timestamp.nunique()
+    diff = distincts - gaps.abs()
+    periodicity = diff.idxmax()
+
+    return _PerDatetimeColumnPeriodicity(str(periodicity), distincts[periodicity], gaps[periodicity], index)
 
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
@@ -618,73 +699,20 @@ async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optio
     return DatetimeIndex(data=first_column, freq=frequency)
 
 
-async def _get_seasonalities(logger: Logger, columns: DataFrame) -> Series:
+async def _get_seasonalities(
+    logger: Logger, columns: DataFrame, index_column_periodicity: _PerDatetimeColumnPeriodicity
+) -> Series:
     row_count = len(columns.index)
     logger.info("Starting seasonality analysis on %d rows", row_count)
-    prepared_columns: DataFrame = columns.sort_index(ascending=True)
 
-    # Remove null entries in datetime index
-    prepared_columns = prepared_columns[prepared_columns.index.notnull()]  # type: ignore
-    new_count = len(prepared_columns.index)
-    if new_count < row_count:
-        empty_index_count = row_count - new_count
-        message = f"Filtered out {empty_index_count} rows, because their index was empty"
-        logger.warning(message)
-        warn(message)
-        row_count = new_count
-
-    # Drop duplicate index rows
-    prepared_columns = prepared_columns[~prepared_columns.index.duplicated(keep="first")]
-    new_count = len(prepared_columns.index)
-    if new_count < row_count:
-        duplicate_count = row_count - new_count
-        message = f"Filtered out {duplicate_count} rows with duplicate index"
-        logger.warning(message)
-        warn(message)
-        row_count = new_count
-
-    deltas = prepared_columns.index.to_series().dt
-    granularities = ["s", "min", "h", "d", "W", "M", "Y"]
-    granularity_offsets = array(
-        [
-            DateOffset(seconds=1),
-            DateOffset(minutes=1),
-            DateOffset(hours=1),
-            DateOffset(days=1),
-            DateOffset(weeks=1),
-            DateOffset(months=1),
-            DateOffset(years=1),
-        ]
-    )
-    timestamp = DataFrame(
-        {granularity: deltas.to_period(granularity).dt.to_timestamp() for granularity in granularities}
-    )
-    timestamp_previous = timestamp.shift(periods=1)
-
-    # Remove first value, it in invalid
-    timestamp = timestamp[1:]
-    timestamp_previous = timestamp_previous[1:]
-    prepared_columns = prepared_columns[1:]
-
-    # This warns about using an object type array (granularity_offsets) for adding.
-    # But since there is no proper type to represent Period with different frequencies,
-    # we just ignore the warning.
-    with catch_warnings(action="ignore"):
-        timestamp_next = timestamp_previous + granularity_offsets
-
-    is_not_equal = (timestamp != timestamp_previous) & (timestamp != timestamp_next)
-    gaps = is_not_equal.sum()
-    distincts = timestamp.nunique()
-    diff = distincts - gaps.abs()
-    periodicity = diff.idxmax()
-    distinct_count = distincts[periodicity].item()
+    filtered_columns = columns.loc[index_column_periodicity.cleaned_index]
     series: Series = Series(
         {
-            name: _seasonal_decompose_column(column=column, distinct_count=distinct_count)
-            for name, column in prepared_columns.items()
+            name: _seasonal_decompose_column(column=column, distinct_count=index_column_periodicity.distincts)
+            for name, column in filtered_columns.items()
         }
     )
-    logger.info("Finished seasonality analysis, found highest periodicity at %s level", periodicity)
+    logger.info("Finished seasonality analysis, found highest periodicity at %s level", index_column_periodicity.period)
     return series
 
 
