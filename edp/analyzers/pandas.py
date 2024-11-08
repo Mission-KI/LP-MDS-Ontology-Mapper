@@ -460,10 +460,7 @@ def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalCo
     abundances = column.resample(interval).count().unique()
     different_abundances = len(abundances)
     return TemporalConsistency(
-        timeScale=interval,
-        stable=(different_abundances == 1),
-        differentAbundancies=different_abundances,
-        abundances=abundances.tolist(),
+        timeScale=interval, stable=(different_abundances == 1), differentAbundancies=different_abundances
     )
 
 

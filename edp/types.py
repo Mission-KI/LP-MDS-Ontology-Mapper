@@ -67,7 +67,6 @@ class TemporalConsistency(BaseModel):
     timeScale: timedelta
     stable: bool
     differentAbundancies: int
-    abundances: List
 
 
 Numeric = Union[int, float, timedelta, complex]
