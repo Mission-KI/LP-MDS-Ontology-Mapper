@@ -72,8 +72,16 @@ async def test_analyse_pickle(output_context, config_data):
     parkhaus = next(item for item in dataset.numericColumns if item.name == "parkhaus")
     assert parkhaus.dataType == "uint8"
 
+    einfahrt = next(item for item in dataset.datetimeColumns if item.name == "einfahrt")
+    assert einfahrt.temporalCover.earliest == datetime.fromisoformat("2016-01-01 00:03:14")
+    assert einfahrt.temporalCover.latest == datetime.fromisoformat("2016-01-01 11:50:45")
+
     assert len(computed_data.dataTypes) == 1
     assert DataSetType.structured in computed_data.dataTypes
+
+    assert computed_data.temporalCover is not None
+    assert computed_data.temporalCover.earliest == datetime.fromisoformat("2016-01-01 00:03:14")
+    assert computed_data.temporalCover.latest == datetime.fromisoformat("2016-01-01 21:13:08")
 
 
 @mark.asyncio

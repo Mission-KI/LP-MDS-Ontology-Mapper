@@ -41,6 +41,7 @@ from edp.types import (
     StringColumn,
     StructuredDataSet,
     TemporalConsistency,
+    TemporalCover,
     TimeBasedGraph,
 )
 
@@ -202,6 +203,7 @@ class Pandas(Analyzer):
         column_count = (
             transformed_numeric_column_count + transformed_date_time_column_count + transformed_string_column_count
         )
+
         return StructuredDataSet(
             name=PurePosixPath(self._file.relative),
             rowCount=row_count,
@@ -391,8 +393,9 @@ class Pandas(Analyzer):
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
-            earliest=computed_fields[_DATETIME_EARLIEST],
-            latest=computed_fields[_DATETIME_LATEST],
+            temporalCover=TemporalCover(
+                earliest=computed_fields[_DATETIME_EARLIEST], latest=computed_fields[_DATETIME_LATEST]
+            ),
             all_entries_are_unique=computed_fields[_DATETIME_ALL_ENTRIES_UNIQUE],
             monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
