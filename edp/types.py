@@ -190,6 +190,9 @@ class StructuredDataSet(BaseModel):
     stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
+    primaryDatetimeColumn: Optional[str] = Field(
+        default=None, description="Name of the datetime column that was determined to be the primary one."
+    )
 
     @property
     def all_columns(self) -> Iterator[_BaseColumn]:
@@ -273,6 +276,10 @@ class ComputedEdpData(BaseModel):
     dataTypes: Set[DataSetType] = Field(description="Types of data contained in this asset")
     temporalCover: Optional[TemporalCover] = Field(
         default=None, description="Earliest and latest dates contained in this asset"
+    )
+    periodicity: Optional[str] = Field(
+        default=None,
+        description="The periodicity of the index date time field of the first structured dataset",
     )
 
     structuredDatasets: List[StructuredDataSet] = Field(
