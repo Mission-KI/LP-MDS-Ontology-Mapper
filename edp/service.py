@@ -182,14 +182,12 @@ class Service:
 
         return edp
 
-
     def _has_temporal_columns(self, edp: ComputedEdpData) -> bool:
         for structured in edp.structuredDatasets:
             if len(structured.datetimeColumns) > 0:
                 return True
 
         return False
-
 
     def _get_overall_temporal_cover(self, edp: ComputedEdpData) -> TemporalCover:
         earliest = min(
