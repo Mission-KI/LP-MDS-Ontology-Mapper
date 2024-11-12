@@ -72,7 +72,6 @@ class TemporalConsistency(BaseModel):
 Numeric = Union[int, float, timedelta, complex]
 
 FileReference = Union[PurePosixPath, AnyUrl]
-ImageList = List[FileReference]
 
 
 class Gap(BaseModel):
