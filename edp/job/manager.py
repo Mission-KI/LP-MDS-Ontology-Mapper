@@ -28,16 +28,13 @@ class AnalysisJobManager:
         job_id = str(uuid4())
 
         # Create job dir
-        job_dir = self._app_config.working_dir / job_id
-        job_dir.mkdir(parents=True, exist_ok=True)
+        job_base_dir = self._app_config.working_dir / job_id
+        job_base_dir.mkdir(parents=True, exist_ok=True)
 
         job = Job(
             job_id=job_id,
-            state=JobState.WAITING_FOR_DATA,
             user_data=userdata,
-            input_data_dir=job_dir / "input",
-            result_dir=job_dir / "result",
-            zip_path=job_dir / "result.zip",
+            job_base_dir=job_base_dir,
         )
         await self._job_repo.create(job)
 
@@ -67,7 +64,7 @@ class AnalysisJobManager:
             await self._service.analyse_asset(
                 job.input_data_dir, Config(userProvidedEdpData=job.user_data), output_context
             )
-            await ZipAlgorithm().compress(job.result_dir, job.zip_path)
+            await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
             job.state = JobState.COMPLETED
             await self._job_repo.update(job)
             self._logger.info("Job %s completed.", job.job_id)

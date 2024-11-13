@@ -103,7 +103,7 @@ def get_job_api_router(app_config: AppConfig):
         job = await job_manager.get_job(job_id)
         if job.state != JobState.COMPLETED:
             raise RuntimeError(f"There is no result for job {job.job_id}")
-        return FileResponse(job.zip_path, media_type="application/zip", filename=job.zip_path.name)
+        return FileResponse(job.zip_archive, media_type="application/zip", filename=job.zip_archive.name)
 
     @router.get(
         "/analysisjob/{job_id}/report",
