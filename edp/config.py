@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 # App config is read from .env file and validate on app startup.
@@ -12,8 +12,7 @@ class AppConfig(BaseSettings):
     host: str = Field(description="Bind FastAPI to host", default="127.0.0.1")
     # api_key: str = Field(description="API key", exclude=True)     # example for required secret setting
 
-    class Config:
-        env_file = "edp/.env"
+    model_config = SettingsConfigDict(env_file="edp/.env")
 
 
 def get_app_config():
