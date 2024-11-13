@@ -303,5 +303,5 @@ def export_edp_schema():
 
 def _get_args():
     parser = ArgumentParser()
-    parser.add_argument("-o", "--output", type=Path, help="PurePosixPath to output the schema to")
+    parser.add_argument("-o", "--output", type=Path, required=True, help="PurePosixPath to output the schema to")
     return parser.parse_args()
