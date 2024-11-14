@@ -112,15 +112,15 @@ class _Distributions(str, Enum):
 class _PerTimeBaseSeasonalityGraphs:
     def __init__(
         self,
+        original: TimeBasedGraph,
         trend: TimeBasedGraph,
         seasonality: TimeBasedGraph,
         residual: TimeBasedGraph,
-        weights: TimeBasedGraph,
     ) -> None:
+        self.original = original
         self.trend = trend
         self.seasonality = seasonality
         self.residual = residual
-        self.weight = weights
 
 
 class _PerDatetimeColumnPeriodicity:
@@ -402,10 +402,10 @@ class Pandas(Analyzer):
                 computed_fields[_NUMERIC_SEASONALITY],
                 output_context,
             )
+            column_result.original_series = [seasonality_graphs.original]
             column_result.trends = [seasonality_graphs.trend]
             column_result.seasonalities = [seasonality_graphs.seasonality]
             column_result.residuals = [seasonality_graphs.residual]
-            column_result.weights = [seasonality_graphs.weight]
         return column_result
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
@@ -746,6 +746,9 @@ async def _get_seasonality_graphs(
                 axes.figure.set_figwidth(20)
             yield axes, reference
 
+    async with get_plot("Original") as (axes, original_reference):
+        axes.plot(seasonality.observed)
+
     async with get_plot("Trend") as (axes, trend_reference):
         axes.plot(seasonality.trend)
 
@@ -756,14 +759,11 @@ async def _get_seasonality_graphs(
         axes.plot(seasonality.resid, marker="o", linestyle="none")
         axes.plot(xlim, (0, 0), zorder=-3)
 
-    async with get_plot("Weights") as (axes, weights_reference):
-        axes.plot(seasonality.weights)
-
     return _PerTimeBaseSeasonalityGraphs(
+        original=TimeBasedGraph(timeBaseColumn=time_base_column, file=original_reference),
         trend=TimeBasedGraph(timeBaseColumn=time_base_column, file=trend_reference),
         seasonality=TimeBasedGraph(timeBaseColumn=time_base_column, file=seasonal_reference),
         residual=TimeBasedGraph(timeBaseColumn=time_base_column, file=residual_reference),
-        weights=TimeBasedGraph(timeBaseColumn=time_base_column, file=weights_reference),
     )
 
 
