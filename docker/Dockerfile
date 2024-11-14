@@ -12,6 +12,8 @@ RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
 # Second Stage: Production environment
 FROM python:3.12-slim AS runner
 
+ARG VERSION
+
 LABEL ai.beebucket.maintainer="beebucket GmbH <hello@beebucket.ai>"
 LABEL ai.beebucket.version=${VERSION}
 
