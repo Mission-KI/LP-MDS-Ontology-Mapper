@@ -1,4 +1,5 @@
 from enum import Enum
+from tempfile import TemporaryFile
 
 from fastapi import (
     APIRouter,
@@ -58,7 +59,14 @@ def get_job_api_router(app_config: AppConfig):
         if request.headers.get("Content-Type") != "application/octet-stream":
             raise HTTPException(status_code=415, detail="Unsupported Media Type. Expected 'application/octet-stream'.")
 
-        await job_manager.upload_file_raw(job_id, filename, request)
+        with TemporaryFile(mode="w+b") as temp_file:
+            # Stream the request into the temp file chunk by chunk.
+            async for chunk in request.stream():
+                temp_file.write(chunk)
+            # Seek back to start (needs 'w+b' mode)!
+            temp_file.seek(0)
+            await job_manager.store_input_file(job_id, filename, temp_file)
+
         background_tasks.add_task(job_manager.process_job, job_id)
         return await job_manager.get_job_view(job_id)
 
@@ -75,7 +83,11 @@ def get_job_api_router(app_config: AppConfig):
         Returns infos about the job.
         """
 
-        await job_manager.upload_file_multipart(job_id, upload_file)
+        try:
+            await job_manager.store_input_file(job_id, upload_file.filename, upload_file.file)
+        finally:
+            await upload_file.close()
+
         background_tasks.add_task(job_manager.process_job, job_id)
         return await job_manager.get_job_view(job_id)
 
