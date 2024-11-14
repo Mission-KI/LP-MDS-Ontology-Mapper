@@ -13,7 +13,8 @@ from fastapi.responses import FileResponse
 from edp.config import AppConfig
 from edp.job.manager import AnalysisJobManager
 from edp.job.repo import InMemoryJobRepository
-from edp.job.types import JobState, JobView, UserProvidedEdpData
+from edp.job.types import JobView
+from edp.types import UserProvidedEdpData
 
 
 class Tags(str, Enum):
@@ -26,14 +27,15 @@ def get_job_api_router(app_config: AppConfig):
     router = APIRouter()
 
     @router.post("/analysisjob", tags=[Tags.AnalysisJob], summary="Create analysis job")
-    async def create_analysis_job(userdata: UserProvidedEdpData) -> JobView:
+    async def create_analysis_job(user_data: UserProvidedEdpData) -> JobView:
         """Create an analysis job based on the user provided EDP data.
         This must be followed by uploading the actual data.
 
         Returns infos about the job including an ID.
         """
 
-        return await job_manager.create_job(userdata)
+        job_id = await job_manager.create_job(user_data)
+        return await job_manager.get_job_view(job_id)
 
     # TODO mka: Is the filename needed for the analysis? Or the type (File.type) derived only by the content? -> Filename is needed for identifying the type!
     # TODO mka: We can use an explicit parameter (filename:str or type:str), the mime-type or use multipart/form-data. Or put the type in the userdata.
@@ -56,10 +58,9 @@ def get_job_api_router(app_config: AppConfig):
         if request.headers.get("Content-Type") != "application/octet-stream":
             raise HTTPException(status_code=415, detail="Unsupported Media Type. Expected 'application/octet-stream'.")
 
-        job = await job_manager.get_job(job_id)
-        await job_manager.upload_file(job, filename, request)
-        background_tasks.add_task(job_manager.process_job, job)
-        return job
+        await job_manager.upload_file_raw(job_id, filename, request)
+        background_tasks.add_task(job_manager.process_job, job_id)
+        return await job_manager.get_job_view(job_id)
 
     @router.post(
         "/analysisjob/{job_id}/data",
@@ -74,16 +75,15 @@ def get_job_api_router(app_config: AppConfig):
         Returns infos about the job.
         """
 
-        job = await job_manager.get_job(job_id)
-        await job_manager.upload_file_multipart(job, upload_file)
-        background_tasks.add_task(job_manager.process_job, job)
-        return job
+        await job_manager.upload_file_multipart(job_id, upload_file)
+        background_tasks.add_task(job_manager.process_job, job_id)
+        return await job_manager.get_job_view(job_id)
 
     @router.get("/analysisjob/{job_id}/status", tags=[Tags.AnalysisJob], summary="Get analysis job status")
     async def get_status(job_id: str) -> JobView:
         """Returns infos about the job."""
 
-        return await job_manager.get_job(job_id)
+        return await job_manager.get_job_view(job_id)
 
     @router.get(
         "/analysisjob/{job_id}/result",
@@ -100,10 +100,8 @@ def get_job_api_router(app_config: AppConfig):
     async def get_result(job_id: str):
         """If an analysis job has reached state COMPLETED, this call returns the zipped EDP including images."""
 
-        job = await job_manager.get_job(job_id)
-        if job.state != JobState.COMPLETED:
-            raise RuntimeError(f"There is no result for job {job.job_id}")
-        return FileResponse(job.zip_archive, media_type="application/zip", filename=job.zip_archive.name)
+        zip_archive = await job_manager.get_zipped_result(job_id)
+        return FileResponse(zip_archive, media_type="application/zip", filename=zip_archive.name)
 
     @router.get(
         "/analysisjob/{job_id}/report",
