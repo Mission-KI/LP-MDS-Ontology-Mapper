@@ -135,6 +135,9 @@ class NumericColumn(_BaseColumn):
         default=None, description="Link to the combined histogram/distribution graph"
     )
     boxPlot: FileReference = Field(description="Link to the box plot of this column")
+    original_series: List[TimeBasedGraph] = Field(
+        default_factory=list, description="Original data graphs over all available date time columns"
+    )
     seasonalities: List[TimeBasedGraph] = Field(
         default_factory=list, description="Seasonality graphs oer all available date time columns"
     )
@@ -143,9 +146,6 @@ class NumericColumn(_BaseColumn):
     )
     residuals: List[TimeBasedGraph] = Field(
         default_factory=list, description="Residual graphs over all available date time columns"
-    )
-    weights: List[TimeBasedGraph] = Field(
-        default_factory=list, description="Weights graphs over all available date time columns"
     )
     dataType: str
 
