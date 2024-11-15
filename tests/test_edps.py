@@ -19,6 +19,7 @@ from edp.types import (
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
 CSV_PATH = DIR / "data/test.csv"
+CSV_HEADERLESS_PATH = DIR / "data/test_headerless.csv"
 PICKLE_PATH = DIR / "data/test.pickle"
 ZIP_PATH = DIR / "data/test.zip"
 
@@ -93,6 +94,20 @@ async def test_analyse_csv(output_context, config_data):
     edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
     assert edp.assetId == config_data.userProvidedEdpData.assetId
     assert edp.compression is None
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
+
+
+@mark.asyncio
+async def test_analyse_csv_no_headers(output_context, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    service = Service()
+    json_file = await service.analyse_asset(CSV_HEADERLESS_PATH, config_data, output_context)
+    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
+    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.compression is None
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
 
 
 @mark.asyncio
@@ -102,6 +117,8 @@ async def test_analyse_zip(output_context, config_data):
     edp = read_edp(output_context.build_full_path(json_file))
     assert edp.assetId == config_data.userProvidedEdpData.assetId
     assert "zip" in edp.compression.algorithms
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
 
 
 @mark.asyncio
