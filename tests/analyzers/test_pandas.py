@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from logging import getLogger
 
+import numpy as np
 from pandas import DataFrame, Series
 from pytest import fixture, mark
 
@@ -19,6 +20,16 @@ def uint8_string_series():
 @fixture
 def int8_string_series():
     return Series(["0", "127", "-128"], dtype=str)
+
+
+@fixture
+def float32_string_series():
+    return Series(["0.0", "1.4e-8", "-1.0", "123.2e8"], dtype=str)
+
+
+@fixture
+def float32_german_string_series():
+    return Series(["1,0", "-127,0", "128,0"], dtype=str)
 
 
 @fixture
@@ -41,6 +52,14 @@ def test_get_smallest_down_cast_able_type_uint8(uint8_string_series):
 
 def test_get_smallest_down_cast_able_type_int8(int8_string_series):
     assert str(infer_type_and_convert(int8_string_series).dtype) == "int8"
+
+
+def test_get_smallest_down_cast_able_type_float32(float32_string_series):
+    assert str(infer_type_and_convert(float32_string_series).dtype) == "float32"
+
+
+def test_get_smallest_down_cast_able_type_float32_german(float32_german_string_series):
+    assert str(infer_type_and_convert(float32_german_string_series).dtype) == "float32"
 
 
 def test_get_smallest_down_cast_able_type_datetime(datetime_string_series):

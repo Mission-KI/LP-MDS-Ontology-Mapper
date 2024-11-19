@@ -769,7 +769,7 @@ def infer_type_and_convert(column: Series) -> Series:
         pass
 
     try:
-        return infer_type_and_convert(to_numeric(column, errors="raise"))
+        return infer_type_and_convert(to_numeric(column.str.replace(",", "."), errors="raise"))
     except (ValueError, TypeError):
         pass
 
