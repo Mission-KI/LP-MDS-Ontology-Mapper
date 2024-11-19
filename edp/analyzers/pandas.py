@@ -45,7 +45,8 @@ from edp.types import (
     TimeBasedGraph,
 )
 
-DATE_TIME_FORMAT = "ISO8601"
+# Try these dateformats one after the other: ISO and a couple of usual German formats.
+DATE_TIME_FORMATS = ["ISO8601", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%H:%M:%S", "%H:%M"]
 
 
 class FittingConfig(BaseModel):
@@ -785,13 +786,13 @@ def infer_type_and_convert(column: Series) -> Series:
         return column
 
     if type_character in "M":
-        return to_datetime(column, errors="raise", format=DATE_TIME_FORMAT)
+        return try_convert_datetime(column)
 
     if type_character in "m":
         return column
 
     try:
-        return to_datetime(column, errors="raise", format=DATE_TIME_FORMAT)
+        return try_convert_datetime(column)
     except (ValueError, TypeError):
         pass
 
@@ -801,3 +802,12 @@ def infer_type_and_convert(column: Series) -> Series:
         pass
 
     return column
+
+
+def try_convert_datetime(column: Series) -> Series:
+    for format in DATE_TIME_FORMATS:
+        try:
+            return to_datetime(column, errors="raise", format=format)
+        except (ValueError, TypeError):
+            pass
+    raise TypeError
