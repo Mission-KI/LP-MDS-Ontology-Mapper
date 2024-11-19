@@ -35,6 +35,7 @@ dependencies = [
     "statsmodels",
     "requests",
     "fastapi[standard]",
+    "clevercsv>=0.8.2",
 ]
 
 [project.scripts]
