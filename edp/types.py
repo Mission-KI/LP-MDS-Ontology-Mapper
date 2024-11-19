@@ -64,19 +64,15 @@ class DataSetCompression(str, Enum):
 
 
 class TemporalConsistency(BaseModel):
-    timeScale: timedelta
-    stable: bool
-    differentAbundancies: int
+    timeScale: str = Field(description="Time scale this temporal consistency has been tested for")
+    differentAbundancies: int = Field(description="Number of unique values on given time resolution")
+    stable: bool = Field(description="The value stays stable on the given time resolution")
+    numberOfGaps: int = Field(description="Number of gaps at the given timescale")
 
 
 Numeric = Union[int, float, timedelta, complex]
 
 FileReference = Union[PurePosixPath, AnyUrl]
-
-
-class Gap(BaseModel):
-    timeScale: timedelta = Field(description="Timescale for which gaps are given")
-    numberOfGaps: int = Field(description="Number of gaps at the given timescale")
 
 
 class Augmentation(BaseModel):
@@ -162,7 +158,6 @@ class DateTimeColumn(_BaseColumn):
     monotonically_decreasing: bool
     periodicity: Optional[str] = Field(default=None, description="The main periodicity found for this column")
     temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
-    gaps: List[Gap] = Field(description="Number of gaps at given timescale")
 
 
 class StringColumn(_BaseColumn):

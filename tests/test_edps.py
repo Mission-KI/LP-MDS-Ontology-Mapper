@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import List
 
@@ -12,7 +12,6 @@ from edp.types import (
     DataSetType,
     DataSpace,
     ExtendedDatasetProfile,
-    Gap,
     License,
     Publisher,
     TemporalConsistency,
@@ -63,7 +62,7 @@ async def test_analyse_pickle(output_context, config_data):
     service = Service()
     computed_data = await service._compute_asset(PICKLE_PATH, config_data, output_context)
     assert len(computed_data.structuredDatasets) == 1
-    assert computed_data.periodicity == "h"
+    assert computed_data.periodicity == "hours"
 
     dataset = computed_data.structuredDatasets[0]
     assert len(dataset.datetimeColumns) == 2
@@ -80,8 +79,8 @@ async def test_analyse_pickle(output_context, config_data):
     einfahrt = next(item for item in dataset.datetimeColumns if item.name == "einfahrt")
     assert einfahrt.temporalCover.earliest == datetime.fromisoformat("2016-01-01 00:03:14")
     assert einfahrt.temporalCover.latest == datetime.fromisoformat("2016-01-01 11:50:45")
-    _assert_pickle_temporal_consistencies(einfahrt.temporalConsistencies, einfahrt.gaps)
-    assert einfahrt.periodicity == "h"
+    _assert_pickle_temporal_consistencies(einfahrt.temporalConsistencies)
+    assert einfahrt.periodicity == "hours"
 
     assert len(computed_data.dataTypes) == 1
     assert DataSetType.structured in computed_data.dataTypes
@@ -141,43 +140,57 @@ def read_edp(json_file: PurePosixPath):
     return ExtendedDatasetProfile.model_validate_json(json_data)
 
 
-def _assert_pickle_temporal_consistencies(temporal_consistencies: List[TemporalConsistency], gaps: List[Gap]):
-    seconds_consistency = temporal_consistencies[0]
-    seconds_gaps = gaps[0]
-    assert seconds_consistency.timeScale == timedelta(seconds=1)
-    assert seconds_gaps.timeScale == timedelta(seconds=1)
+def _assert_pickle_temporal_consistencies(temporal_consistencies: List[TemporalConsistency]):
+    microseconds_consistency = temporal_consistencies[0]
+    assert microseconds_consistency.timeScale == "microseconds"
+    assert microseconds_consistency.stable == False
+    assert microseconds_consistency.differentAbundancies == 50
+    assert microseconds_consistency.numberOfGaps == 49
+
+    milliseconds_consistency = temporal_consistencies[1]
+    assert milliseconds_consistency.timeScale == "milliseconds"
+    assert milliseconds_consistency.stable == False
+    assert milliseconds_consistency.differentAbundancies == 50
+    assert milliseconds_consistency.numberOfGaps == 49
+
+    seconds_consistency = temporal_consistencies[2]
+    assert seconds_consistency.timeScale == "seconds"
     assert seconds_consistency.stable == False
-    assert seconds_consistency.differentAbundancies == 2
-    assert seconds_gaps.numberOfGaps == 48
+    assert seconds_consistency.differentAbundancies == 50
+    assert seconds_consistency.numberOfGaps == 48
 
-    minutes_consistency = temporal_consistencies[1]
-    minutes_gaps = gaps[1]
-    assert minutes_consistency.timeScale == timedelta(minutes=1)
-    assert minutes_gaps.timeScale == timedelta(minutes=1)
+    minutes_consistency = temporal_consistencies[3]
+    assert minutes_consistency.timeScale == "minutes"
     assert minutes_consistency.stable == False
-    assert minutes_consistency.differentAbundancies == 3
-    assert minutes_gaps.numberOfGaps == 44
+    assert minutes_consistency.differentAbundancies == 47
+    assert minutes_consistency.numberOfGaps == 44
 
-    hours_consistency = temporal_consistencies[2]
-    hours_gaps = gaps[2]
-    assert hours_consistency.timeScale == timedelta(hours=1)
-    assert hours_gaps.timeScale == timedelta(hours=1)
+    hours_consistency = temporal_consistencies[4]
+    assert hours_consistency.timeScale == "hours"
     assert hours_consistency.stable == False
-    assert hours_consistency.differentAbundancies == 7
-    assert hours_gaps.numberOfGaps == 3
+    assert hours_consistency.differentAbundancies == 12
+    assert hours_consistency.numberOfGaps == 3
 
-    days_consistency = temporal_consistencies[3]
-    days_gaps = gaps[3]
-    assert days_consistency.timeScale == timedelta(days=1)
-    assert days_gaps.timeScale == timedelta(days=1)
+    days_consistency = temporal_consistencies[5]
+    assert days_consistency.timeScale == "days"
     assert days_consistency.stable == True
     assert days_consistency.differentAbundancies == 1
-    assert days_gaps.numberOfGaps == 0
+    assert days_consistency.numberOfGaps == 0
 
-    weeks_consistency = temporal_consistencies[4]
-    weeks_gaps = gaps[4]
-    assert weeks_consistency.timeScale == timedelta(weeks=1)
-    assert weeks_gaps.timeScale == timedelta(weeks=1)
+    weeks_consistency = temporal_consistencies[6]
+    assert weeks_consistency.timeScale == "weeks"
     assert weeks_consistency.stable == True
     assert weeks_consistency.differentAbundancies == 1
-    assert weeks_gaps.numberOfGaps == 0
+    assert weeks_consistency.numberOfGaps == 0
+
+    month_consistency = temporal_consistencies[7]
+    assert month_consistency.timeScale == "months"
+    assert month_consistency.stable == True
+    assert month_consistency.differentAbundancies == 1
+    assert month_consistency.numberOfGaps == 0
+
+    year_consistency = temporal_consistencies[8]
+    assert year_consistency.timeScale == "years"
+    assert year_consistency.stable == True
+    assert year_consistency.differentAbundancies == 1
+    assert year_consistency.numberOfGaps == 0
