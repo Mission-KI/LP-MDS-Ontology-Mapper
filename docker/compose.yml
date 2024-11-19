@@ -1,9 +1,6 @@
 services:
   edp:
     image: beebucket/edps:latest
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
     # deploy:
     #   resources:
     #     limits:
