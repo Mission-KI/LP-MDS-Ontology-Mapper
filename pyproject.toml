@@ -64,7 +64,7 @@ include = ["edp*"]
 exclude = ["test*"]
 
 [tool.setuptools.dynamic]
-version = { file = "VERSION.txt" }
+version = { file = "dist/VERSION.txt" }
 
 [tool.isort]
 profile = 'black'

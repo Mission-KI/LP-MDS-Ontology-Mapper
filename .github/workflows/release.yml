@@ -16,6 +16,7 @@ jobs:
         name: Build Release Wheel
         env:
             DISTRIBUTION_DIR: "${{ github.workspace }}/dist"
+            VERSION: "${{ github.ref_name }}"
         steps:
         -   uses: actions/checkout@v4
             with:
@@ -25,10 +26,7 @@ jobs:
                 python-version: 3.12
                 cache: 'pip'
         -   name: Build Wheel
-            run: |
-                echo "${{ github.ref_name }}" >> VERSION.txt
-                mkdir -p ${{ env.DISTRIBUTION_DIR }}
-                pip wheel build --no-deps --no-input --no-binary :all: --wheel-dir ${{ env.DISTRIBUTION_DIR }} .
+            run: /bin/bash ${{ github.workspace}}/scripts/build_wheel.sh
         -   uses: actions/upload-artifact@v4
             with:
                 name: ${{ env.WHEEL_NAME }}
@@ -87,7 +85,7 @@ jobs:
             id: download_wheel
             with:
                 name: ${{ env.WHEEL_NAME }}
-                path: ${{ github.workspace }}/wheels
+                path: ${{ github.workspace }}/dist
         -   uses: docker/setup-qemu-action@v3
         -   uses: docker/setup-buildx-action@v3
         -   name: Extract Docker metadata
