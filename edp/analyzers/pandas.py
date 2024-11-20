@@ -6,23 +6,23 @@ from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, Iterator, List, Optional, Tuple
-from warnings import catch_warnings, warn
+from typing import Dict, List, Optional, Tuple
+from warnings import warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
-from numpy import array, corrcoef, count_nonzero, linspace, ones_like, triu
+from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
-    DateOffset,
     DatetimeIndex,
     Series,
+    Timedelta,
+    UInt64Dtype,
     concat,
     to_datetime,
     to_numeric,
-    to_timedelta,
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
@@ -36,7 +36,6 @@ from edp.types import (
     DataSetType,
     DateTimeColumn,
     FileReference,
-    Gap,
     NumericColumn,
     StringColumn,
     StructuredDataSet,
@@ -101,8 +100,6 @@ _DATETIME_ALL_ENTRIES_UNIQUE = "all-entries-are-unique"
 _DATETIME_MONOTONIC_INCREASING = "monotonically-increasing"
 _DATETIME_MONOTONIC_DECREASING = "monotonically-decreasing"
 _DATETIME_TEMPORAL_CONSISTENCY = "temporal-consistency"
-_DATETIME_GAPS = "gaps"
-_DATETIME_PERIODICITY = "periodicity"
 
 
 class _Distributions(str, Enum):
@@ -124,12 +121,19 @@ class _PerTimeBaseSeasonalityGraphs:
         self.residual = residual
 
 
-class _PerDatetimeColumnPeriodicity:
-    def __init__(self, period: str, distincts: int, gaps: int, cleaned_index: DatetimeIndex) -> None:
+class _DatetimeColumnTemporalConsistency:
+    def __init__(
+        self, period: str, temporal_consistencies: List[TemporalConsistency], cleaned_index: DatetimeIndex
+    ) -> None:
         self.period = period
-        self.distincts = distincts
-        self.gaps = gaps
+        self.temporal_consistencies = temporal_consistencies
         self.cleaned_index = cleaned_index
+
+    def __getitem__(self, period: str) -> TemporalConsistency:
+        try:
+            return next((consistency for consistency in self.temporal_consistencies if consistency.timeScale == period))
+        except StopIteration as error:
+            raise KeyError(f"{period} not in the temporal consistencies") from error
 
 
 class Pandas(Analyzer):
@@ -167,12 +171,12 @@ class Pandas(Analyzer):
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
         datetime_index = await _determine_datetime_index(self._logger, datetime_columns)
         datetime_column_name: Optional[str] = None
-        datetime_column_periodicity: Optional[_PerDatetimeColumnPeriodicity] = None
+        datetime_column_periodicity: Optional[_DatetimeColumnTemporalConsistency] = None
         if datetime_index is not None:
             self._logger.info('Using "%s" as index', datetime_index.name)
             self._data.set_index(datetime_index, inplace=True)
             datetime_column_name = str(datetime_index.name)
-            datetime_column_periodicity = datetime_fields[_DATETIME_PERIODICITY][datetime_column_name]
+            datetime_column_periodicity = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY][datetime_column_name]
 
         numeric_ids = columns_by_type[_ColumnType.Numeric]
         numeric_columns = self._data.loc[:, numeric_ids]
@@ -244,7 +248,7 @@ class Pandas(Analyzer):
         self,
         columns: DataFrame,
         common_fields: DataFrame,
-        index_column_periodicity: Optional[_PerDatetimeColumnPeriodicity],
+        index_column_periodicity: Optional[_DatetimeColumnTemporalConsistency],
     ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
@@ -309,11 +313,7 @@ class Pandas(Analyzer):
         computed[_DATETIME_MONOTONIC_DECREASING] = Series(
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
-        computed[_DATETIME_TEMPORAL_CONSISTENCY] = _get_temporal_consistencies(columns, self._intervals)
-        # TODO: Merge _get_gaps() and _compute_periodicity(), since they do nearly the same.
-        #       To be clarified with Daniel.
-        computed[_DATETIME_GAPS] = _get_gaps(columns, self._intervals)
-        computed[_DATETIME_PERIODICITY] = await _compute_periodicity(self._logger, columns)
+        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await _compute_temporal_consistency(self._logger, columns)
         return computed
 
     async def _determine_types(self) -> Dict[_ColumnType, List[str]]:
@@ -411,7 +411,7 @@ class Pandas(Analyzer):
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
         self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
-        periodicity: _PerDatetimeColumnPeriodicity = computed_fields[_DATETIME_PERIODICITY]
+        temporal_consistency: _DatetimeColumnTemporalConsistency = computed_fields[_DATETIME_TEMPORAL_CONSISTENCY]
 
         return DateTimeColumn(
             name=str(column.name),
@@ -424,9 +424,8 @@ class Pandas(Analyzer):
             all_entries_are_unique=computed_fields[_DATETIME_ALL_ENTRIES_UNIQUE],
             monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
-            temporalConsistencies=computed_fields[_DATETIME_TEMPORAL_CONSISTENCY],
-            gaps=computed_fields[_DATETIME_GAPS],
-            periodicity=periodicity.period,
+            temporalConsistencies=temporal_consistency.temporal_consistencies,
+            periodicity=temporal_consistency.period,
         )
 
     async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
@@ -447,46 +446,18 @@ async def _generate_box_plot(plot_name: str, column: Series, output_context: Out
     return reference
 
 
-def _get_temporal_consistencies(columns: DataFrame, intervals: List[timedelta]) -> Series:
-    # TODO: Vectorize this!
-    return Series({name: _get_temporal_consistencies_for_column(column, intervals) for name, column in columns.items()})
-
-
-def _get_temporal_consistencies_for_column(column: Series, intervals: List[timedelta]) -> List[TemporalConsistency]:
-    column.index = DatetimeIndex(column)
-    return [_get_temporal_consistency(column, interval) for interval in intervals]
-
-
-def _get_temporal_consistency(column: Series, interval: timedelta) -> TemporalConsistency:
-    # TODO: Restrict to only the most abundant ones.
-    abundances = column.resample(interval).count().unique()
-    different_abundances = len(abundances)
-    return TemporalConsistency(
-        timeScale=interval, stable=(different_abundances == 1), differentAbundancies=different_abundances
-    )
-
-
-def _get_gaps(columns: DataFrame, intervals: List[timedelta]) -> Series:
-    # TODO: Vectorize!
-    gaps = [list(_get_gaps_per_column(column, intervals)) for _, column in columns.items()]
-    return Series(gaps, index=columns.columns)
-
-
-def _get_gaps_per_column(column: Series, intervals: List[timedelta]) -> Iterator[Gap]:
-    deltas = column.sort_values().diff()
-    for interval in intervals:
-        over_interval_size = deltas > to_timedelta(interval)
-        gap_count = count_nonzero(over_interval_size)
-        yield Gap(timeScale=interval, numberOfGaps=gap_count)
-
-
-async def _compute_periodicity(logger: Logger, columns: DataFrame) -> Series:
+async def _compute_temporal_consistency(logger: Logger, columns: DataFrame) -> Series:
     return Series(
-        {name: _compute_periodicity_for_column(logger, DatetimeIndex(columns[name])) for name in columns.columns}
+        {
+            name: _compute_temporal_consistency_for_column(logger, DatetimeIndex(columns[name]))
+            for name in columns.columns
+        }
     )
 
 
-def _compute_periodicity_for_column(logger: Logger, index: DatetimeIndex) -> _PerDatetimeColumnPeriodicity:
+def _compute_temporal_consistency_for_column(
+    logger: Logger, index: DatetimeIndex
+) -> _DatetimeColumnTemporalConsistency:
     index = index.sort_values(ascending=True)
     row_count = len(index)
 
@@ -500,41 +471,41 @@ def _compute_periodicity_for_column(logger: Logger, index: DatetimeIndex) -> _Pe
         warn(message)
         row_count = new_count
 
-    deltas = index.to_series().dt
-    granularities = ["s", "min", "h", "d", "W", "M", "Y"]
-    granularity_offsets = array(
-        [
-            DateOffset(seconds=1),
-            DateOffset(minutes=1),
-            DateOffset(hours=1),
-            DateOffset(days=1),
-            DateOffset(weeks=1),
-            DateOffset(months=1),
-            DateOffset(years=1),
-        ]
+    granularities = {
+        "microseconds": Timedelta(microseconds=1),
+        "milliseconds": Timedelta(milliseconds=1),
+        "seconds": Timedelta(seconds=1),
+        "minutes": Timedelta(minutes=1),
+        "hours": Timedelta(hours=1),
+        "days": Timedelta(days=1),
+        "weeks": Timedelta(weeks=1),
+        "months": Timedelta(days=30),
+        "years": Timedelta(days=365),
+    }
+
+    deltas = index[1:] - index[:-1]
+    gaps = Series(
+        {label: count_nonzero(deltas > time_base) for label, time_base in granularities.items()},
+        dtype=UInt64Dtype(),
     )
-    timestamp = DataFrame(
-        {granularity: deltas.to_period(granularity).dt.to_timestamp() for granularity in granularities}
+    distincts = Series(
+        {label: len(index.round(time_base).unique()) for label, time_base in granularities.items()},  # type: ignore
+        dtype=UInt64Dtype(),
     )
-    timestamp_previous = timestamp.shift(periods=1)
+    stable = distincts == 1
+    diff = distincts - gaps
+    periodicity: str = diff.idxmax()  # type: ignore
+    temporal_consistencies = [
+        TemporalConsistency(
+            timeScale=time_base,
+            differentAbundancies=distincts[time_base],
+            stable=stable[time_base],
+            numberOfGaps=gaps[time_base],
+        )
+        for time_base in granularities
+    ]
 
-    # Remove first value, it in invalid
-    timestamp = timestamp[1:]
-    timestamp_previous = timestamp_previous[1:]
-
-    # This warns about using an object type array (granularity_offsets) for adding.
-    # But since there is no proper type to represent Period with different frequencies,
-    # we just ignore the warning.
-    with catch_warnings(action="ignore"):
-        timestamp_next = timestamp_previous + granularity_offsets
-
-    is_not_equal = (timestamp != timestamp_previous) & (timestamp != timestamp_next)
-    gaps = is_not_equal.sum()
-    distincts = timestamp.nunique()
-    diff = distincts - gaps.abs()
-    periodicity = diff.idxmax()
-
-    return _PerDatetimeColumnPeriodicity(str(periodicity), distincts[periodicity], gaps[periodicity], index)
+    return _DatetimeColumnTemporalConsistency(periodicity, temporal_consistencies, index)
 
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
@@ -699,15 +670,16 @@ async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optio
 
 
 async def _get_seasonalities(
-    logger: Logger, columns: DataFrame, index_column_periodicity: _PerDatetimeColumnPeriodicity
+    logger: Logger, columns: DataFrame, index_column_periodicity: _DatetimeColumnTemporalConsistency
 ) -> Series:
     row_count = len(columns.index)
     logger.info("Starting seasonality analysis on %d rows", row_count)
 
     filtered_columns = columns.loc[index_column_periodicity.cleaned_index]
+    distincts = index_column_periodicity[index_column_periodicity.period].differentAbundancies
     series: Series = Series(
         {
-            name: _seasonal_decompose_column(column=column, distinct_count=index_column_periodicity.distincts)
+            name: _seasonal_decompose_column(column=column, distinct_count=distincts)
             for name, column in filtered_columns.items()
         }
     )
