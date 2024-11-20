@@ -9,7 +9,7 @@ env:
     OPENAPI_SCHEMA: edps_openapi_${{ github.ref_name }}.json
     IMAGE_PATH: beebucket/edps
     WHEEL_NAME: edps.whl
-    
+
 jobs:
     build_wheel:
         runs-on: ubuntu-24.04
@@ -23,7 +23,7 @@ jobs:
                 lfs: true
         -   uses: actions/setup-python@v5
             with:
-                python-version: 3.12
+                python-version-file: '.python-version'
                 cache: 'pip'
         -   name: Build Wheel
             run: /bin/bash ${{ github.workspace}}/scripts/build_wheel.sh
@@ -42,7 +42,7 @@ jobs:
         -   uses: actions/checkout@v4
         -   uses: actions/setup-python@v5
             with:
-                python-version: 3.12
+                python-version-file: '.python-version'
                 cache: 'pip'
         -   uses: actions/download-artifact@v4
             id: download_wheel
@@ -63,7 +63,7 @@ jobs:
             with:
                 name: ${{ env.OPENAPI_SCHEMA }}
                 path: ${{ env.OPENAPI_SCHEMA }}
-    
+
     build_and_release_docker:
         runs-on: ubuntu-24.04
         name: Build and Push EDPS docker image
