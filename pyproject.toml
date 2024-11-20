@@ -49,13 +49,12 @@ test = [
     "pytest",
     "pytest-asyncio",
     "bandit",
-    "black",
-    "isort",
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
     "types-seaborn",
     "types-requests",
+    "ruff>=0.7.4",
 ]
 dev = ["edp[test]"]
 
@@ -67,14 +66,11 @@ exclude = ["test*"]
 [tool.setuptools.dynamic]
 version = { file = "dist/VERSION.txt" }
 
-[tool.isort]
-profile = 'black'
-src_paths = ["edp", "tests"]
-skip = ['.conda', '.mypy_cache']
-skip_gitignore = true
-
-[tool.black]
+[tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I"] # isort replacement
 
 [tool.pytest.ini_options]
 log_cli = true
