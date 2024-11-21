@@ -5,7 +5,8 @@ from pathlib import PurePosixPath
 from types import NoneType
 from typing import Union, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import AnyUrl, BaseModel
+from pydantic.fields import FieldInfo
 from pydantic_core import Url
 
 from edp.types import ExtendedDatasetProfile
@@ -26,7 +27,7 @@ async def test_validate_EDP_model():
 
 def _validate_model(model_type: type[BaseModel]):
     logger.info(f"Checking model {model_type.__name__}")
-    for field_name, field in model_type.model_fields.items():
+    for field_name, field in model_type.__pydantic_fields__.items():
         field_type = field.annotation
         if field_type:
             try:
@@ -37,7 +38,7 @@ def _validate_model(model_type: type[BaseModel]):
 
 # Check if the given type is valid for the EDPS model and return additional types that need checking.
 def _validate_model_type(current_type: type):
-    if current_type in [NoneType, str, int, float, complex, bool, datetime, timedelta, PurePosixPath, Url]:
+    if current_type in [NoneType, str, int, float, complex, bool, datetime, timedelta, PurePosixPath, AnyUrl]:
         pass
     elif isinstance(current_type, type) and issubclass(current_type, Enum):
         pass
