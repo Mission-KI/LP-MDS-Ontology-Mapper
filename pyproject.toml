@@ -87,7 +87,7 @@ filterwarnings = [
 ]
 
 [tool.bandit]
-exclude_dirs = ['tests']
+exclude_dirs = ["tests", ".venv", ".conda"]
 skips = ["B403"]
 
 [tool.mypy]
