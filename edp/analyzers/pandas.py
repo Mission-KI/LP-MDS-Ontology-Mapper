@@ -377,7 +377,7 @@ class Pandas(Analyzer):
             dataType=str(column.dtype),
             boxPlot=box_plot,
         )
-        if not computed_fields[_NUMERIC_DISTRIBUTION] in [
+        if computed_fields[_NUMERIC_DISTRIBUTION] not in [
             _Distributions.SingleValue.value,
             _Distributions.TooSmallDataset.value,
         ]:

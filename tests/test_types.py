@@ -6,8 +6,6 @@ from types import NoneType
 from typing import Union, get_args, get_origin
 
 from pydantic import AnyUrl, BaseModel
-from pydantic.fields import FieldInfo
-from pydantic_core import Url
 
 from edp.types import ExtendedDatasetProfile
 

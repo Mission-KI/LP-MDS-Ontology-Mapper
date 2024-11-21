@@ -71,7 +71,7 @@ class Service:
         async for child_file in self._walk_all_files(base_path, path, compressions):
             file_type = child_file.type
             extracted_size += child_file.size
-            if not file_type in IMPORTERS:
+            if file_type not in IMPORTERS:
                 text = f'Import for "{file_type}" not yet supported'
                 self._logger.warning(text)
                 warn(text, RuntimeWarning)
@@ -125,7 +125,7 @@ class Service:
     @asynccontextmanager
     async def _extract(self, file: File) -> AsyncIterator[Path]:
         archive_type = file.type
-        if not archive_type in DECOMPRESSION_ALGORITHMS:
+        if archive_type not in DECOMPRESSION_ALGORITHMS:
             raise RuntimeError(f'"{archive_type}" is not a know archive type')
         decompressor = DECOMPRESSION_ALGORITHMS[archive_type]
         if decompressor is None:

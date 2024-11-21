@@ -33,7 +33,10 @@ async def csv(file: File):
 
     def runner():
         return read_csv(
-            file.path, dialect=csv_dialect, header="infer" if has_header else None, encoding=encoding  # type: ignore
+            file.path,
+            dialect=csv_dialect,  # type: ignore
+            header="infer" if has_header else None,
+            encoding=encoding,
         )
 
     loop = get_running_loop()

@@ -228,7 +228,7 @@ class UserProvidedEdpData(BaseModel):
         default=AssetProcessingStatus.original_data, description="Processing status of the asset"
     )
     description: Optional[str] = Field(default=None, description="Description of the asset")
-    tags: Optional[List[str]] = Field(default_factory=list[str], description="Optional list of tags")
+    tags: List[str] = Field(default_factory=list, description="Optional list of tags")
     dataSubCategory: Optional[str] = Field(
         default=None, description="A data room-specific sub-categorization for assetDataCategory"
     )

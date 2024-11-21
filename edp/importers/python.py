@@ -4,7 +4,7 @@ from pickle import load
 
 from pandas import DataFrame
 
-from edp.analyzers import PandasAnalyzer
+from edp.analyzers import Pandas as PandasAnalyzer
 from edp.file import File
 
 

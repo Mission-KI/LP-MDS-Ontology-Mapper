@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from logging import getLogger
 
-import numpy as np
 from pandas import DataFrame, Series
 from pytest import fixture, mark
 

@@ -143,54 +143,54 @@ def read_edp(json_file: PurePosixPath):
 def _assert_pickle_temporal_consistencies(temporal_consistencies: List[TemporalConsistency]):
     microseconds_consistency = temporal_consistencies[0]
     assert microseconds_consistency.timeScale == "microseconds"
-    assert microseconds_consistency.stable == False
+    assert microseconds_consistency.stable is False
     assert microseconds_consistency.differentAbundancies == 50
     assert microseconds_consistency.numberOfGaps == 49
 
     milliseconds_consistency = temporal_consistencies[1]
     assert milliseconds_consistency.timeScale == "milliseconds"
-    assert milliseconds_consistency.stable == False
+    assert milliseconds_consistency.stable is False
     assert milliseconds_consistency.differentAbundancies == 50
     assert milliseconds_consistency.numberOfGaps == 49
 
     seconds_consistency = temporal_consistencies[2]
     assert seconds_consistency.timeScale == "seconds"
-    assert seconds_consistency.stable == False
+    assert seconds_consistency.stable is False
     assert seconds_consistency.differentAbundancies == 50
     assert seconds_consistency.numberOfGaps == 48
 
     minutes_consistency = temporal_consistencies[3]
     assert minutes_consistency.timeScale == "minutes"
-    assert minutes_consistency.stable == False
+    assert minutes_consistency.stable is False
     assert minutes_consistency.differentAbundancies == 47
     assert minutes_consistency.numberOfGaps == 44
 
     hours_consistency = temporal_consistencies[4]
     assert hours_consistency.timeScale == "hours"
-    assert hours_consistency.stable == False
+    assert hours_consistency.stable is False
     assert hours_consistency.differentAbundancies == 12
     assert hours_consistency.numberOfGaps == 3
 
     days_consistency = temporal_consistencies[5]
     assert days_consistency.timeScale == "days"
-    assert days_consistency.stable == True
+    assert days_consistency.stable is True
     assert days_consistency.differentAbundancies == 1
     assert days_consistency.numberOfGaps == 0
 
     weeks_consistency = temporal_consistencies[6]
     assert weeks_consistency.timeScale == "weeks"
-    assert weeks_consistency.stable == True
+    assert weeks_consistency.stable is True
     assert weeks_consistency.differentAbundancies == 1
     assert weeks_consistency.numberOfGaps == 0
 
     month_consistency = temporal_consistencies[7]
     assert month_consistency.timeScale == "months"
-    assert month_consistency.stable == True
+    assert month_consistency.stable is True
     assert month_consistency.differentAbundancies == 1
     assert month_consistency.numberOfGaps == 0
 
     year_consistency = temporal_consistencies[8]
     assert year_consistency.timeScale == "years"
-    assert year_consistency.stable == True
+    assert year_consistency.stable is True
     assert year_consistency.differentAbundancies == 1
     assert year_consistency.numberOfGaps == 0
