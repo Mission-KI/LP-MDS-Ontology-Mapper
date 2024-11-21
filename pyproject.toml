@@ -59,6 +59,7 @@ test = [
     "types-requests",
     "ruff>=0.7.4",
     "pre-commit>=4.0.1",
+    "pip-licenses>=5.0.0",
 ]
 dev = ["edp[test]"]
 
@@ -88,7 +89,11 @@ filterwarnings = [
 markers = ["slow: Tests that may take more than a few seconds."]
 
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", ".conda"]
+exclude_dirs = [
+    "tests",
+    ".venv",
+    ".conda",
+]
 skips = ["B403"]
 
 [tool.mypy]
@@ -98,5 +103,19 @@ exclude = ["build"]
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["filetype", "fitter", "statsmodels.*"]
+module = [
+    "filetype",
+    "fitter",
+    "statsmodels.*"
+]
 ignore_missing_imports = true
+
+[tool.pip-licenses]
+from = "classifier"
+ignore-packages = [
+    "edp",
+    "chardet",
+    "fitter",
+]
+partial-match = true
+allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0"

@@ -24,6 +24,8 @@ jobs:
             run: ruff format --check .
         -   name: bandit
             run: bandit -c pyproject.toml .
+        -   name: check licenses
+            run: pip-licenses
     unit-tests:
         runs-on: ubuntu-24.04
         name: Perform unit tests

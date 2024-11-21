@@ -64,6 +64,25 @@ jobs:
                 name: ${{ env.OPENAPI_SCHEMA }}
                 path: ${{ env.OPENAPI_SCHEMA }}
 
+    license_report:
+        runs-on: ubuntu-24.04
+        steps:
+        -   uses: actions/checkout@v4
+        -   uses: actions/setup-python@v5
+            with:
+                python-version-file: '.python-version'
+                cache: "pip"
+        -   name: Install
+            run: pip install .[test]
+        -   name: Run pip-licenses
+            run: pip-licenses --format=csv --with-url --order=license | tee license-report.csv
+
+        -   name: Upload License Report
+            uses: actions/upload-artifact@v4
+            with:
+                name: license-report
+                path: license-report.csv
+
     build_and_release_docker:
         runs-on: ubuntu-24.04
         name: Build and Push EDPS docker image

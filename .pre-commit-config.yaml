@@ -44,3 +44,11 @@ repos:
         types: [python]
         language: system
         pass_filenames: false
+  - repo: local
+    hooks:
+      - id: pip-licenses
+        name: pip-licenses
+        entry: pip-licenses
+        # types: [toml] # a lock file would be helpful here
+        language: system
+        pass_filenames: false
