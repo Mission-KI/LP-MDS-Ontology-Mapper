@@ -158,6 +158,7 @@ class DateTimeColumn(_BaseColumn):
     monotonically_decreasing: bool
     periodicity: Optional[str] = Field(default=None, description="The main periodicity found for this column")
     temporalConsistencies: List[TemporalConsistency] = Field(description="Temporal consistency at given timescale")
+    format: str = Field(description="Datetime format used for parsing")
 
 
 class StringColumn(_BaseColumn):

@@ -2,19 +2,20 @@ import warnings
 from asyncio import get_running_loop
 from collections.abc import Hashable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar
 from warnings import warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import any as numpy_any
-from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
+from numpy import corrcoef, count_nonzero, linspace, ones_like, triu  # , dtype
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -61,10 +62,181 @@ class FittingConfig(BaseModel):
     )
 
 
-class _ColumnType(str, Enum):
-    Numeric = "Numeric"
-    String = "String"
-    DateTime = "DateTime"
+## Type parsing
+
+
+class ColumnInfo(BaseModel):
+    dtype_str: str
+    dtype_kind: str
+
+
+class DatetimeColumnInfo(ColumnInfo):
+    format: str
+
+
+class NumericColumnInfo(ColumnInfo):
+    pass
+
+
+class StringColumnInfo(ColumnInfo):
+    pass
+
+
+COL_INFO = TypeVar("COL_INFO", bound=ColumnInfo)
+
+
+@dataclass(frozen=True)
+class ColumnWithInfo(Generic[COL_INFO]):
+    id: str
+    info: COL_INFO
+    data: Series
+
+
+@dataclass(frozen=True)
+class ColumnsWithInfo(Generic[COL_INFO]):
+    infos: dict[str, COL_INFO]
+    data: DataFrame
+
+    @property
+    def ids(self) -> list[str]:
+        return list(self.infos.keys())
+
+    def __getitem__(self, id: str):
+        return ColumnWithInfo(id, self.infos[id], self.data[id])
+
+
+class TypeParser:
+    def __init__(self, data: DataFrame):
+        self._data = data
+        self._processed_data = DataFrame(index=data.index)
+        self._column_infos: Dict[str, ColumnInfo] = dict()
+        self._logger = getLogger(__name__)
+
+    @property
+    def all_cols(self) -> ColumnsWithInfo[ColumnInfo]:
+        return ColumnsWithInfo(self._column_infos, self._processed_data)
+
+    @property
+    def datetime_cols(self) -> ColumnsWithInfo[DatetimeColumnInfo]:
+        return self._build_filtered_cols(DatetimeColumnInfo)
+
+    @property
+    def numeric_cols(self) -> ColumnsWithInfo[NumericColumnInfo]:
+        return self._build_filtered_cols(NumericColumnInfo)
+
+    @property
+    def string_cols(self) -> ColumnsWithInfo[StringColumnInfo]:
+        return self._build_filtered_cols(StringColumnInfo)
+
+    def _build_filtered_cols(self, info_type: type[COL_INFO]) -> ColumnsWithInfo[COL_INFO]:
+        infos = {key: value for key, value in self._column_infos.items() if isinstance(value, info_type)}
+        data = self._processed_data.loc[:, list(infos.keys())]
+        return ColumnsWithInfo(infos, data)
+
+    async def process(self):
+        for column_name in self._data.columns:
+            column, column_info = TypeParser._determine_type(self._data[column_name])
+            self._column_infos[column_name] = column_info
+            self._processed_data[column_name] = column
+
+        self._logger.debug("Found Numeric columns: %s", self.numeric_cols.ids)
+        self._logger.debug("Found DateTime columns: %s", self.datetime_cols.ids)
+        self._logger.debug("Found String columns: %s", self.string_cols.ids)
+
+    @staticmethod
+    def _determine_type(column: Series) -> tuple[Series, ColumnInfo]:
+        type_character = column.dtype.kind
+
+        if type_character in "i":
+            if numpy_any(column < 0):
+                return TypeParser._numeric_column(to_numeric(column, downcast="signed", errors="raise"))
+            else:
+                return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
+
+        elif type_character in "u":
+            return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
+
+        elif type_character in "f":
+            return TypeParser._numeric_column(to_numeric(column, downcast="float", errors="raise"))
+
+        elif type_character in "c":
+            return TypeParser._numeric_column(column)
+
+        elif type_character in "M":
+            return TypeParser._try_convert_datetime(column)
+
+        elif type_character in "m":
+            return TypeParser._numeric_column(column)
+
+        try:
+            return TypeParser._try_convert_datetime(column)
+        except TypeError:
+            pass
+
+        try:
+            normalized_column = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
+            numeric_column = to_numeric(normalized_column, errors="raise")
+            return TypeParser._determine_type(numeric_column)
+        except (ValueError, TypeError):
+            pass
+
+        return TypeParser._string_column(column)
+
+    @staticmethod
+    def _try_convert_datetime(column: Series) -> tuple[Series, DatetimeColumnInfo]:
+        # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
+        # This needs utc=False otherwise it would just assume UTC for missing time zone!
+        try:
+            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
+        except TypeError:
+            pass
+
+        # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
+        # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
+        # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
+        # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
+        try:
+            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
+        except TypeError:
+            pass
+
+        # Try parsing with different local formats (no time zone).
+        for format in DATE_TIME_OTHER_FORMATS:
+            try:
+                return TypeParser._try_convert_datetime_format(column, format, False)
+            except TypeError:
+                pass
+
+        raise TypeError
+
+    @staticmethod
+    def _try_convert_datetime_format(column: Series, format: str, utc: bool) -> tuple[Series, DatetimeColumnInfo]:
+        with warnings.catch_warnings():
+            # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
+            # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
+            # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
+            # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+            warnings.simplefilter("ignore", FutureWarning)
+
+            try:
+                result_column = to_datetime(column, errors="raise", format=format, utc=utc)
+            except (ValueError, TypeError):
+                raise TypeError
+            if result_column.dtype.kind != "M":
+                raise TypeError
+            return TypeParser._datetime_column(result_column, format)
+
+    @staticmethod
+    def _numeric_column(column: Series) -> tuple[Series, NumericColumnInfo]:
+        return column, NumericColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
+
+    @staticmethod
+    def _string_column(column: Series) -> tuple[Series, StringColumnInfo]:
+        return column, StringColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
+
+    @staticmethod
+    def _datetime_column(column: Series, format: str) -> tuple[Series, DatetimeColumnInfo]:
+        return column, DatetimeColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind, format=format)
 
 
 # Labels for fields
@@ -147,7 +319,6 @@ class Pandas(Analyzer):
         self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
         self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
-        self._computed_data = DataFrame(index=self._data.columns)
         self._intervals = [
             timedelta(seconds=1),
             timedelta(minutes=1),
@@ -163,52 +334,56 @@ class Pandas(Analyzer):
     async def analyze(self, output_context: OutputContext):
         row_count = len(self._data.index)
         self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
-        columns_by_type = await self._determine_types()
-        common_fields = await self._compute_common_fields()
 
-        datetime_ids = columns_by_type[_ColumnType.DateTime]
-        datetime_columns = self._data.loc[:, datetime_ids]
-        datetime_common_fields = common_fields.loc[datetime_ids]
-        datetime_fields = await self._compute_datetime_fields(datetime_columns)
+        type_parser = TypeParser(self._data)
+        await type_parser.process()
+        processed_cols = type_parser.all_cols
+
+        common_fields = await self._compute_common_fields(processed_cols.data)
+
+        datetime_cols = type_parser.datetime_cols
+        datetime_common_fields = common_fields.loc[datetime_cols.ids]
+        datetime_fields = await self._compute_datetime_fields(datetime_cols.data)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
-        datetime_index = await _determine_datetime_index(self._logger, datetime_columns)
+        datetime_index = await _determine_datetime_index(self._logger, datetime_cols.data)
         datetime_column_name: Optional[str] = None
         datetime_column_periodicity: Optional[_DatetimeColumnTemporalConsistency] = None
         if datetime_index is not None:
             self._logger.info('Using "%s" as index', datetime_index.name)
-            self._data.set_index(datetime_index, inplace=True)
+            processed_cols.data.set_index(datetime_index, inplace=True)
             datetime_column_name = str(datetime_index.name)
             datetime_column_periodicity = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY][datetime_column_name]
 
-        numeric_ids = columns_by_type[_ColumnType.Numeric]
-        numeric_columns = self._data.loc[:, numeric_ids]
-        numeric_common_fields = common_fields.loc[numeric_ids]
+        numeric_cols = type_parser.numeric_cols
+        numeric_common_fields = common_fields.loc[numeric_cols.ids]
         numeric_fields = await self._compute_numeric_fields(
-            numeric_columns, numeric_common_fields, datetime_column_periodicity
+            numeric_cols.data, numeric_common_fields, datetime_column_periodicity
         )
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
-        string_ids = columns_by_type[_ColumnType.String]
-        string_columns = self._data[string_ids]
-        string_fields = common_fields.loc[string_ids]
+        string_cols = type_parser.string_cols
+        string_fields = common_fields.loc[string_cols.ids]
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
-                numeric_columns[name], _get_single_row(name, numeric_fields), output_context, datetime_column_name
+                numeric_cols[id],
+                _get_single_row(id, numeric_fields),
+                output_context,
+                datetime_column_name,
             )
-            for name in numeric_ids
+            for id in numeric_cols.ids
         ]
         transformed_datetime_columns = [
-            await self._transform_datetime_results(datetime_columns[name], _get_single_row(name, datetime_fields))
-            for name in datetime_ids
+            await self._transform_datetime_results(datetime_cols[id], _get_single_row(id, datetime_fields))
+            for id in datetime_cols.ids
         ]
         transformed_string_columns = [
-            await self._transform_string_results(string_columns[name], _get_single_row(name, string_fields))
-            for name in string_ids
+            await self._transform_string_results(string_cols[id], _get_single_row(id, string_fields))
+            for id in string_cols.ids
         ]
 
-        correlation_ids = numeric_ids
-        correlation_columns = self._data.loc[:, correlation_ids]
+        correlation_ids = numeric_cols.ids
+        correlation_columns = processed_cols.data.loc[:, correlation_ids]
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
             self._logger,
@@ -239,11 +414,11 @@ class Pandas(Analyzer):
             primaryDatetimeColumn=datetime_column_name,
         )
 
-    async def _compute_common_fields(self) -> DataFrame:
-        common_fields = DataFrame(index=self._data.columns)
-        common_fields[_COMMON_NON_NULL] = self._data.count()
-        common_fields[_COMMON_NULL] = self._data.isna().sum()
-        common_fields[_COMMON_UNIQUE] = self._data.nunique(dropna=True)
+    async def _compute_common_fields(self, columns: DataFrame) -> DataFrame:
+        common_fields = DataFrame(index=columns.columns)
+        common_fields[_COMMON_NON_NULL] = columns.count()
+        common_fields[_COMMON_NULL] = columns.isna().sum()
+        common_fields[_COMMON_UNIQUE] = columns.nunique(dropna=True)
         return common_fields
 
     async def _compute_numeric_fields(
@@ -318,43 +493,19 @@ class Pandas(Analyzer):
         computed[_DATETIME_TEMPORAL_CONSISTENCY] = await _compute_temporal_consistency(self._logger, columns)
         return computed
 
-    async def _determine_types(self) -> Dict[_ColumnType, List[str]]:
-        columns_by_type: Dict[_ColumnType, List[str]] = {
-            _ColumnType.Numeric: [],
-            _ColumnType.DateTime: [],
-            _ColumnType.String: [],
-        }
-
-        for column_name in self._data.columns:
-            columns_by_type[await self._determine_type(column_name)].append(column_name)
-
-        self._logger.debug("Found Numeric columns: %s", columns_by_type[_ColumnType.Numeric])
-        self._logger.debug("Found DateTime columns: %s", columns_by_type[_ColumnType.DateTime])
-        self._logger.debug("Found String columns: %s", columns_by_type[_ColumnType.String])
-        return columns_by_type
-
-    async def _determine_type(self, column_name: str) -> _ColumnType:
-        self._data[column_name] = infer_type_and_convert(self._data[column_name])
-        type_char = self._data[column_name].dtype.kind
-        if type_char in "iufcm":
-            return _ColumnType.Numeric
-        elif type_char in "M":
-            return _ColumnType.DateTime
-        else:
-            return _ColumnType.String
-
     async def _transform_numeric_results(
         self,
-        column: Series,
+        column_info: ColumnWithInfo[DatetimeColumnInfo],
         computed_fields: Series,
         output_context: OutputContext,
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
-        self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = self._file.output_reference + "_" + str(column.name)
-        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
+        self._logger.debug('Transforming numeric column "%s" results to EDP', column_info.id)
+        column_plot_base = self._file.output_reference + "_" + column_info.id
+        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column_info.data, output_context)
+
         column_result = NumericColumn(
-            name=str(column.name),
+            name=column_info.id,
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -376,7 +527,7 @@ class Pandas(Analyzer):
             iqr=computed_fields[_NUMERIC_IQR],
             iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
             distribution=computed_fields[_NUMERIC_DISTRIBUTION],
-            dataType=str(column.dtype),
+            dataType=column_info.info.dtype_str,
             boxPlot=box_plot,
         )
         if computed_fields[_NUMERIC_DISTRIBUTION] not in [
@@ -384,7 +535,7 @@ class Pandas(Analyzer):
             _Distributions.TooSmallDataset.value,
         ]:
             column_result.distributionGraph = await _plot_distribution(
-                column,
+                column_info.data,
                 computed_fields,
                 self._fitting_config,
                 column_plot_base + "_distribution",
@@ -399,7 +550,7 @@ class Pandas(Analyzer):
             and (datetime_index_column is not None)
         ):
             seasonality_graphs = await _get_seasonality_graphs(
-                str(column.name),
+                column_info.id,
                 column_plot_base,
                 datetime_index_column,
                 computed_fields[_NUMERIC_SEASONALITY],
@@ -411,14 +562,16 @@ class Pandas(Analyzer):
             column_result.residuals = [seasonality_graphs.residual]
         return column_result
 
-    async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
-        self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
+    async def _transform_datetime_results(
+        self, column_info: ColumnWithInfo[DatetimeColumnInfo], computed_fields: Series
+    ) -> DateTimeColumn:
+        self._logger.debug('Transforming datetime column "%s" results to EDP', column_info.id)
         temporal_consistency: Optional[_DatetimeColumnTemporalConsistency] = computed_fields[
             _DATETIME_TEMPORAL_CONSISTENCY
         ]
 
         return DateTimeColumn(
-            name=str(column.name),
+            name=column_info.id,
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -431,12 +584,15 @@ class Pandas(Analyzer):
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
             periodicity=temporal_consistency.period if temporal_consistency else None,
+            format=column_info.info.format,
         )
 
-    async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
-        self._logger.debug('Transforming string column "%s" results to EDP', column.name)
+    async def _transform_string_results(
+        self, column_info: ColumnWithInfo[StringColumnInfo], computed_fields: Series
+    ) -> StringColumn:
+        self._logger.debug('Transforming string column "%s" results to EDP', column_info.id)
         return StringColumn(
-            name=str(column.name),
+            name=column_info.id,
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -754,83 +910,3 @@ async def _get_seasonality_graphs(
         seasonality=TimeBasedGraph(timeBaseColumn=time_base_column, file=seasonal_reference),
         residual=TimeBasedGraph(timeBaseColumn=time_base_column, file=residual_reference),
     )
-
-
-def infer_type_and_convert(column: Series) -> Series:
-    type_character = column.dtype.kind
-
-    if type_character in "i":
-        if numpy_any(column < 0):
-            return to_numeric(column, downcast="signed", errors="raise")
-        return to_numeric(column, downcast="unsigned", errors="raise")
-
-    if type_character in "u":
-        return to_numeric(column, downcast="unsigned", errors="raise")
-
-    if type_character in "f":
-        return to_numeric(column, downcast="float", errors="raise")
-
-    if type_character in "c":
-        return column
-
-    if type_character in "M":
-        return try_convert_datetime(column)
-
-    if type_character in "m":
-        return column
-
-    try:
-        return try_convert_datetime(column)
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        normalized_col = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
-        return infer_type_and_convert(to_numeric(normalized_col, errors="raise"))
-    except (ValueError, TypeError):
-        pass
-
-    return column
-
-
-def try_convert_datetime(column: Series) -> Series:
-    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
-    # This needs utc=False otherwise it would just assume UTC for missing time zone!
-    try:
-        return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
-    except TypeError:
-        pass
-
-    # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
-    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
-    # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
-    # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
-    try:
-        return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
-    except TypeError:
-        pass
-
-    # Try parsing with different local formats (no time zone).
-    for format in DATE_TIME_OTHER_FORMATS:
-        try:
-            return try_convert_datetime_format(column, format, False)
-        except TypeError:
-            pass
-    raise TypeError
-
-
-def try_convert_datetime_format(column: Series, format: str, utc: bool) -> Series:
-    with warnings.catch_warnings():
-        # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
-        # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
-        # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
-        # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-        warnings.simplefilter("ignore", FutureWarning)
-
-        try:
-            result_column = to_datetime(column, errors="raise", format=format, utc=utc)
-        except (ValueError, TypeError):
-            raise TypeError
-        if result_column.dtype.kind != "M":
-            raise TypeError
-        return result_column

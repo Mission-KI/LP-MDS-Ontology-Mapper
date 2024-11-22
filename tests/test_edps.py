@@ -103,6 +103,8 @@ async def test_analyse_csv(output_context, config_data):
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
+    assert edp.structuredDatasets[0].datetimeColumns[0].format == "ISO8601"
+    assert edp.structuredDatasets[0].datetimeColumns[1].format == "ISO8601"
 
 
 @mark.asyncio
