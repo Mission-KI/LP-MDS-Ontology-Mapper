@@ -1,5 +1,6 @@
 from asyncio import get_running_loop
-from logging import getLogger
+from csv import Dialect
+from logging import Logger, getLogger
 
 from clevercsv import Detector
 from clevercsv.detect import DetectionMethod
@@ -14,13 +15,25 @@ async def csv(file: File):
     logger = getLogger("CSV Importer")
     logger.info("Importing %s as CSV", file)
 
-    dialect, has_header = _detect_dialect_and_has_header(file, num_chars=5000)
+    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(logger, file, num_chars=5000)
+
+    csv_dialect: Dialect | None = None
+    if dialect:
+        csv_dialect = dialect.to_csv_dialect()
+        logger.info(
+            "Detected dialect. Delimiter=%s, EscapeChar=%s, QuoteChar=%s",
+            dialect.delimiter,
+            dialect.escapechar,
+            dialect.quotechar,
+        )
+    else:
+        logger.info("No dialect detected")
+
+    logger.info("%s", "Detected Header" if has_header else "No Header detected")
 
     def runner():
         return read_csv(
-            file.path,
-            dialect=dialect.to_csv_dialect() if dialect is not None else None,  # type: ignore
-            header="infer" if has_header else None,
+            file.path, dialect=csv_dialect, header="infer" if has_header else None, encoding=encoding  # type: ignore
         )
 
     loop = get_running_loop()
@@ -35,8 +48,12 @@ async def csv(file: File):
     return Pandas(data_frame, file)
 
 
-def _detect_dialect_and_has_header(file: File, num_chars: int):
+def _detect_dialect_encoding_and_has_header(logger: Logger, file: File, num_chars: int):
     enc = get_encoding(file.path)
+    if enc is None:
+        raise RuntimeError(f'Could not detect encoding for "{file.relative}"')
+
+    logger.info('Detected encoding "%s"', enc)
     # newline="" is important for CSV files as it preserves line endings.
     # Thus read() passes them through to the detector.
     with file.path.open("r", newline="", encoding=enc) as fp:
@@ -44,4 +61,4 @@ def _detect_dialect_and_has_header(file: File, num_chars: int):
         detector = Detector()
         dialect = detector.detect(data, verbose=False, method=DetectionMethod.AUTO)
         has_header = detector.has_header(data)
-    return dialect, has_header
+    return dialect, enc, has_header
