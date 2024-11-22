@@ -411,7 +411,9 @@ class Pandas(Analyzer):
 
     async def _transform_datetime_results(self, column: Series, computed_fields: Series) -> DateTimeColumn:
         self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
-        temporal_consistency: _DatetimeColumnTemporalConsistency = computed_fields[_DATETIME_TEMPORAL_CONSISTENCY]
+        temporal_consistency: Optional[_DatetimeColumnTemporalConsistency] = computed_fields[
+            _DATETIME_TEMPORAL_CONSISTENCY
+        ]
 
         return DateTimeColumn(
             name=str(column.name),
@@ -419,13 +421,14 @@ class Pandas(Analyzer):
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
             temporalCover=TemporalCover(
-                earliest=computed_fields[_DATETIME_EARLIEST], latest=computed_fields[_DATETIME_LATEST]
+                earliest=computed_fields[_DATETIME_EARLIEST],
+                latest=computed_fields[_DATETIME_LATEST],
             ),
             all_entries_are_unique=computed_fields[_DATETIME_ALL_ENTRIES_UNIQUE],
             monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
-            temporalConsistencies=temporal_consistency.temporal_consistencies,
-            periodicity=temporal_consistency.period,
+            temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
+            periodicity=temporal_consistency.period if temporal_consistency else None,
         )
 
     async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
@@ -457,9 +460,20 @@ async def _compute_temporal_consistency(logger: Logger, columns: DataFrame) -> S
 
 def _compute_temporal_consistency_for_column(
     logger: Logger, index: DatetimeIndex
-) -> _DatetimeColumnTemporalConsistency:
+) -> Optional[_DatetimeColumnTemporalConsistency]:
     index = index.sort_values(ascending=True)
     row_count = len(index)
+
+    TIME_BASE_THRESHOLD = 15
+    unique_timestamps = index.nunique()
+    if unique_timestamps < TIME_BASE_THRESHOLD:
+        message = (
+            "Can not analyze temporal consistency, time base contains too few unique timestamps. "
+            f"Have {unique_timestamps}, need at least {TIME_BASE_THRESHOLD}."
+        )
+        logger.warning(message)
+        warn(message)
+        return None
 
     # Remove null entries
     index = index[index.notnull()]  # type: ignore
