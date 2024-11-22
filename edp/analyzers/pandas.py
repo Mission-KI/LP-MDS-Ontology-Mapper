@@ -45,7 +45,7 @@ from edp.types import (
 )
 
 # Try these dateformats one after the other: ISO and a couple of usual German formats.
-DATE_TIME_FORMATS = ["ISO8601", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%H:%M:%S", "%H:%M"]
+DATE_TIME_FORMATS = ["ISO8601", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
 
 
 class FittingConfig(BaseModel):

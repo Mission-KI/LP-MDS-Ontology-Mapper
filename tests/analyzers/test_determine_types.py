@@ -201,11 +201,8 @@ async def test_determine_datetime_de_HMS():
         ]
     )
     types = await analyzer._determine_types()
-    assert types[_ColumnType.DateTime] == ["col"]
-    assert analyzer._data["col"].dtype.kind == "M"
-    assert analyzer._data["col"][0] == Timestamp(year=1900, month=1, day=1, hour=0, minute=3, second=14)
-    assert analyzer._data["col"][1] == Timestamp(year=1900, month=1, day=1, hour=0, minute=26, second=57)
-    assert analyzer._data["col"][2] == Timestamp(year=1900, month=1, day=1, hour=13, minute=29, second=53)
+    # For now a pure time column is categorized as string column
+    assert types[_ColumnType.String] == ["col"]
 
 
 async def test_determine_datetime_de_HM():
@@ -217,11 +214,8 @@ async def test_determine_datetime_de_HM():
         ]
     )
     types = await analyzer._determine_types()
-    assert types[_ColumnType.DateTime] == ["col"]
-    assert analyzer._data["col"].dtype.kind == "M"
-    assert analyzer._data["col"][0] == Timestamp(year=1900, month=1, day=1, hour=0, minute=3)
-    assert analyzer._data["col"][1] == Timestamp(year=1900, month=1, day=1, hour=0, minute=26)
-    assert analyzer._data["col"][2] == Timestamp(year=1900, month=1, day=1, hour=13, minute=29)
+    # For now a pure time column is categorized as string column
+    assert types[_ColumnType.String] == ["col"]
 
 
 async def test_determine_datetime_mixed():
