@@ -785,7 +785,8 @@ def infer_type_and_convert(column: Series) -> Series:
         pass
 
     try:
-        return infer_type_and_convert(to_numeric(column.str.replace(",", "."), errors="raise"))
+        normalized_col = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
+        return infer_type_and_convert(to_numeric(normalized_col, errors="raise"))
     except (ValueError, TypeError):
         pass
 

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from logging import getLogger
+from math import isnan
 
 from pandas import DataFrame, Series
 from pytest import fixture, mark
@@ -32,6 +33,11 @@ def float32_german_string_series():
 
 
 @fixture
+def bool_series():
+    return Series([False, True, float("nan"), None], dtype=object)
+
+
+@fixture
 def datetime_string_series():
     now = datetime.now()
     return Series(
@@ -59,6 +65,16 @@ def test_get_smallest_down_cast_able_type_float32(float32_string_series):
 
 def test_get_smallest_down_cast_able_type_float32_german(float32_german_string_series):
     assert str(infer_type_and_convert(float32_german_string_series).dtype) == "float32"
+
+
+def test_get_smallest_down_cast_able_type_bool(bool_series):
+    # Boolean are converted to 0.0 (False) / 1.0 (True)
+    result = infer_type_and_convert(bool_series)
+    assert str(result.dtype) == "float32"
+    assert result[0] == 0.0
+    assert result[1] == 1.0
+    assert isnan(result[2])
+    assert isnan(result[3])
 
 
 def test_get_smallest_down_cast_able_type_datetime(datetime_string_series):
