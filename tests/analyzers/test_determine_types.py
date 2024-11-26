@@ -144,6 +144,27 @@ async def test_determine_datetime_iso_YmdTHMS_TZ():
     )
 
 
+async def test_determine_datetime_iso_YmdTHMS_TZ_different():
+    analyzer = buildPandasAnalyzer(
+        [
+            "20160301T00:03:14+0100",
+            "19970402T00:26:57+0200",
+            "20450630T13:29:53+0300",
+            "20450607T03:30:00+0230",
+        ]
+    )
+    types = await analyzer._determine_types()
+    assert types[_ColumnType.DateTime] == ["col"]
+    assert analyzer._data["col"].dtype.kind == "M"
+    assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
+    assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57, tz="UTC+0200")
+    assert analyzer._data["col"][2] == Timestamp(
+        year=2045, month=6, day=30, hour=13, minute=29, second=53, tz="UTC+0300"
+    )
+    # non-standard time zones (like +0230) are normalized to UTC!
+    assert analyzer._data["col"][3] == Timestamp(year=2045, month=6, day=7, hour=1, minute=0, second=0, tz="UTC")
+
+
 async def test_determine_datetime_de_dmY_HMS():
     analyzer = buildPandasAnalyzer(
         [

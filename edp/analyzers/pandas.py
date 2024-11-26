@@ -1,3 +1,4 @@
+import warnings
 from asyncio import get_running_loop
 from collections.abc import Hashable
 from contextlib import asynccontextmanager
@@ -45,7 +46,8 @@ from edp.types import (
 )
 
 # Try these dateformats one after the other: ISO and a couple of usual German formats.
-DATE_TIME_FORMATS = ["ISO8601", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
+DATE_TIME_FORMAT_ISO = "ISO8601"
+DATE_TIME_OTHER_FORMATS = ["%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
 
 
 class FittingConfig(BaseModel):
@@ -791,9 +793,40 @@ def infer_type_and_convert(column: Series) -> Series:
 
 
 def try_convert_datetime(column: Series) -> Series:
-    for format in DATE_TIME_FORMATS:
+    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53"
+    # This needs utc=False otherwise it would just assume UTC for missing time zone!
+    try:
+        return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
+    except TypeError:
+        pass
+    # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
+    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200"
+    # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
+    try:
+        return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
+    except TypeError:
+        pass
+    # Try parsing with different local formats (no time zone)
+    for format in DATE_TIME_OTHER_FORMATS:
         try:
-            return to_datetime(column, errors="raise", format=format)
-        except (ValueError, TypeError):
+            return try_convert_datetime_format(column, format, False)
+        except TypeError:
             pass
     raise TypeError
+
+
+def try_convert_datetime_format(column: Series, format: str, utc: bool) -> Series:
+    with warnings.catch_warnings():
+        # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
+        # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
+        # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
+        # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+        warnings.simplefilter("error", FutureWarning)
+
+        try:
+            result_column = to_datetime(column, errors="raise", format=format, utc=utc)
+        except (ValueError, TypeError, FutureWarning):
+            raise TypeError
+        if result_column.dtype.kind != "M":
+            raise TypeError
+        return result_column
