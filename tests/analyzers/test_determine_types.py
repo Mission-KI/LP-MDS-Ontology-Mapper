@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from pathlib import Path
 
 from pandas import DataFrame, Timestamp
@@ -19,6 +20,7 @@ async def test_determine_datetime_iso_Ymd_HMS():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29, second=53)
@@ -35,6 +37,7 @@ async def test_determine_datetime_iso_Ymd_HMSm():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(
         year=2016, month=3, day=1, hour=0, minute=3, second=14, microsecond=123000
     )
@@ -57,6 +60,7 @@ async def test_determine_datetime_iso_Ymd_HM():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29)
@@ -73,6 +77,7 @@ async def test_determine_datetime_iso_Ymd():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30)
@@ -89,6 +94,7 @@ async def test_determine_datetime_iso_Ymd_short():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30)
@@ -105,6 +111,7 @@ async def test_determine_datetime_iso_YmdTHMS():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29, second=53)
@@ -121,6 +128,7 @@ async def test_determine_datetime_iso_YmdTHMS_UTC():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz == timezone.utc for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC")
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57, tz="UTC")
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29, second=53, tz="UTC")
@@ -137,6 +145,7 @@ async def test_determine_datetime_iso_YmdTHMS_TZ():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz == timezone(timedelta(hours=1)) for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57, tz="UTC+0100")
     assert analyzer._data["col"][2] == Timestamp(
@@ -154,15 +163,39 @@ async def test_determine_datetime_iso_YmdTHMS_TZ_different():
         ]
     )
     types = await analyzer._determine_types()
+    # For different time zones we need to_datetime(utc=True). This normalizes tz to UTC!
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz == timezone.utc for i in range(4))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57, tz="UTC+0200")
     assert analyzer._data["col"][2] == Timestamp(
         year=2045, month=6, day=30, hour=13, minute=29, second=53, tz="UTC+0300"
     )
-    # non-standard time zones (like +0230) are normalized to UTC!
     assert analyzer._data["col"][3] == Timestamp(year=2045, month=6, day=7, hour=1, minute=0, second=0, tz="UTC")
+
+
+async def test_determine_datetime_iso_YmdTHMS_TZ_partially():
+    analyzer = buildPandasAnalyzer(
+        [
+            "20160301T00:03:14+0100",
+            "20450630T13:29:53+0300",
+            "20450607T03:30:00",
+            "20450607T04:30:00",
+        ]
+    )
+    types = await analyzer._determine_types()
+    # For mixed datetimes with and without tz we need to_datetime(utc=True). This normalizes tz to UTC!
+    # For datetimes without tz the parser assumes the same tz as the previous value.
+    assert types[_ColumnType.DateTime] == ["col"]
+    assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz == timezone.utc for i in range(4))
+    assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
+    assert analyzer._data["col"][1] == Timestamp(
+        year=2045, month=6, day=30, hour=13, minute=29, second=53, tz="UTC+0300"
+    )
+    assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=7, hour=0, minute=30, second=0, tz="UTC")
+    assert analyzer._data["col"][3] == Timestamp(year=2045, month=6, day=7, hour=1, minute=30, second=0, tz="UTC")
 
 
 async def test_determine_datetime_de_dmY_HMS():
@@ -176,6 +209,7 @@ async def test_determine_datetime_de_dmY_HMS():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26, second=57)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29, second=53)
@@ -192,6 +226,7 @@ async def test_determine_datetime_de_dmY_HM():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2, hour=0, minute=26)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30, hour=13, minute=29)
@@ -208,6 +243,7 @@ async def test_determine_datetime_de_dmY():
     types = await analyzer._determine_types()
     assert types[_ColumnType.DateTime] == ["col"]
     assert analyzer._data["col"].dtype.kind == "M"
+    assert all(analyzer._data["col"][i].tz is None for i in range(3))
     assert analyzer._data["col"][0] == Timestamp(year=2016, month=3, day=1)
     assert analyzer._data["col"][1] == Timestamp(year=1997, month=4, day=2)
     assert analyzer._data["col"][2] == Timestamp(year=2045, month=6, day=30)

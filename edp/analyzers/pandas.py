@@ -793,20 +793,23 @@ def infer_type_and_convert(column: Series) -> Series:
 
 
 def try_convert_datetime(column: Series) -> Series:
-    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53"
+    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
     # This needs utc=False otherwise it would just assume UTC for missing time zone!
     try:
         return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
     except TypeError:
         pass
+
     # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
-    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200"
+    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
     # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
+    # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
     try:
         return try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
     except TypeError:
         pass
-    # Try parsing with different local formats (no time zone)
+
+    # Try parsing with different local formats (no time zone).
     for format in DATE_TIME_OTHER_FORMATS:
         try:
             return try_convert_datetime_format(column, format, False)
@@ -821,11 +824,11 @@ def try_convert_datetime_format(column: Series, format: str, utc: bool) -> Serie
         # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
         # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
         # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-        warnings.simplefilter("error", FutureWarning)
+        warnings.simplefilter("ignore", FutureWarning)
 
         try:
             result_column = to_datetime(column, errors="raise", format=format, utc=utc)
-        except (ValueError, TypeError, FutureWarning):
+        except (ValueError, TypeError):
             raise TypeError
         if result_column.dtype.kind != "M":
             raise TypeError
