@@ -40,13 +40,17 @@ def user_provided_data():
         publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
         version="2.3.1",
         tags=["test", "csv"],
+        freely_available=True,
     )
 
 
 @fixture
 def config_data(user_provided_data):
     augmented_columns = [
-        AugmentedColumn(name="aufenthalt", augmentation=Augmentation(sourceColumns=["einfahrt", "ausfahrt"]))
+        AugmentedColumn(
+            name="aufenthalt",
+            augmentation=Augmentation(sourceColumns=["einfahrt", "ausfahrt"]),
+        )
     ]
     return Config(userProvidedEdpData=user_provided_data, augmentedColumns=augmented_columns)
 
@@ -140,7 +144,9 @@ def read_edp(json_file: PurePosixPath):
     return ExtendedDatasetProfile.model_validate_json(json_data)
 
 
-def _assert_pickle_temporal_consistencies(temporal_consistencies: List[TemporalConsistency]):
+def _assert_pickle_temporal_consistencies(
+    temporal_consistencies: List[TemporalConsistency],
+):
     microseconds_consistency = temporal_consistencies[0]
     assert microseconds_consistency.timeScale == "microseconds"
     assert microseconds_consistency.stable is False

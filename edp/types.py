@@ -250,6 +250,9 @@ class UserProvidedEdpData(BaseModel):
     )
     dpa: Optional[str] = Field(default=None, description="Identifier that describes or links a dpa")
     dataLog: Optional[str] = Field(default=None, description="Description or links to data log")
+    freely_available: bool = Field(
+        description="Whether asset is freely available. That means, there is no registration or login needed to download it."
+    )
 
 
 class Config(BaseModel):
