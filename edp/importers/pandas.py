@@ -15,7 +15,7 @@ async def csv(file: File):
     logger = getLogger("CSV Importer")
     logger.info("Importing %s as CSV", file)
 
-    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(logger, file, num_chars=5000)
+    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(logger, file, num_lines=100)
 
     csv_dialect: Dialect | None = None
     if dialect:
@@ -48,17 +48,28 @@ async def csv(file: File):
     return Pandas(data_frame, file)
 
 
-def _detect_dialect_encoding_and_has_header(logger: Logger, file: File, num_chars: int):
+def _detect_dialect_encoding_and_has_header(logger: Logger, file: File, num_lines: int | None):
     enc = get_encoding(file.path)
     if enc is None:
         raise RuntimeError(f'Could not detect encoding for "{file.relative}"')
-
     logger.info('Detected encoding "%s"', enc)
+
+    data = _read_file_top_lines(file, enc, num_lines)
+
+    detector = Detector()
+    dialect = detector.detect(data, verbose=False, method=DetectionMethod.AUTO)
+    has_header = detector.has_header(data)
+    return dialect, enc, has_header
+
+
+def _read_file_top_lines(file: File, enc: str, num_lines: int | None) -> str:
+    data: str = ""
     # newline="" is important for CSV files as it preserves line endings.
     # Thus read() passes them through to the detector.
     with file.path.open("r", newline="", encoding=enc) as fp:
-        data = fp.read(num_chars) if num_chars else fp.read()
-        detector = Detector()
-        dialect = detector.detect(data, verbose=False, method=DetectionMethod.AUTO)
-        has_header = detector.has_header(data)
-    return dialect, enc, has_header
+        for index, line in enumerate(fp):
+            if not num_lines or index < num_lines:
+                data += line
+            else:
+                break
+    return data
