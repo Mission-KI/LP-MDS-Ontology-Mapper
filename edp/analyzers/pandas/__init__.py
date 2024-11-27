@@ -1,20 +1,17 @@
-import warnings
 from asyncio import get_running_loop
 from collections.abc import Hashable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import Dict, List, Optional, Tuple
 from warnings import warn
 
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
-from numpy import any as numpy_any
 from numpy import corrcoef, count_nonzero, linspace, ones_like, triu  # , dtype
 from pandas import (
     DataFrame,
@@ -23,8 +20,6 @@ from pandas import (
     Timedelta,
     UInt64Dtype,
     concat,
-    to_datetime,
-    to_numeric,
 )
 from pydantic import BaseModel, Field
 from scipy.stats import distributions
@@ -32,6 +27,12 @@ from seaborn import heatmap
 from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edp.analyzers.base import Analyzer
+from edp.analyzers.pandas.type_parser import (
+    ColumnWithInfo,
+    DatetimeColumnInfo,
+    StringColumnInfo,
+    TypeParser,
+)
 from edp.context import OutputContext
 from edp.file import File
 from edp.types import (
@@ -46,197 +47,18 @@ from edp.types import (
     TimeBasedGraph,
 )
 
-# Try these dateformats one after the other: ISO and a couple of usual German formats.
-DATE_TIME_FORMAT_ISO = "ISO8601"
-DATE_TIME_OTHER_FORMATS = ["%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
-
 
 class FittingConfig(BaseModel):
     timeout: timedelta = Field(default=timedelta(seconds=30), description="Timeout to use for the fitting")
     error_function: str = Field(
-        default="sumsquare_error", description="Error function to use to measure performance of the fits"
+        default="sumsquare_error",
+        description="Error function to use to measure performance of the fits",
     )
     bins: int = Field(default=100, description="Number of bins to use for the fitting")
     distributions: List[str] = Field(
-        default_factory=get_common_distributions, description="Distributions to try to fit"
+        default_factory=get_common_distributions,
+        description="Distributions to try to fit",
     )
-
-
-## Type parsing
-
-
-class ColumnInfo(BaseModel):
-    dtype_str: str
-    dtype_kind: str
-
-
-class DatetimeColumnInfo(ColumnInfo):
-    format: str
-
-
-class NumericColumnInfo(ColumnInfo):
-    pass
-
-
-class StringColumnInfo(ColumnInfo):
-    pass
-
-
-COL_INFO = TypeVar("COL_INFO", bound=ColumnInfo)
-
-
-@dataclass(frozen=True)
-class ColumnWithInfo(Generic[COL_INFO]):
-    id: str
-    info: COL_INFO
-    data: Series
-
-
-@dataclass(frozen=True)
-class ColumnsWithInfo(Generic[COL_INFO]):
-    infos: dict[str, COL_INFO]
-    data: DataFrame
-
-    @property
-    def ids(self) -> list[str]:
-        return list(self.infos.keys())
-
-    def __getitem__(self, id: str):
-        return ColumnWithInfo(id, self.infos[id], self.data[id])
-
-
-class TypeParser:
-    def __init__(self, data: DataFrame):
-        self._data = data
-        self._processed_data = DataFrame(index=data.index)
-        self._column_infos: Dict[str, ColumnInfo] = dict()
-        self._logger = getLogger(__name__)
-
-    @property
-    def all_cols(self) -> ColumnsWithInfo[ColumnInfo]:
-        return ColumnsWithInfo(self._column_infos, self._processed_data)
-
-    @property
-    def datetime_cols(self) -> ColumnsWithInfo[DatetimeColumnInfo]:
-        return self._build_filtered_cols(DatetimeColumnInfo)
-
-    @property
-    def numeric_cols(self) -> ColumnsWithInfo[NumericColumnInfo]:
-        return self._build_filtered_cols(NumericColumnInfo)
-
-    @property
-    def string_cols(self) -> ColumnsWithInfo[StringColumnInfo]:
-        return self._build_filtered_cols(StringColumnInfo)
-
-    def _build_filtered_cols(self, info_type: type[COL_INFO]) -> ColumnsWithInfo[COL_INFO]:
-        infos = {key: value for key, value in self._column_infos.items() if isinstance(value, info_type)}
-        data = self._processed_data.loc[:, list(infos.keys())]
-        return ColumnsWithInfo(infos, data)
-
-    async def process(self):
-        for column_name in self._data.columns:
-            column, column_info = TypeParser._determine_type(self._data[column_name])
-            self._column_infos[column_name] = column_info
-            self._processed_data[column_name] = column
-
-        self._logger.debug("Found Numeric columns: %s", self.numeric_cols.ids)
-        self._logger.debug("Found DateTime columns: %s", self.datetime_cols.ids)
-        self._logger.debug("Found String columns: %s", self.string_cols.ids)
-
-    @staticmethod
-    def _determine_type(column: Series) -> tuple[Series, ColumnInfo]:
-        type_character = column.dtype.kind
-
-        if type_character in "i":
-            if numpy_any(column < 0):
-                return TypeParser._numeric_column(to_numeric(column, downcast="signed", errors="raise"))
-            else:
-                return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
-
-        elif type_character in "u":
-            return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
-
-        elif type_character in "f":
-            return TypeParser._numeric_column(to_numeric(column, downcast="float", errors="raise"))
-
-        elif type_character in "c":
-            return TypeParser._numeric_column(column)
-
-        elif type_character in "M":
-            return TypeParser._try_convert_datetime(column)
-
-        elif type_character in "m":
-            return TypeParser._numeric_column(column)
-
-        try:
-            return TypeParser._try_convert_datetime(column)
-        except TypeError:
-            pass
-
-        try:
-            normalized_column = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
-            numeric_column = to_numeric(normalized_column, errors="raise")
-            return TypeParser._determine_type(numeric_column)
-        except (ValueError, TypeError):
-            pass
-
-        return TypeParser._string_column(column)
-
-    @staticmethod
-    def _try_convert_datetime(column: Series) -> tuple[Series, DatetimeColumnInfo]:
-        # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
-        # This needs utc=False otherwise it would just assume UTC for missing time zone!
-        try:
-            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
-        except TypeError:
-            pass
-
-        # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
-        # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
-        # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
-        # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
-        try:
-            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
-        except TypeError:
-            pass
-
-        # Try parsing with different local formats (no time zone).
-        for format in DATE_TIME_OTHER_FORMATS:
-            try:
-                return TypeParser._try_convert_datetime_format(column, format, False)
-            except TypeError:
-                pass
-
-        raise TypeError
-
-    @staticmethod
-    def _try_convert_datetime_format(column: Series, format: str, utc: bool) -> tuple[Series, DatetimeColumnInfo]:
-        with warnings.catch_warnings():
-            # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
-            # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
-            # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
-            # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-            warnings.simplefilter("ignore", FutureWarning)
-
-            try:
-                result_column = to_datetime(column, errors="raise", format=format, utc=utc)
-            except (ValueError, TypeError):
-                raise TypeError
-            if result_column.dtype.kind != "M":
-                raise TypeError
-            return TypeParser._datetime_column(result_column, format)
-
-    @staticmethod
-    def _numeric_column(column: Series) -> tuple[Series, NumericColumnInfo]:
-        return column, NumericColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
-
-    @staticmethod
-    def _string_column(column: Series) -> tuple[Series, StringColumnInfo]:
-        return column, StringColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
-
-    @staticmethod
-    def _datetime_column(column: Series, format: str) -> tuple[Series, DatetimeColumnInfo]:
-        return column, DatetimeColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind, format=format)
 
 
 # Labels for fields
@@ -297,7 +119,10 @@ class _PerTimeBaseSeasonalityGraphs:
 
 class _DatetimeColumnTemporalConsistency:
     def __init__(
-        self, period: str, temporal_consistencies: List[TemporalConsistency], cleaned_index: DatetimeIndex
+        self,
+        period: str,
+        temporal_consistencies: List[TemporalConsistency],
+        cleaned_index: DatetimeIndex,
     ) -> None:
         self.period = period
         self.temporal_consistencies = temporal_consistencies
@@ -333,7 +158,10 @@ class Pandas(Analyzer):
 
     async def analyze(self, output_context: OutputContext):
         row_count = len(self._data.index)
-        self._logger.info("Started structured data analysis with dataset containing %d rows", row_count)
+        self._logger.info(
+            "Started structured data analysis with dataset containing %d rows",
+            row_count,
+        )
 
         type_parser = TypeParser(self._data)
         await type_parser.process()
@@ -697,7 +525,13 @@ async def _get_distributions(
     for index, values in enumerate(columns.items(), start=1):
         name, column = values
         distributions.append(
-            await _get_distribution(column, _get_single_row(name, fields), config, distribution_threshold, workers)
+            await _get_distribution(
+                column,
+                _get_single_row(name, fields),
+                config,
+                distribution_threshold,
+                workers,
+            )
         )
         logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
@@ -710,7 +544,11 @@ async def _get_distributions(
 
 
 async def _get_distribution(
-    column: Series, fields: Series, config: FittingConfig, distribution_threshold: int, workers: int
+    column: Series,
+    fields: Series,
+    config: FittingConfig,
+    distribution_threshold: int,
+    workers: int,
 ) -> Tuple[str, Dict]:
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
@@ -761,7 +599,13 @@ async def _plot_distribution(
         axes.set_xlabel(f"Value of {column.name}")
         axes.set_ylabel("Relative Density")
         axes.set_xlim(x_min, x_max)
-        axes.hist(column, bins=config.bins, range=x_limits, density=True, label=f"{column.name} Value Distribution")
+        axes.hist(
+            column,
+            bins=config.bins,
+            range=x_limits,
+            density=True,
+            label=f"{column.name} Value Distribution",
+        )
         x = linspace(x_min, x_max, 2048)
         distribution = getattr(distributions, distribution_name)
         distribution_y = distribution.pdf(x, **distribution_parameters)
@@ -776,7 +620,11 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
 
 
 async def _get_correlation_graph(
-    logger: Logger, plot_name: str, columns: DataFrame, fields: DataFrame, output_context: OutputContext
+    logger: Logger,
+    plot_name: str,
+    columns: DataFrame,
+    fields: DataFrame,
+    output_context: OutputContext,
 ) -> Optional[FileReference]:
     filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
     if len(filtered_column_names) < 2:
@@ -795,7 +643,10 @@ async def _get_correlation_graph(
         if isinstance(figure, Figure):
             width_offset = 3
             height_offset = 3
-            figure_size = (correlation.shape[0] + width_offset, correlation.shape[1] + height_offset)
+            figure_size = (
+                correlation.shape[0] + width_offset,
+                correlation.shape[1] + height_offset,
+            )
             figure.set_size_inches(figure_size)
         heatmap(
             correlation,
@@ -842,7 +693,9 @@ async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optio
 
 
 async def _get_seasonalities(
-    logger: Logger, columns: DataFrame, index_column_periodicity: _DatetimeColumnTemporalConsistency
+    logger: Logger,
+    columns: DataFrame,
+    index_column_periodicity: _DatetimeColumnTemporalConsistency,
 ) -> Series:
     row_count = len(columns.index)
     logger.info("Starting seasonality analysis on %d rows", row_count)
@@ -855,7 +708,10 @@ async def _get_seasonalities(
             for name, column in filtered_columns.items()
         }
     )
-    logger.info("Finished seasonality analysis, found highest periodicity at %s level", index_column_periodicity.period)
+    logger.info(
+        "Finished seasonality analysis, found highest periodicity at %s level",
+        index_column_periodicity.period,
+    )
     return series
 
 
