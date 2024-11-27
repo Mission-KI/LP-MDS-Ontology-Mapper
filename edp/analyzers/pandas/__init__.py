@@ -12,7 +12,7 @@ from warnings import warn
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
-from numpy import corrcoef, count_nonzero, linspace, ones_like, triu  # , dtype
+from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -28,10 +28,8 @@ from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edp.analyzers.base import Analyzer
 from edp.analyzers.pandas.type_parser import (
-    ColumnWithInfo,
     DatetimeColumnInfo,
-    StringColumnInfo,
-    TypeParser,
+    parse_types,
 )
 from edp.context import OutputContext
 from edp.file import File
@@ -163,13 +161,12 @@ class Pandas(Analyzer):
             row_count,
         )
 
-        type_parser = TypeParser(self._data)
-        await type_parser.process()
-        processed_cols = type_parser.all_cols
+        type_parser_results = await parse_types(self._data)
 
-        common_fields = await self._compute_common_fields(processed_cols.data)
+        all_cols = type_parser_results.all_cols
+        common_fields = await self._compute_common_fields(all_cols.data)
 
-        datetime_cols = type_parser.datetime_cols
+        datetime_cols = type_parser_results.datetime_cols
         datetime_common_fields = common_fields.loc[datetime_cols.ids]
         datetime_fields = await self._compute_datetime_fields(datetime_cols.data)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
@@ -178,23 +175,25 @@ class Pandas(Analyzer):
         datetime_column_periodicity: Optional[_DatetimeColumnTemporalConsistency] = None
         if datetime_index is not None:
             self._logger.info('Using "%s" as index', datetime_index.name)
-            processed_cols.data.set_index(datetime_index, inplace=True)
+            type_parser_results.set_index(datetime_index)
             datetime_column_name = str(datetime_index.name)
             datetime_column_periodicity = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY][datetime_column_name]
 
-        numeric_cols = type_parser.numeric_cols
+        numeric_cols = type_parser_results.numeric_cols
         numeric_common_fields = common_fields.loc[numeric_cols.ids]
         numeric_fields = await self._compute_numeric_fields(
-            numeric_cols.data, numeric_common_fields, datetime_column_periodicity
+            numeric_cols.data,
+            numeric_common_fields,
+            datetime_column_periodicity,
         )
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
-        string_cols = type_parser.string_cols
+        string_cols = type_parser_results.string_cols
         string_fields = common_fields.loc[string_cols.ids]
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
-                numeric_cols[id],
+                numeric_cols.get_col(id),
                 _get_single_row(id, numeric_fields),
                 output_context,
                 datetime_column_name,
@@ -202,16 +201,20 @@ class Pandas(Analyzer):
             for id in numeric_cols.ids
         ]
         transformed_datetime_columns = [
-            await self._transform_datetime_results(datetime_cols[id], _get_single_row(id, datetime_fields))
+            await self._transform_datetime_results(
+                datetime_cols.get_col(id),
+                _get_single_row(id, datetime_fields),
+                datetime_cols.get_info(id),
+            )
             for id in datetime_cols.ids
         ]
         transformed_string_columns = [
-            await self._transform_string_results(string_cols[id], _get_single_row(id, string_fields))
+            await self._transform_string_results(string_cols.get_col(id), _get_single_row(id, string_fields))
             for id in string_cols.ids
         ]
 
         correlation_ids = numeric_cols.ids
-        correlation_columns = processed_cols.data.loc[:, correlation_ids]
+        correlation_columns = all_cols.data.loc[:, correlation_ids]
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
             self._logger,
@@ -323,17 +326,17 @@ class Pandas(Analyzer):
 
     async def _transform_numeric_results(
         self,
-        column_info: ColumnWithInfo[DatetimeColumnInfo],
+        column: Series,
         computed_fields: Series,
         output_context: OutputContext,
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
-        self._logger.debug('Transforming numeric column "%s" results to EDP', column_info.id)
-        column_plot_base = self._file.output_reference + "_" + column_info.id
-        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column_info.data, output_context)
+        self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
+        column_plot_base = self._file.output_reference + "_" + str(column.name)
+        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
 
         column_result = NumericColumn(
-            name=column_info.id,
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -355,7 +358,7 @@ class Pandas(Analyzer):
             iqr=computed_fields[_NUMERIC_IQR],
             iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
             distribution=computed_fields[_NUMERIC_DISTRIBUTION],
-            dataType=column_info.info.dtype_str,
+            dataType=str(column.dtype),
             boxPlot=box_plot,
         )
         if computed_fields[_NUMERIC_DISTRIBUTION] not in [
@@ -363,7 +366,7 @@ class Pandas(Analyzer):
             _Distributions.TooSmallDataset.value,
         ]:
             column_result.distributionGraph = await _plot_distribution(
-                column_info.data,
+                column,
                 computed_fields,
                 self._fitting_config,
                 column_plot_base + "_distribution",
@@ -378,7 +381,7 @@ class Pandas(Analyzer):
             and (datetime_index_column is not None)
         ):
             seasonality_graphs = await _get_seasonality_graphs(
-                column_info.id,
+                str(column.name),
                 column_plot_base,
                 datetime_index_column,
                 computed_fields[_NUMERIC_SEASONALITY],
@@ -391,15 +394,15 @@ class Pandas(Analyzer):
         return column_result
 
     async def _transform_datetime_results(
-        self, column_info: ColumnWithInfo[DatetimeColumnInfo], computed_fields: Series
+        self, column: Series, computed_fields: Series, info: DatetimeColumnInfo
     ) -> DateTimeColumn:
-        self._logger.debug('Transforming datetime column "%s" results to EDP', column_info.id)
+        self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
         temporal_consistency: Optional[_DatetimeColumnTemporalConsistency] = computed_fields[
             _DATETIME_TEMPORAL_CONSISTENCY
         ]
 
         return DateTimeColumn(
-            name=column_info.id,
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
@@ -412,15 +415,13 @@ class Pandas(Analyzer):
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
             periodicity=temporal_consistency.period if temporal_consistency else None,
-            format=column_info.info.format,
+            format=info.format,
         )
 
-    async def _transform_string_results(
-        self, column_info: ColumnWithInfo[StringColumnInfo], computed_fields: Series
-    ) -> StringColumn:
-        self._logger.debug('Transforming string column "%s" results to EDP', column_info.id)
+    async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
+        self._logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
-            name=column_info.id,
+            name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],

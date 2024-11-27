@@ -1,186 +1,198 @@
 import warnings
-from dataclasses import dataclass
 from logging import getLogger
-from typing import Dict, Generic, TypeVar
+from typing import Dict, Generic, TypeVar, Union
 
 from numpy import any as numpy_any
-from pandas import DataFrame, Series, to_datetime, to_numeric
-from pydantic import BaseModel
+from pandas import DataFrame, Index, Series, to_datetime, to_numeric
+from pydantic.dataclasses import dataclass
 
 # Try these dateformats one after the other: ISO and a couple of usual German formats.
 DATE_TIME_FORMAT_ISO = "ISO8601"
 DATE_TIME_OTHER_FORMATS = ["%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
 
 
-class ColumnInfo(BaseModel):
-    dtype_str: str
-    dtype_kind: str
+_logger = getLogger(__name__)
 
 
-class DatetimeColumnInfo(ColumnInfo):
+@dataclass
+class DatetimeColumnInfo:
     format: str
 
 
-class NumericColumnInfo(ColumnInfo):
+@dataclass
+class NumericColumnInfo:
     pass
 
 
-class StringColumnInfo(ColumnInfo):
+@dataclass
+class StringColumnInfo:
     pass
 
 
-COL_INFO = TypeVar("COL_INFO", bound=ColumnInfo)
+_ColumnInfo = Union[DatetimeColumnInfo, NumericColumnInfo, StringColumnInfo]
 
 
-@dataclass(frozen=True)
-class ColumnWithInfo(Generic[COL_INFO]):
-    id: str
-    info: COL_INFO
-    data: Series
+TColumnInfo = TypeVar("TColumnInfo", bound=_ColumnInfo)
 
 
-@dataclass(frozen=True)
-class ColumnsWithInfo(Generic[COL_INFO]):
-    infos: dict[str, COL_INFO]
-    data: DataFrame
+class ColumnsWrapper(Generic[TColumnInfo]):
+    def __init__(self, all_data: DataFrame, infos: dict[str, TColumnInfo]):
+        self._all_data = all_data
+        self._infos = infos
 
     @property
     def ids(self) -> list[str]:
-        return list(self.infos.keys())
+        return list(self._infos.keys())
 
-    def __getitem__(self, id: str):
-        return ColumnWithInfo(id, self.infos[id], self.data[id])
+    def get_info(self, id: str) -> TColumnInfo:
+        return self._infos[id]
+
+    @property
+    def data(self) -> DataFrame:
+        return self._all_data.loc[:, self.ids]
+
+    def get_col(self, id: str) -> Series:
+        return self._all_data.loc[:, id]
 
 
-class TypeParser:
-    def __init__(self, data: DataFrame):
+class Result:
+    def __init__(self, data: DataFrame, infos: Dict[str, _ColumnInfo]) -> None:
         self._data = data
-        self._processed_data = DataFrame(index=data.index)
-        self._column_infos: Dict[str, ColumnInfo] = dict()
-        self._logger = getLogger(__name__)
+        self._infos: Dict[str, _ColumnInfo] = infos
+
+    def set_index(self, index: Index):
+        self._data.set_index(index, inplace=True)
 
     @property
-    def all_cols(self) -> ColumnsWithInfo[ColumnInfo]:
-        return ColumnsWithInfo(self._column_infos, self._processed_data)
+    def all_cols(self) -> ColumnsWrapper[_ColumnInfo]:
+        return ColumnsWrapper(self._data, self._infos)
 
     @property
-    def datetime_cols(self) -> ColumnsWithInfo[DatetimeColumnInfo]:
-        return self._build_filtered_cols(DatetimeColumnInfo)
+    def datetime_cols(self) -> ColumnsWrapper[DatetimeColumnInfo]:
+        infos = {key: value for key, value in self._infos.items() if isinstance(value, DatetimeColumnInfo)}
+        return ColumnsWrapper(self._data, infos)
 
     @property
-    def numeric_cols(self) -> ColumnsWithInfo[NumericColumnInfo]:
-        return self._build_filtered_cols(NumericColumnInfo)
+    def numeric_cols(self) -> ColumnsWrapper[NumericColumnInfo]:
+        infos = {key: value for key, value in self._infos.items() if isinstance(value, NumericColumnInfo)}
+        return ColumnsWrapper(self._data, infos)
 
     @property
-    def string_cols(self) -> ColumnsWithInfo[StringColumnInfo]:
-        return self._build_filtered_cols(StringColumnInfo)
+    def string_cols(self) -> ColumnsWrapper[StringColumnInfo]:
+        infos = {key: value for key, value in self._infos.items() if isinstance(value, StringColumnInfo)}
+        return ColumnsWrapper(self._data, infos)
 
-    def _build_filtered_cols(self, info_type: type[COL_INFO]) -> ColumnsWithInfo[COL_INFO]:
-        infos = {key: value for key, value in self._column_infos.items() if isinstance(value, info_type)}
-        data = self._processed_data.loc[:, list(infos.keys())]
-        return ColumnsWithInfo(infos, data)
 
-    async def process(self):
-        for column_name in self._data.columns:
-            column, column_info = TypeParser._determine_type(self._data[column_name])
-            self._column_infos[column_name] = column_info
-            self._processed_data[column_name] = column
+async def parse_types(data: DataFrame) -> Result:
+    column_infos = dict[str, _ColumnInfo]()
+    results_data = DataFrame(index=data.index)
 
-        self._logger.debug("Found Numeric columns: %s", self.numeric_cols.ids)
-        self._logger.debug("Found DateTime columns: %s", self.datetime_cols.ids)
-        self._logger.debug("Found String columns: %s", self.string_cols.ids)
+    for column_name, column in data.items():
+        if not isinstance(column_name, str):
+            raise RuntimeError(f"Column {column_name} needs a label.")
+        inferred_type_data, info = _determine_type(column)
+        column_infos[column_name] = info
+        results_data[column_name] = inferred_type_data
 
-    @staticmethod
-    def _determine_type(column: Series) -> tuple[Series, ColumnInfo]:
-        type_character = column.dtype.kind
+    result = Result(results_data, column_infos)
 
-        if type_character in "i":
-            if numpy_any(column < 0):
-                return TypeParser._numeric_column(to_numeric(column, downcast="signed", errors="raise"))
-            else:
-                return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
+    _logger.debug("Found Numeric columns: %s", result.numeric_cols.ids)
+    _logger.debug("Found DateTime columns: %s", result.datetime_cols.ids)
+    _logger.debug("Found String columns: %s", result.string_cols.ids)
 
-        elif type_character in "u":
-            return TypeParser._numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
+    return result
 
-        elif type_character in "f":
-            return TypeParser._numeric_column(to_numeric(column, downcast="float", errors="raise"))
 
-        elif type_character in "c":
-            return TypeParser._numeric_column(column)
+def _determine_type(column: Series) -> tuple[Series, _ColumnInfo]:
+    type_character = column.dtype.kind
 
-        elif type_character in "M":
-            return TypeParser._try_convert_datetime(column)
+    if type_character in "i":
+        if numpy_any(column < 0):
+            return _numeric_column(to_numeric(column, downcast="signed", errors="raise"))
+        else:
+            return _numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
 
-        elif type_character in "m":
-            return TypeParser._numeric_column(column)
+    elif type_character in "u":
+        return _numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
 
+    elif type_character in "f":
+        return _numeric_column(to_numeric(column, downcast="float", errors="raise"))
+
+    elif type_character in "c":
+        return _numeric_column(column)
+
+    elif type_character in "M":
+        return _try_convert_datetime(column)
+
+    elif type_character in "m":
+        return _numeric_column(column)
+
+    try:
+        return _try_convert_datetime(column)
+    except TypeError:
+        pass
+
+    try:
+        normalized_column = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
+        numeric_column = to_numeric(normalized_column, errors="raise")
+        return _determine_type(numeric_column)
+    except (ValueError, TypeError):
+        pass
+
+    return _string_column(column)
+
+
+def _try_convert_datetime(column: Series) -> tuple[Series, DatetimeColumnInfo]:
+    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
+    # This needs utc=False otherwise it would just assume UTC for missing time zone!
+    try:
+        return _try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
+    except TypeError:
+        pass
+
+    # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
+    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
+    # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
+    # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
+    try:
+        return _try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
+    except TypeError:
+        pass
+
+    # Try parsing with different local formats (no time zone).
+    for format in DATE_TIME_OTHER_FORMATS:
         try:
-            return TypeParser._try_convert_datetime(column)
+            return _try_convert_datetime_format(column, format, False)
         except TypeError:
             pass
 
+    raise TypeError
+
+
+def _try_convert_datetime_format(column: Series, format: str, utc: bool) -> tuple[Series, DatetimeColumnInfo]:
+    with warnings.catch_warnings():
+        # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
+        # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
+        # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
+        # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+        warnings.simplefilter("ignore", FutureWarning)
+
         try:
-            normalized_column = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
-            numeric_column = to_numeric(normalized_column, errors="raise")
-            return TypeParser._determine_type(numeric_column)
+            result_column = to_datetime(column, errors="raise", format=format, utc=utc)
         except (ValueError, TypeError):
-            pass
+            raise TypeError
+        if result_column.dtype.kind != "M":
+            raise TypeError
+        return _datetime_column(result_column, format)
 
-        return TypeParser._string_column(column)
 
-    @staticmethod
-    def _try_convert_datetime(column: Series) -> tuple[Series, DatetimeColumnInfo]:
-        # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
-        # This needs utc=False otherwise it would just assume UTC for missing time zone!
-        try:
-            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
-        except TypeError:
-            pass
+def _numeric_column(column: Series) -> tuple[Series, NumericColumnInfo]:
+    return column, NumericColumnInfo()
 
-        # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
-        # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
-        # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
-        # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
-        try:
-            return TypeParser._try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
-        except TypeError:
-            pass
 
-        # Try parsing with different local formats (no time zone).
-        for format in DATE_TIME_OTHER_FORMATS:
-            try:
-                return TypeParser._try_convert_datetime_format(column, format, False)
-            except TypeError:
-                pass
+def _string_column(column: Series) -> tuple[Series, StringColumnInfo]:
+    return column, StringColumnInfo()
 
-        raise TypeError
 
-    @staticmethod
-    def _try_convert_datetime_format(column: Series, format: str, utc: bool) -> tuple[Series, DatetimeColumnInfo]:
-        with warnings.catch_warnings():
-            # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
-            # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
-            # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
-            # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-            warnings.simplefilter("ignore", FutureWarning)
-
-            try:
-                result_column = to_datetime(column, errors="raise", format=format, utc=utc)
-            except (ValueError, TypeError):
-                raise TypeError
-            if result_column.dtype.kind != "M":
-                raise TypeError
-            return TypeParser._datetime_column(result_column, format)
-
-    @staticmethod
-    def _numeric_column(column: Series) -> tuple[Series, NumericColumnInfo]:
-        return column, NumericColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
-
-    @staticmethod
-    def _string_column(column: Series) -> tuple[Series, StringColumnInfo]:
-        return column, StringColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind)
-
-    @staticmethod
-    def _datetime_column(column: Series, format: str) -> tuple[Series, DatetimeColumnInfo]:
-        return column, DatetimeColumnInfo(dtype_str=str(column.dtype), dtype_kind=column.dtype.kind, format=format)
+def _datetime_column(column: Series, format: str) -> tuple[Series, DatetimeColumnInfo]:
+    return column, DatetimeColumnInfo(format=format)

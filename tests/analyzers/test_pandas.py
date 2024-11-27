@@ -5,7 +5,8 @@ from math import isnan
 from pandas import DataFrame, Series
 from pytest import fixture, mark
 
-from edp.analyzers.pandas import _COMMON_UNIQUE, TypeParser, _get_correlation_graph
+from edp.analyzers.pandas import _COMMON_UNIQUE, _get_correlation_graph, parse_types
+from edp.analyzers.pandas.type_parser import Result
 
 
 @fixture
@@ -87,21 +88,22 @@ async def test_correlation(output_context):
     await _get_correlation_graph(getLogger("Test"), "test_correlation_graph", columns, fields, output_context)
 
 
+COL_ID = "col"
+
+
 async def expect_numeric_column(series: Series, dtype_str: str):
-    parser = TypeParser(DataFrame(series))
-    await parser.process()
-    cols = parser.numeric_cols
-    col_infos = list(cols.infos.values())
-    assert len(col_infos) == 1
-    assert col_infos[0].dtype_str == dtype_str
-    return cols.data[0]
+    series.name = COL_ID
+    result = await parse_types(DataFrame(series))
+    cols = result.numeric_cols
+    assert len(cols.ids) == 1
+    assert str(cols.get_col(COL_ID).dtype) == dtype_str
+    return cols.get_col(COL_ID)
 
 
 async def expect_datetime_column(series: Series, dtype_str: str):
-    parser = TypeParser(DataFrame(series))
-    await parser.process()
-    cols = parser.datetime_cols
-    col_infos = list(cols.infos.values())
-    assert len(col_infos) == 1
-    assert col_infos[0].dtype_str == dtype_str
-    return cols.data[0]
+    series.name = COL_ID
+    result: Result = await parse_types(DataFrame(series))
+    cols = result.datetime_cols
+    assert len(cols.ids) == 1
+    assert str(cols.get_col(COL_ID).dtype) == dtype_str
+    return cols.get_col(COL_ID)

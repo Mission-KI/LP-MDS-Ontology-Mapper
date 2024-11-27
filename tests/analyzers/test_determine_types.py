@@ -3,7 +3,11 @@ from pathlib import Path
 
 from pandas import DataFrame, Timestamp
 
-from edp.analyzers.pandas import DatetimeColumnInfo, StringColumnInfo, TypeParser
+from edp.analyzers.pandas.type_parser import (
+    DatetimeColumnInfo,
+    StringColumnInfo,
+    parse_types,
+)
 
 DUMMY_FILE = Path(__file__).parent.parent / "data/test.csv"
 
@@ -220,7 +224,7 @@ async def test_determine_datetime_de_HMS():
     )
     # For now a pure time column is categorized as string column
     assert isinstance(info, StringColumnInfo)
-    assert info.dtype_kind == "O"
+    assert col.dtype.kind == "O"
 
 
 async def test_determine_datetime_de_HM():
@@ -233,7 +237,7 @@ async def test_determine_datetime_de_HM():
     )
     # For now a pure time column is categorized as string column
     assert isinstance(info, StringColumnInfo)
-    assert info.dtype_kind == "O"
+    assert col.dtype.kind == "O"
 
 
 async def test_determine_datetime_mixed():
@@ -246,7 +250,7 @@ async def test_determine_datetime_mixed():
     )
     # A column with mixed datetime formats is categorized as string column
     assert isinstance(info, StringColumnInfo)
-    assert info.dtype_kind == "O"
+    assert col.dtype.kind == "O"
     assert col[0] == "01.03.2016 00:03"
 
 
@@ -260,7 +264,7 @@ async def test_determine_unknown():
     )
     # A column with a unknown format is categorized as string column
     assert isinstance(info, StringColumnInfo)
-    assert info.dtype_kind == "O"
+    assert col.dtype.kind == "O"
     assert col[0] == "01-03-2016"
 
 
@@ -276,10 +280,6 @@ async def parse_col(col: list[str]):
             "col": col,
         }
     )
-    parser = TypeParser(df)
-    await parser.process()
-    cols = parser.all_cols
-    col_infos = list(cols.infos.values())
-    parsed_col = cols.data["col"]
-    assert len(col_infos) == 1
-    return parsed_col, col_infos[0]
+    result = await parse_types(df)
+    cols = result.all_cols
+    return cols.get_col("col"), cols.get_info("col")
