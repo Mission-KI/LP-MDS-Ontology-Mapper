@@ -144,6 +144,12 @@ def read_edp(json_file: PurePosixPath):
     return ExtendedDatasetProfile.model_validate_json(json_data)
 
 
+@mark.asyncio
+async def test_analyse_csv_daseen_context(daseen_output_context, config_data):
+    service = Service()
+    await service.analyse_asset(CSV_PATH, config_data, daseen_output_context)
+
+
 def _assert_pickle_temporal_consistencies(
     temporal_consistencies: List[TemporalConsistency],
 ):
