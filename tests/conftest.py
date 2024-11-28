@@ -22,13 +22,15 @@ def output_context(output_directory):
 
 
 @fixture
-def daseen_output_context(output_directory):
-    return OutputDaseenContext(
-        local_path=output_directory,
-        s3_access_key_id="ABC",
-        s3_secret_access_key="PW",
-        s3_bucket_name="dummybucket",
-        elastic_url="http://elastic",
-        elastic_apikey="APIKEY",
-        skip_upload=True,
-    )
+def daseen_output_context(monkeypatch, output_directory):
+    with monkeypatch.context() as monkey:
+        monkey.setattr(OutputDaseenContext, "_upload_to_elastic", lambda *args: None)
+        monkey.setattr(OutputDaseenContext, "_upload_to_s3", lambda *args: None)
+        yield OutputDaseenContext(
+            local_path=output_directory,
+            s3_access_key_id="ABC",
+            s3_secret_access_key="PW",
+            s3_bucket_name="dummybucket",
+            elastic_url="http://elastic",
+            elastic_apikey="APIKEY",
+        )

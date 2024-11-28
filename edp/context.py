@@ -115,7 +115,6 @@ class OutputDaseenContext(OutputContext):
         elastic_apikey: str,
         text_encoding: str = "utf-8",
         request_timeout: float = 10,
-        skip_upload=False,
     ):
         self._logger = getLogger(__name__)
         self.output_local_context = OutputLocalFilesContext(local_path, text_encoding)
@@ -123,7 +122,6 @@ class OutputDaseenContext(OutputContext):
         self.elastic_url = elastic_url
         self.elastic_apikey = elastic_apikey
         self.request_timeout = request_timeout
-        self.skip_upload = skip_upload
 
     async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference:
         await self.output_local_context.write_edp(name, edp)
@@ -149,17 +147,15 @@ class OutputDaseenContext(OutputContext):
 
     def _upload_to_s3(self, file_rel_path: PurePosixPath, upload_key: str):
         file_full_path = self.output_local_context.build_full_path(file_rel_path)
-        if not self.skip_upload:
-            self.s3_bucket.upload_file(file_full_path, upload_key)
+        self.s3_bucket.upload_file(file_full_path, upload_key)
         full_download_url = HttpUrl(f"https://{self.s3_bucket.name}.s3.amazonaws.com/{upload_key}")
         self._logger.info("Uploaded %s to S3: %s", file_full_path, full_download_url)
 
     def _upload_to_elastic(self, edp: ExtendedDatasetProfile, docid: UUID):
-        if not self.skip_upload:
-            url = f"{self.elastic_url}/_create/{docid}"
-            headers = {"Authorization": f"ApiKey {self.elastic_apikey}", "Content-Type": "application/json"}
-            json: str = edp.model_dump_json()
-            response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
-            response.raise_for_status()
+        url = f"{self.elastic_url}/_create/{docid}"
+        headers = {"Authorization": f"ApiKey {self.elastic_apikey}", "Content-Type": "application/json"}
+        json: str = edp.model_dump_json()
+        response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
+        response.raise_for_status()
         full_download_url = HttpUrl(f"{self.elastic_url}/_doc/{docid}")
         self._logger.info("Uploaded EDP to Elastic Search with ID %s: %s", docid, full_download_url)
