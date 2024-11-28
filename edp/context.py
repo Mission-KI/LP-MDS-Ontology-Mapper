@@ -115,6 +115,7 @@ class OutputDaseenContext(OutputContext):
         elastic_apikey: str,
         text_encoding: str = "utf-8",
         request_timeout: float = 10,
+        skip_upload=False,
     ):
         self._logger = getLogger(__name__)
         self.output_local_context = OutputLocalFilesContext(local_path, text_encoding)
@@ -122,21 +123,22 @@ class OutputDaseenContext(OutputContext):
         self.elastic_url = elastic_url
         self.elastic_apikey = elastic_apikey
         self.request_timeout = request_timeout
+        self.skip_upload = skip_upload
 
     async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference:
         await self.output_local_context.write_edp(name, edp)
         docid: UUID = uuid4()
-        download_url = self._build_elastic_download_url(docid)
-        self._upload_to_elastic(edp, docid, download_url)
+        download_url = PurePosixPath(f"{docid}")
+        self._upload_to_elastic(edp, docid)
         return download_url
 
     @asynccontextmanager
     async def get_plot(self, name: str):
         async with self.output_local_context.get_plot(name) as (axes, rel_path):
             upload_key = self._build_s3_key(rel_path)
-            download_url = self._build_s3_download_url(upload_key)
+            download_url = PurePosixPath(upload_key)
             yield axes, download_url
-        self._upload_to_s3(rel_path, upload_key, download_url)
+        self._upload_to_s3(rel_path, upload_key)
 
     def _build_s3_bucket(self, s3_access_key_id: str, s3_secret_access_key: str, s3_bucket_name: str):
         s3 = aws_resource("s3", aws_access_key_id=s3_access_key_id, aws_secret_access_key=s3_secret_access_key)
@@ -145,21 +147,19 @@ class OutputDaseenContext(OutputContext):
     def _build_s3_key(self, file_ref: PurePosixPath):
         return f"{uuid4()}/{file_ref.name}"
 
-    def _build_s3_download_url(self, upload_key: str) -> FileReference:
-        return HttpUrl(f"https://{self.s3_bucket.name}.s3.amazonaws.com/{upload_key}")
-
-    def _upload_to_s3(self, file_rel_path: PurePosixPath, upload_key: str, download_url: FileReference):
+    def _upload_to_s3(self, file_rel_path: PurePosixPath, upload_key: str):
         file_full_path = self.output_local_context.build_full_path(file_rel_path)
-        self.s3_bucket.upload_file(file_full_path, upload_key)
-        self._logger.info("Uploaded %s to S3: %s", file_full_path, download_url)
+        if not self.skip_upload:
+            self.s3_bucket.upload_file(file_full_path, upload_key)
+        full_download_url = HttpUrl(f"https://{self.s3_bucket.name}.s3.amazonaws.com/{upload_key}")
+        self._logger.info("Uploaded %s to S3: %s", file_full_path, full_download_url)
 
-    def _build_elastic_download_url(self, docid: UUID) -> FileReference:
-        return HttpUrl(f"{self.elastic_url}/_doc/{docid}")
-
-    def _upload_to_elastic(self, edp: ExtendedDatasetProfile, docid: UUID, download_url: FileReference):
-        url = f"{self.elastic_url}/_create/{docid}"
-        headers = {"Authorization": f"ApiKey {self.elastic_apikey}", "Content-Type": "application/json"}
-        json: str = edp.model_dump_json()
-        response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
-        response.raise_for_status()
-        self._logger.info("Uploaded EDP to Elastic Search with ID %s: %s", docid, download_url)
+    def _upload_to_elastic(self, edp: ExtendedDatasetProfile, docid: UUID):
+        if not self.skip_upload:
+            url = f"{self.elastic_url}/_create/{docid}"
+            headers = {"Authorization": f"ApiKey {self.elastic_apikey}", "Content-Type": "application/json"}
+            json: str = edp.model_dump_json()
+            response = post(url=url, data=json, headers=headers, timeout=self.request_timeout)
+            response.raise_for_status()
+        full_download_url = HttpUrl(f"{self.elastic_url}/_doc/{docid}")
+        self._logger.info("Uploaded EDP to Elastic Search with ID %s: %s", docid, full_download_url)

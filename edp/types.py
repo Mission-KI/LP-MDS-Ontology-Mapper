@@ -5,7 +5,7 @@ from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterator, List, Optional, Set, Union
 
-from pydantic import AnyUrl, BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 
 
 class DataSpace(BaseModel):
@@ -72,7 +72,7 @@ class TemporalConsistency(BaseModel):
 
 Numeric = Union[int, float, timedelta, complex]
 
-FileReference = Union[PurePosixPath, AnyUrl]
+FileReference = PurePosixPath
 
 
 class Augmentation(BaseModel):
