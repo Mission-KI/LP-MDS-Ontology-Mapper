@@ -143,7 +143,7 @@ class OutputDaseenContext(OutputContext):
         return s3.Bucket(s3_bucket_name)
 
     def _build_s3_key(self, file_ref: PurePosixPath):
-        return f"{uuid4()}/{file_ref.name}"
+        return f"{uuid4()}{file_ref.suffix}"
 
     def _upload_to_s3(self, file_rel_path: PurePosixPath, upload_key: str):
         file_full_path = self.output_local_context.build_full_path(file_rel_path)
