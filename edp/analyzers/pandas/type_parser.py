@@ -1,32 +1,80 @@
 import warnings
+from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Dict, Generic, TypeVar, Union
+from typing import Dict, Generic, Iterator, Optional, TypeVar, Union
 
 from numpy import any as numpy_any
-from pandas import DataFrame, Index, Series, to_datetime, to_numeric
-from pydantic.dataclasses import dataclass
-
-# Try these dateformats one after the other: ISO and a couple of usual German formats.
-DATE_TIME_FORMAT_ISO = "ISO8601"
-DATE_TIME_OTHER_FORMATS = ["%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"]
-
+from pandas import DataFrame, Index, Series, StringDtype, to_datetime, to_numeric
 
 _logger = getLogger(__name__)
 
 
-@dataclass
-class DatetimeColumnInfo:
-    format: str
+class _BaseColumnInfo(ABC):
+    @abstractmethod
+    def cast(self, col: Series) -> Series: ...
+
+    def count_valid_rows(self, col: Series) -> int:
+        try:
+            converted_col = self.cast(col)
+            return converted_col.notna().sum()
+        except Exception as e:
+            _logger.warning("Type parsing error", exc_info=e)
+            return 0
 
 
-@dataclass
-class NumericColumnInfo:
-    pass
+class DatetimeColumnInfo(_BaseColumnInfo):
+    def __init__(self, format: str, utc: bool = False):
+        self._format = format
+        self._utc = utc
+
+    @property
+    def format(self):
+        return self._format
+
+    @property
+    def utc(self):
+        return self._utc
+
+    def cast(self, col: Series) -> Series:
+        return to_datetime(col, errors="coerce", format=self.format, utc=self.utc)
 
 
-@dataclass
-class StringColumnInfo:
-    pass
+class NumericColumnInfo(_BaseColumnInfo):
+    def __init__(self, decimal_separator: Optional[str] = None):
+        self._decimal_separator = decimal_separator
+
+    def cast(self, col: Series) -> Series:
+        # Replace decimal separator with "." if needed.
+        decimal_separator = self._decimal_separator
+        if decimal_separator is not None:
+            col = col.apply(lambda val: val.replace(decimal_separator, ".") if isinstance(val, str) else val)
+        # Removes rows with incompatible type
+        col_numeric = to_numeric(col, errors="coerce")
+        # Narrow type to one supporting pd.NA (Int64 or Float64); doesn't work with complex numbers.
+        if col_numeric.dtype.kind not in "c":
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                col_numeric = col_numeric.convert_dtypes(
+                    infer_objects=False,
+                    convert_string=False,
+                    convert_integer=True,
+                    convert_boolean=False,
+                    convert_floating=True,
+                )
+        # After that dtype should be Int64 or Float64. Try downcasting.
+        if col_numeric.dtype.kind in "i" and numpy_any(col_numeric < 0):
+            return to_numeric(col_numeric, downcast="signed", errors="coerce")
+        elif col_numeric.dtype.kind in ("i", "u"):
+            return to_numeric(col_numeric, downcast="unsigned", errors="coerce")
+        elif col_numeric.dtype.kind in "f":
+            return to_numeric(col_numeric, downcast="float", errors="coerce")
+        # E.g. complex numbers
+        return col_numeric
+
+
+class StringColumnInfo(_BaseColumnInfo):
+    def cast(self, col: Series) -> Series:
+        return col.astype(StringDtype())
 
 
 _ColumnInfo = Union[DatetimeColumnInfo, NumericColumnInfo, StringColumnInfo]
@@ -83,6 +131,30 @@ class Result:
         return ColumnsWrapper(self._data, infos)
 
 
+# First try datetime parsing (because "20240103" is an ISO date and a number):
+# 1) Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
+#    This needs utc=False otherwise it would just assume UTC for missing time zone!
+# 2) Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
+#    e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
+#    This needs utc=True otherwise we get the warning below and resulting column has type "object"!
+#    On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
+# 3) Try parsing with different local formats (no time zone).
+# Then try parsing as a number ("." and "," as decimal separator).
+ALLOWED_COLUMN_INFOS = (
+    DatetimeColumnInfo(format="ISO8601", utc=False),
+    DatetimeColumnInfo(format="ISO8601", utc=True),
+    DatetimeColumnInfo(format="%d.%m.%Y %H:%M:%S"),
+    DatetimeColumnInfo(format="%d.%m.%Y %H:%M"),
+    DatetimeColumnInfo(format="%d.%m.%Y"),
+    NumericColumnInfo(),
+    NumericColumnInfo(","),
+)
+# String conversion as fallback because that is always possible.
+FALLBACK_COLUMN_INFO = StringColumnInfo()
+# Required minimum successful conversion ratio considering non-null values.
+MIN_CONVERSION_RATIO = 0.5
+
+
 async def parse_types(data: DataFrame) -> Result:
     column_infos = dict[str, _ColumnInfo]()
     results_data = DataFrame(index=data.index)
@@ -90,9 +162,9 @@ async def parse_types(data: DataFrame) -> Result:
     for column_name, column in data.items():
         if not isinstance(column_name, str):
             raise RuntimeError(f"Column {column_name} needs a label.")
-        inferred_type_data, info = _determine_type(column)
-        column_infos[column_name] = info
-        results_data[column_name] = inferred_type_data
+        converted_column, col_info = _determine_type(column)
+        column_infos[column_name] = col_info
+        results_data[column_name] = converted_column
 
     result = Result(results_data, column_infos)
 
@@ -104,95 +176,27 @@ async def parse_types(data: DataFrame) -> Result:
 
 
 def _determine_type(column: Series) -> tuple[Series, _ColumnInfo]:
-    type_character = column.dtype.kind
-
-    if type_character in "i":
-        if numpy_any(column < 0):
-            return _numeric_column(to_numeric(column, downcast="signed", errors="raise"))
-        else:
-            return _numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
-
-    elif type_character in "u":
-        return _numeric_column(to_numeric(column, downcast="unsigned", errors="raise"))
-
-    elif type_character in "f":
-        return _numeric_column(to_numeric(column, downcast="float", errors="raise"))
-
-    elif type_character in "c":
-        return _numeric_column(column)
-
-    elif type_character in "M":
-        return _try_convert_datetime(column)
-
-    elif type_character in "m":
-        return _numeric_column(column)
-
-    try:
-        return _try_convert_datetime(column)
-    except TypeError:
-        pass
-
-    try:
-        normalized_column = column.apply(lambda val: val.replace(",", ".") if isinstance(val, str) else val)
-        numeric_column = to_numeric(normalized_column, errors="raise")
-        return _determine_type(numeric_column)
-    except (ValueError, TypeError):
-        pass
-
-    return _string_column(column)
+    # remove NA values
+    column = column[column.notna()]
+    # match: converted_series, matched_colinfo, non_null_count
+    matches = [match for match in _try_type_conversions(column)]
+    if len(matches) > 0:
+        # best match has highest non_null_count
+        best_match = max(matches, key=lambda match: match[2])
+        return best_match[0], best_match[1]
+    else:
+        return FALLBACK_COLUMN_INFO.cast(column), FALLBACK_COLUMN_INFO
 
 
-def _try_convert_datetime(column: Series) -> tuple[Series, DatetimeColumnInfo]:
-    # Parse ISO datetimes with either missing or consistent time zone, e.g. "20450630T13:29:53".
-    # This needs utc=False otherwise it would just assume UTC for missing time zone!
-    try:
-        return _try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, False)
-    except TypeError:
-        pass
-
-    # Parse ISO datetimes with mixed time zones in one column and convert them to UTC,
-    # e.g. "20450630T13:29:53+0100" AND "20450630T13:29:53+0200".
-    # This needs utc=True otherwise we get the warning below and resulting column has type "object"!
-    # On the downside we lose the info about the original time zone and just get the UTC normalized datetime.
-    try:
-        return _try_convert_datetime_format(column, DATE_TIME_FORMAT_ISO, True)
-    except TypeError:
-        pass
-
-    # Try parsing with different local formats (no time zone).
-    for format in DATE_TIME_OTHER_FORMATS:
-        try:
-            return _try_convert_datetime_format(column, format, False)
-        except TypeError:
-            pass
-
-    raise TypeError
-
-
-def _try_convert_datetime_format(column: Series, format: str, utc: bool) -> tuple[Series, DatetimeColumnInfo]:
-    with warnings.catch_warnings():
-        # If we try parsing datetimes with mixed time zones, we get a FutureWarning:
-        # FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error
-        # unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To
-        # create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-        warnings.simplefilter("ignore", FutureWarning)
-
-        try:
-            result_column = to_datetime(column, errors="raise", format=format, utc=utc)
-        except (ValueError, TypeError):
-            raise TypeError
-        if result_column.dtype.kind != "M":
-            raise TypeError
-        return _datetime_column(result_column, format)
-
-
-def _numeric_column(column: Series) -> tuple[Series, NumericColumnInfo]:
-    return column, NumericColumnInfo()
-
-
-def _string_column(column: Series) -> tuple[Series, StringColumnInfo]:
-    return column, StringColumnInfo()
-
-
-def _datetime_column(column: Series, format: str) -> tuple[Series, DatetimeColumnInfo]:
-    return column, DatetimeColumnInfo(format=format)
+def _try_type_conversions(column: Series) -> Iterator[tuple[Series, _ColumnInfo, int]]:
+    count = len(column)
+    if count > 0:
+        for column_info in ALLOWED_COLUMN_INFOS:
+            try:
+                converted_column = column_info.cast(column)
+                non_null_count = converted_column.notna().sum()
+                # succesfully converted values must surpass min ratio
+                if non_null_count >= MIN_CONVERSION_RATIO * count:
+                    yield converted_column, column_info, non_null_count
+            except Exception as e:
+                _logger.debug("Can't convert to %s", column_info, exc_info=e)
