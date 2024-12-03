@@ -48,6 +48,7 @@ test = [
     "boto3-stubs[boto3]",
     "pytest",
     "pytest-asyncio",
+    "pytest-benchmark",
     "bandit",
     "mypy",
     "pandas-stubs",
@@ -82,6 +83,7 @@ filterwarnings = [
     "error",
     "ignore::matplotlib._api.deprecation.MatplotlibDeprecationWarning",
 ]
+markers = ["slow: Tests that may take more than a few seconds."]
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", ".conda"]

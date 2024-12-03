@@ -74,11 +74,11 @@ async def test_analyse_pickle(output_context, config_data):
     assert len(dataset.stringColumns) == 1
 
     aufenthalt = next(item for item in dataset.numericColumns if item.name == "aufenthalt")
-    assert aufenthalt.dataType == "uint32"
+    assert aufenthalt.dataType == "UInt32"
     assert aufenthalt.augmentation == config_data.augmentedColumns[0].augmentation
 
     parkhaus = next(item for item in dataset.numericColumns if item.name == "parkhaus")
-    assert parkhaus.dataType == "uint8"
+    assert parkhaus.dataType == "UInt8"
 
     einfahrt = next(item for item in dataset.datetimeColumns if item.name == "einfahrt")
     assert einfahrt.temporalCover.earliest == datetime.fromisoformat("2016-01-01 00:03:14")
