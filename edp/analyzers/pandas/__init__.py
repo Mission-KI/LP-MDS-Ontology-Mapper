@@ -161,7 +161,7 @@ class Pandas(Analyzer):
             row_count,
         )
 
-        type_parser_results = await parse_types(self._data)
+        type_parser_results = parse_types(self._data)
 
         all_cols = type_parser_results.all_cols
         common_fields = await self._compute_common_fields(all_cols.data)
