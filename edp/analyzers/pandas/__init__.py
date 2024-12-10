@@ -12,7 +12,7 @@ from warnings import warn
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
-from numpy import corrcoef, count_nonzero, linspace, ones_like, triu
+from numpy import count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
     DatetimeIndex,
@@ -632,12 +632,7 @@ async def _get_correlation_graph(
         return None
     filtered_columns = columns[filtered_column_names]
     logger.debug("Computing correlation between columns %s", filtered_columns.columns)
-    correlation_matrix = corrcoef(filtered_columns.values, rowvar=False)
-    correlation = DataFrame(
-        correlation_matrix,
-        columns=filtered_columns.columns,
-        index=filtered_columns.columns,
-    )
+    correlation = filtered_columns.corr()
     mask = triu(ones_like(correlation, dtype=bool))
     async with output_context.get_plot(plot_name) as (axes, reference):
         figure = axes.figure

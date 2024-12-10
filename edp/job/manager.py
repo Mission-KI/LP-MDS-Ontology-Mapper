@@ -86,7 +86,7 @@ class AnalysisJobManager:
 
             except Exception as exception:
                 job.update_state(JobState.FAILED, f"Processing failed: {exception}")
-                self._logger.error("Job %s has failed: %s", job.job_id, exception)
+                self._logger.error("Job %s has failed", job.job_id, exc_info=exception)
 
     async def store_input_file(self, job_id: str, filename: Optional[str], file):
         """Store uploaded job data which will be analyzed later.
