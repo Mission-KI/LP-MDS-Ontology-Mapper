@@ -36,6 +36,8 @@ dependencies = [
     "requests",
     "fastapi[standard]",
     "clevercsv>=0.8.2",
+    "openpyxl",
+    "xlrd",
 ]
 
 [project.scripts]

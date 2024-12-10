@@ -1,19 +1,20 @@
 from asyncio import get_running_loop
 from csv import Dialect
 from logging import Logger, getLogger
+from typing import Literal
 
 from clevercsv import Detector
 from clevercsv.detect import DetectionMethod
 from clevercsv.encoding import get_encoding
-from pandas import read_csv
+from pandas import read_csv, read_excel
 
 from edp.analyzers.pandas import Pandas
 from edp.file import File
 
 
-async def csv(file: File):
+async def csv_importer(file: File):
     logger = getLogger("CSV Importer")
-    logger.info("Importing %s as CSV", file)
+    logger.info("Importing '%s' as CSV", file)
 
     dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(logger, file, num_lines=100)
 
@@ -49,6 +50,45 @@ async def csv(file: File):
         data_frame.columns = [f"col{i:03d}" for i in range(col_count)]
 
     return Pandas(data_frame, file)
+
+
+async def excel_importer(file: File, engine: Literal["xlrd", "openpyxl"]):
+    """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
+
+    logger = getLogger("Excel Importer")
+    logger.info("Importing '%s' as Excel", file)
+
+    def runner():
+        return read_excel(
+            file.path,
+            engine=engine,
+            sheet_name=None,  # imports all sheets as dictionary
+            header=0,  # assume header in row 0
+        )
+
+    loop = get_running_loop()
+    dataframes_map = await loop.run_in_executor(None, runner)
+
+    sheets = list(dataframes_map.keys())
+    dataframes = list(dataframes_map.values())
+
+    # TODO: Importer should be able to provide multiple outputs (DataFrames) in the future!
+    if len(sheets) == 0:
+        raise RuntimeError("Excel contains no sheets!")
+    if len(sheets) == 1:
+        logger.info("Data imported from sheet '%s'", sheets[0])
+    if len(sheets) > 1:
+        logger.warning("Excel contains multiple sheets %s, only first one is used!", sheets)
+
+    return Pandas(dataframes[0], file)
+
+
+async def xlsx_importer(file: File):
+    return await excel_importer(file, "openpyxl")
+
+
+async def xls_importer(file: File):
+    return await excel_importer(file, "xlrd")
 
 
 def _detect_dialect_encoding_and_has_header(logger: Logger, file: File, num_lines: int | None):
