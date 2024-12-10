@@ -2,7 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 from logging import getLogger
-from typing import Dict, Generic, Iterator, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, Iterator, Optional, TypeVar, Union
 
 from numpy import any as numpy_any
 from pandas import DataFrame, Index, Series, StringDtype, to_datetime, to_numeric
@@ -29,7 +29,7 @@ class DatetimeColumnInfo(_BaseColumnInfo):
     def format(self) -> str: ...
 
     @abstractmethod
-    def _convert_entry(self, element: str) -> None | datetime: ...
+    def _convert_entry(self, element: Any) -> None | datetime: ...
 
     def cast(self, col: Series) -> Series:
         col_converted = col.apply(self._convert_entry)
@@ -51,12 +51,25 @@ class DatetimeColumnInfo(_BaseColumnInfo):
 
 
 @dataclass(frozen=True)
+class DatetimeNativeColumnInfo(DatetimeColumnInfo):
+    @property
+    def format(self) -> str:
+        return "NATIVE"
+
+    def _convert_entry(self, element: Any) -> None | datetime:
+        if isinstance(element, datetime):
+            return element
+        else:
+            return None
+
+
+@dataclass(frozen=True)
 class DatetimeIsoColumnInfo(DatetimeColumnInfo):
     @property
     def format(self) -> str:
         return "ISO8601"
 
-    def _convert_entry(self, element: str) -> None | datetime:
+    def _convert_entry(self, element: Any) -> None | datetime:
         try:
             return datetime.fromisoformat(element)
         except Exception:
@@ -71,7 +84,7 @@ class DatetimePatternColumnInfo(DatetimeColumnInfo):
     def format(self) -> str:
         return self.pattern
 
-    def _convert_entry(self, element: str) -> None | datetime:
+    def _convert_entry(self, element: Any) -> None | datetime:
         try:
             return datetime.strptime(element, self.format)
         except Exception:
@@ -197,6 +210,8 @@ class Result:
 # 2) Try parsing with different local formats (no time zone for now).
 # Then try parsing as a number ("." and "," as decimal separator).
 ALLOWED_COLUMN_INFOS = (
+    # Column already has datetime type (e.g. from Excel import)
+    DatetimeNativeColumnInfo(),
     # ISO datetime
     DatetimeIsoColumnInfo(),
     # DE datetime
