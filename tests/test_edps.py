@@ -20,8 +20,10 @@ from edp.types import (
 
 DIR = Path(__file__).parent
 ENCODING = "utf-8"
-CSV_PATH = DIR / "data/test.csv"
+CSV_PATH: Path = DIR / "data/test.csv"
 CSV_HEADERLESS_PATH = DIR / "data/test_headerless.csv"
+XLSX_PATH: Path = DIR / "data/test.xlsx"
+XLS_PATH: Path = DIR / "data/test.xls"
 PICKLE_PATH = DIR / "data/test.pickle"
 ZIP_PATH = DIR / "data/test.zip"
 
@@ -103,8 +105,15 @@ async def test_analyse_csv(output_context, config_data):
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
+    assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
+    assert edp.structuredDatasets[0].datetimeColumns[0].name == "einfahrt"
     assert edp.structuredDatasets[0].datetimeColumns[0].format == "ISO8601"
+    assert edp.structuredDatasets[0].datetimeColumns[1].name == "ausfahrt"
     assert edp.structuredDatasets[0].datetimeColumns[1].format == "ISO8601"
+    assert edp.structuredDatasets[0].numericColumns[0].name == "aufenthalt"
+    assert edp.structuredDatasets[0].numericColumns[0].dataType == "UInt32"
+    assert edp.structuredDatasets[0].numericColumns[1].name == "parkhaus"
+    assert edp.structuredDatasets[0].numericColumns[1].dataType == "UInt8"
 
 
 @mark.asyncio
@@ -117,6 +126,55 @@ async def test_analyse_csv_no_headers(output_context, user_provided_data):
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
+    assert edp.structuredDatasets[0].stringColumns[0].name == "col000"
+    assert edp.structuredDatasets[0].datetimeColumns[0].name == "col001"
+    assert edp.structuredDatasets[0].datetimeColumns[0].format == "ISO8601"
+    assert edp.structuredDatasets[0].datetimeColumns[1].name == "col002"
+    assert edp.structuredDatasets[0].datetimeColumns[1].format == "ISO8601"
+    assert edp.structuredDatasets[0].numericColumns[0].name == "col003"
+    assert edp.structuredDatasets[0].numericColumns[0].dataType == "UInt32"
+    assert edp.structuredDatasets[0].numericColumns[1].name == "col004"
+    assert edp.structuredDatasets[0].numericColumns[1].dataType == "UInt8"
+
+
+@mark.asyncio
+async def test_analyse_xlsx(output_context, config_data):
+    service = Service()
+    json_file = await service.analyse_asset(XLSX_PATH, config_data, output_context)
+    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
+    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.compression is None
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
+    assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
+    assert edp.structuredDatasets[0].datetimeColumns[0].name == "einfahrt"
+    assert edp.structuredDatasets[0].datetimeColumns[0].format == "NATIVE"
+    assert edp.structuredDatasets[0].datetimeColumns[1].name == "ausfahrt"
+    assert edp.structuredDatasets[0].datetimeColumns[1].format == "NATIVE"
+    assert edp.structuredDatasets[0].numericColumns[0].name == "aufenthalt"
+    assert edp.structuredDatasets[0].numericColumns[0].dataType == "UInt32"
+    assert edp.structuredDatasets[0].numericColumns[1].name == "parkhaus"
+    assert edp.structuredDatasets[0].numericColumns[1].dataType == "UInt8"
+
+
+@mark.asyncio
+async def test_analyse_xls(output_context, config_data):
+    service = Service()
+    json_file = await service.analyse_asset(XLS_PATH, config_data, output_context)
+    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
+    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.compression is None
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
+    assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
+    assert edp.structuredDatasets[0].datetimeColumns[0].name == "einfahrt"
+    assert edp.structuredDatasets[0].datetimeColumns[0].format == "NATIVE"
+    assert edp.structuredDatasets[0].datetimeColumns[1].name == "ausfahrt"
+    assert edp.structuredDatasets[0].datetimeColumns[1].format == "NATIVE"
+    assert edp.structuredDatasets[0].numericColumns[0].name == "aufenthalt"
+    assert edp.structuredDatasets[0].numericColumns[0].dataType == "UInt32"
+    assert edp.structuredDatasets[0].numericColumns[1].name == "parkhaus"
+    assert edp.structuredDatasets[0].numericColumns[1].dataType == "UInt8"
 
 
 @mark.asyncio

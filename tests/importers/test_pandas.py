@@ -1,11 +1,13 @@
 from pathlib import Path
 
 from edp.file import File
-from edp.importers.pandas import csv as csv_importer
+from edp.importers.pandas import csv_importer, xls_importer, xlsx_importer
 
 DIR = Path(__file__).parent.parent
 CSV_PATH = DIR / "data/test.csv"
 CSV_HEADERLESS_PATH = DIR / "data/test_headerless.csv"
+XLSX_PATH: Path = DIR / "data/test.xlsx"
+XLS_PATH: Path = DIR / "data/test.xls"
 
 
 async def test_import_csv():
@@ -74,6 +76,30 @@ async def test_import_csv_with_quoted_strings(tmp_path: Path):
         "value": {0: "hello", 1: "world"},
         "num": {0: 2023, 1: 2024},
     }
+
+
+async def test_import_xlsx():
+    file = get_file(XLSX_PATH)
+    analyzer = await xlsx_importer(file)
+    data = analyzer._data
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 5
+    assert row_count == 50
+    assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
+
+
+async def test_import_xls():
+    file = get_file(XLS_PATH)
+    analyzer = await xls_importer(file)
+    data = analyzer._data
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 5
+    assert row_count == 50
+    assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
 def get_file(path: Path):
