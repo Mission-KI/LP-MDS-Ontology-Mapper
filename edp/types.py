@@ -3,13 +3,12 @@ from datetime import datetime, timedelta
 from enum import Enum
 from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Iterator, List, Optional, Set, Union
+from typing import Annotated, Any, Dict, Iterator, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import AfterValidator, BaseModel, Field, TypeAdapter
 
 
 class DataSpace(BaseModel):
-    dataSpaceId: int = Field(description=" Identifier that describes the data space in which the asset can be found")
     name: str = Field(description="Name of the dataspace")
     url: str = Field(description="URL of the dataspace")
 
@@ -200,14 +199,19 @@ class StructuredDataSet(BaseModel):
 
 
 class Publisher(BaseModel):
-    id: str = Field(description="Unique identifier of the publisher")
     name: str = Field(description="Name of the publisher")
     url: Optional[str] = Field(default=None, description="URL to the publisher")
 
 
 class License(BaseModel):
-    name: str = Field(description="Name of the license")
+    name: Optional[str] = Field(default=None, description="Name of the license")
     url: Optional[str] = Field(default=None, description="URL describing the license")
+
+
+def validate_licence(license: License):
+    if license.name is None and license.url is None:
+        raise ValueError("License model needs at least 'name' or 'url'")
+    return license
 
 
 class UserProvidedEdpData(BaseModel):
@@ -216,13 +220,14 @@ class UserProvidedEdpData(BaseModel):
     assetId: str = Field(description="The asset ID is a unique identifier for an asset within a data room")
     name: str = Field(description="Name of the asset")
     url: str = Field(description="The URL via which the asset can be found in the published data room")
-    dataCategory: str = Field(
+    dataCategory: Optional[str] = Field(
+        default=None,
         description="A data room-specific categorization of the asset (e.g. https://github.com/Mobility-Data-Space/mobility-data-space/wiki/MDS-Ontology",
     )
     dataSpace: DataSpace = Field(description="Dataspace the asset can be found")
     publisher: Publisher = Field(description="Provider that placed the asset in the data room")
     publishDate: datetime = Field(description="Date on which this asset has been published")
-    license: License = Field(
+    license: Annotated[License, AfterValidator(validate_licence)] = Field(
         description="Describes the data license under which the asset is made available by the data provider (see also https://www.dcat-ap.de/def/licenses/)"
     )
     assetProcessingStatus: Optional[AssetProcessingStatus] = Field(
