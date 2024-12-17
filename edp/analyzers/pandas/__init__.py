@@ -415,7 +415,7 @@ class Pandas(Analyzer):
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
             periodicity=temporal_consistency.period if temporal_consistency else None,
-            format=info.format,
+            format=info.get_format(),
         )
 
     async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:

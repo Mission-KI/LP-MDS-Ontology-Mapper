@@ -8,6 +8,7 @@ from pytest import fixture, mark
 from edp.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
     DatetimeIsoColumnInfo,
+    DatetimeKind,
     DatetimePatternColumnInfo,
     NumericColumnInfo,
     StringColumnInfo,
@@ -24,7 +25,8 @@ def test_determine_datetime_iso_Ymd_HMS():
             "2045-06-30 13:29:53",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
+    assert info.get_kind() == DatetimeKind.UNKNOWN  # for ISO we can't determine if it's a DATE or DATETIME
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -40,7 +42,7 @@ def test_determine_datetime_iso_Ymd_HMSm():
             "2045-06-30 13:29:53.000",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, microsecond=123000)
@@ -56,7 +58,7 @@ def test_determine_datetime_iso_Ymd_HM():
             "2045-06-30 13:29",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
@@ -72,7 +74,7 @@ def test_determine_datetime_iso_Ymd():
             "2045-06-30",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -88,7 +90,7 @@ def test_determine_datetime_iso_Ymd_short():
             "20450630",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -104,7 +106,7 @@ def test_determine_datetime_iso_YmdTHMS():
             "20450630T13:29:53",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -120,7 +122,7 @@ def test_determine_datetime_iso_YmdTHMS_UTC():
             "20450630T13:29:53Z",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC")
@@ -136,7 +138,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ():
             "20450630T13:29:53+0100",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(3))  # original TZ is not preserved
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -154,7 +156,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ_different():
             "20450607T03:30:00+0230",
         ]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(4))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -168,7 +170,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ_partially():
     col, info = expect_datetime_column(
         ["20160301T00:03:14+0100", "20450630T13:29:53+0300", "20450607T03:30:00", "20450607T04:30:00", "2024"]
     )
-    assert info.format == "ISO8601"
+    assert info.get_format() == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(4))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -186,7 +188,7 @@ def test_determine_datetime_de_dmY_HMS():
             "30.06.2045 13:29:53",
         ]
     )
-    assert info.format == "%d.%m.%Y %H:%M:%S"
+    assert info.get_format() == "%d.%m.%Y %H:%M:%S"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -202,7 +204,7 @@ def test_determine_datetime_de_dmY_HM():
             "30.06.2045 13:29",
         ]
     )
-    assert info.format == "%d.%m.%Y %H:%M"
+    assert info.get_format() == "%d.%m.%Y %H:%M"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
@@ -218,7 +220,8 @@ def test_determine_datetime_de_dmY():
             "30.06.2045",
         ]
     )
-    assert info.format == "%d.%m.%Y"
+    assert info.get_format() == "%d.%m.%Y"
+    assert info.get_kind() == DatetimeKind.DATE
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -234,22 +237,26 @@ def test_determine_datetime_de_HMS():
             "13:29:53",
         ]
     )
-    # For now a pure time column is categorized as string column
-    assert isinstance(info, StringColumnInfo)
+    # A pure time column is handled as a string column
+    assert info.get_format() == "%H:%M:%S"
+    assert info.get_kind() == DatetimeKind.TIME
     assert isinstance(col.dtype, pd.StringDtype)
+    assert col[0] == "00:03:14"
 
 
 def test_determine_datetime_de_HM():
-    col, info = parse_column(
+    col, info = expect_datetime_column(
         [
             "00:03",
             "00:26",
             "13:29",
         ]
     )
-    # For now a pure time column is categorized as string column
-    assert isinstance(info, StringColumnInfo)
+    # A pure time column is handled as a string column
+    assert info.get_format() == "%H:%M"
+    assert info.get_kind() == DatetimeKind.TIME
     assert isinstance(col.dtype, pd.StringDtype)
+    assert col[0] == "00:03"
 
 
 def test_determine_datetime_us_dmY_HMS():
@@ -260,7 +267,8 @@ def test_determine_datetime_us_dmY_HMS():
             "06/30/2045 13:29:53",
         ]
     )
-    assert info.format == "%m/%d/%Y %H:%M:%S"
+    assert info.get_format() == "%m/%d/%Y %H:%M:%S"
+    assert info.get_kind() == DatetimeKind.DATETIME
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -276,7 +284,8 @@ def test_determine_datetime_us_dmY():
             "06-30-2045",
         ]
     )
-    assert info.format == "%m-%d-%Y"
+    assert info.get_format() == "%m-%d-%Y"
+    assert info.get_kind() == DatetimeKind.DATE
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -329,7 +338,7 @@ def test_determine_mixed_datetimes1():
     # one datetime type and some invalid values
     data = ["A"] + ["01.03.1979"] * 20 + ["Z"] + [None] * 5
     col, info = expect_datetime_column(data)
-    assert info.format == "%d.%m.%Y"
+    assert info.get_format() == "%d.%m.%Y"
     assert col.notna().sum() == 20
 
 
@@ -337,7 +346,7 @@ def test_determine_mixed_datetimes2():
     # clear majority for one datetime type
     data = ["A"] + ["01.03.1979 03:14", "2016-03-01 00:03:14", "01.03.1979 01:13"] * 25 + [None] * 3 + ["Z"]
     col, info = expect_datetime_column(data)
-    assert info.format == "%d.%m.%Y %H:%M"
+    assert info.get_format() == "%d.%m.%Y %H:%M"
     assert col.notna().sum() == 50
     assert col.isna().sum() == 30
     assert len(col.index) == 80
@@ -401,7 +410,7 @@ def test_determine_datetime_iso_bigdata(datetimes_bigdata, benchmark):
 def test_determine_datetime_de_bigdata(datetimes_bigdata, benchmark):
     data = Series([i.strftime("%d.%m.%Y %H:%M") for i in datetimes_bigdata], dtype=str)
     col, info = benchmark.pedantic(expect_datetime_column, (data, None))
-    assert info == DatetimePatternColumnInfo(pattern="%d.%m.%Y %H:%M")
+    assert info == DatetimePatternColumnInfo(format="%d.%m.%Y %H:%M", kind=DatetimeKind.DATETIME)
     assert col[0] == START_OF_EPOCH
 
 
@@ -409,7 +418,7 @@ def test_determine_datetime_de_bigdata(datetimes_bigdata, benchmark):
 def test_determine_datetime_us_bigdata(datetimes_bigdata, benchmark):
     data = Series([i.strftime("%m/%d/%Y %H:%M:%S") for i in datetimes_bigdata], dtype=str)
     col, info = benchmark.pedantic(expect_datetime_column, (data, None))
-    assert info == DatetimePatternColumnInfo(pattern="%m/%d/%Y %H:%M:%S")
+    assert info == DatetimePatternColumnInfo(format="%m/%d/%Y %H:%M:%S", kind=DatetimeKind.DATETIME)
     assert col[0] == START_OF_EPOCH
 
 

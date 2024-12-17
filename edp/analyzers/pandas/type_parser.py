@@ -1,6 +1,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
+from enum import Enum
 from logging import getLogger
 from typing import Any, Dict, Generic, Iterator, Optional, TypeVar, Union
 
@@ -22,16 +23,41 @@ class _BaseColumnInfo(ABC):
         return converted_col.notna().sum()
 
 
+class DatetimeKind(str, Enum):
+    UNKNOWN = "UNKNOWN"
+    DATETIME = "DATETIME"
+    DATE = "DATE"
+    TIME = "TIME"
+
+
 @dataclass(frozen=True)
 class DatetimeColumnInfo(_BaseColumnInfo):
-    @property
     @abstractmethod
-    def format(self) -> str: ...
+    def get_format(self) -> str: ...
+
+    @abstractmethod
+    def get_kind(self) -> DatetimeKind: ...
 
     @abstractmethod
     def _convert_entry(self, element: Any) -> None | datetime: ...
 
+    def count_valid_rows(self, col: Series) -> int:
+        converted_col = self._cast_internal(col)
+        return converted_col.notna().sum()
+
     def cast(self, col: Series) -> Series:
+        if self.get_kind() == DatetimeKind.TIME:
+            _logger.warning(
+                "Column '%s' contains pure times without dates. This is handled as a string column.", col.name
+            )
+            return col.astype(StringDtype())
+        elif self.get_kind() == DatetimeKind.DATE:
+            _logger.warning("Column '%s' contains pure dates without times.", col.name)
+            return self._cast_internal(col)
+        else:
+            return self._cast_internal(col)
+
+    def _cast_internal(self, col: Series) -> Series:
         col_converted = col.apply(self._convert_entry)
         col_valid = col_converted[col_converted.notna()]
         count_with_timezone = col_valid.apply(lambda timestamp: timestamp.tzinfo is not None).sum()
@@ -52,9 +78,11 @@ class DatetimeColumnInfo(_BaseColumnInfo):
 
 @dataclass(frozen=True)
 class DatetimeNativeColumnInfo(DatetimeColumnInfo):
-    @property
-    def format(self) -> str:
+    def get_format(self) -> str:
         return "NATIVE"
+
+    def get_kind(self) -> DatetimeKind:
+        return DatetimeKind.UNKNOWN
 
     def _convert_entry(self, element: Any) -> None | datetime:
         if isinstance(element, datetime):
@@ -65,9 +93,11 @@ class DatetimeNativeColumnInfo(DatetimeColumnInfo):
 
 @dataclass(frozen=True)
 class DatetimeIsoColumnInfo(DatetimeColumnInfo):
-    @property
-    def format(self) -> str:
+    def get_format(self) -> str:
         return "ISO8601"
+
+    def get_kind(self) -> DatetimeKind:
+        return DatetimeKind.UNKNOWN
 
     def _convert_entry(self, element: Any) -> None | datetime:
         try:
@@ -78,11 +108,14 @@ class DatetimeIsoColumnInfo(DatetimeColumnInfo):
 
 @dataclass(frozen=True)
 class DatetimePatternColumnInfo(DatetimeColumnInfo):
-    pattern: str
+    format: str
+    kind: DatetimeKind
 
-    @property
-    def format(self) -> str:
-        return self.pattern
+    def get_format(self) -> str:
+        return self.format
+
+    def get_kind(self) -> DatetimeKind:
+        return self.kind
 
     def _convert_entry(self, element: Any) -> None | datetime:
         try:
@@ -215,16 +248,19 @@ ALLOWED_COLUMN_INFOS = (
     # ISO datetime
     DatetimeIsoColumnInfo(),
     # DE datetime
-    DatetimePatternColumnInfo(pattern="%d.%m.%Y %H:%M:%S"),
-    DatetimePatternColumnInfo(pattern="%d.%m.%Y %H:%M"),
-    DatetimePatternColumnInfo(pattern="%d.%m.%Y"),
+    DatetimePatternColumnInfo(format="%d.%m.%Y %H:%M:%S", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%d.%m.%Y %H:%M", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%d.%m.%Y", kind=DatetimeKind.DATE),
     # US datetime
-    DatetimePatternColumnInfo(pattern="%m/%d/%Y %H:%M:%S"),
-    DatetimePatternColumnInfo(pattern="%m-%d-%Y %H:%M:%S"),
-    DatetimePatternColumnInfo(pattern="%m/%d/%Y %H:%M"),
-    DatetimePatternColumnInfo(pattern="%m-%d-%Y %H:%M"),
-    DatetimePatternColumnInfo(pattern="%m/%d/%Y"),
-    DatetimePatternColumnInfo(pattern="%m-%d-%Y"),
+    DatetimePatternColumnInfo(format="%m/%d/%Y %H:%M:%S", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%m-%d-%Y %H:%M:%S", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%m/%d/%Y %H:%M", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%m-%d-%Y %H:%M", kind=DatetimeKind.DATETIME),
+    DatetimePatternColumnInfo(format="%m/%d/%Y", kind=DatetimeKind.DATE),
+    DatetimePatternColumnInfo(format="%m-%d-%Y", kind=DatetimeKind.DATE),
+    # Time only
+    DatetimePatternColumnInfo(format="%H:%M:%S", kind=DatetimeKind.TIME),
+    DatetimePatternColumnInfo(format="%H:%M", kind=DatetimeKind.TIME),
     # Numeric
     NumericColumnInfo(),
 )
