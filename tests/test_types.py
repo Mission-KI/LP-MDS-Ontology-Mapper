@@ -24,7 +24,7 @@ async def test_validate_EDP_model():
 
 
 def _validate_model(model_type: type[BaseModel]):
-    logger.info(f"Checking model {model_type.__name__}")
+    logger.info("Checking model %s", model_type.__name__)
     for field_name, field in model_type.__pydantic_fields__.items():
         field_type = field.annotation
         if field_type:

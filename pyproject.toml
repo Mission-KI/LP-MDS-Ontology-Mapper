@@ -46,6 +46,7 @@ dependencies = [
 export_edps_schema = "edp.types:export_edp_schema"
 export_openapi_schema = "edp.__main__:cmdline_export_openapi_schema"
 edps = "edp.__main__:main"
+pontusx = "edp.pontusx.__main__:main"
 
 [project.optional-dependencies]
 test = [
