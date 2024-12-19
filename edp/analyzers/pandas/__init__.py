@@ -31,7 +31,6 @@ from edp.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
     parse_types,
 )
-from edp.context import OutputContext
 from edp.file import File
 from edp.task import TaskContext
 from edp.types import (
@@ -155,7 +154,7 @@ class Pandas(Analyzer):
     def data_set_type(self):
         return DataSetType.structured
 
-    async def analyze(self, ctx: TaskContext, output_context: OutputContext):
+    async def analyze(self, ctx: TaskContext):
         row_count = len(self._data.index)
         self._logger.info(
             "Started structured data analysis with dataset containing %d rows",
@@ -194,9 +193,9 @@ class Pandas(Analyzer):
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
+                ctx,
                 numeric_cols.get_col(id),
                 _get_single_row(id, numeric_fields),
-                output_context,
                 datetime_column_name,
             )
             for id in numeric_cols.ids
@@ -218,11 +217,11 @@ class Pandas(Analyzer):
         correlation_columns = all_cols.data.loc[:, correlation_ids]
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
+            ctx,
             self._logger,
             self._file.output_reference + "_correlations",
             correlation_columns,
             correlation_fields,
-            output_context,
         )
 
         transformed_numeric_column_count = len(transformed_numeric_columns)
@@ -327,14 +326,14 @@ class Pandas(Analyzer):
 
     async def _transform_numeric_results(
         self,
+        ctx: TaskContext,
         column: Series,
         computed_fields: Series,
-        output_context: OutputContext,
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
         self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         column_plot_base = self._file.output_reference + "_" + str(column.name)
-        box_plot = await _generate_box_plot(column_plot_base + "_box_plot", column, output_context)
+        box_plot = await _generate_box_plot(ctx, column_plot_base + "_box_plot", column)
 
         column_result = NumericColumn(
             name=str(column.name),
@@ -367,13 +366,13 @@ class Pandas(Analyzer):
             _Distributions.TooSmallDataset.value,
         ]:
             column_result.distributionGraph = await _plot_distribution(
+                ctx,
                 column,
                 computed_fields,
                 self._fitting_config,
                 column_plot_base + "_distribution",
                 computed_fields[_NUMERIC_DISTRIBUTION],
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
-                output_context,
             )
 
         if (
@@ -382,11 +381,11 @@ class Pandas(Analyzer):
             and (datetime_index_column is not None)
         ):
             seasonality_graphs = await _get_seasonality_graphs(
+                ctx,
                 str(column.name),
                 column_plot_base,
                 datetime_index_column,
                 computed_fields[_NUMERIC_SEASONALITY],
-                output_context,
             )
             column_result.original_series = [seasonality_graphs.original]
             column_result.trends = [seasonality_graphs.trend]
@@ -429,8 +428,8 @@ class Pandas(Analyzer):
         )
 
 
-async def _generate_box_plot(plot_name: str, column: Series, output_context: OutputContext) -> FileReference:
-    async with output_context.get_plot(plot_name) as (axes, reference):
+async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -> FileReference:
+    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
         if isinstance(axes.figure, Figure):
             axes.figure.set_figwidth(3.0)
         axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
@@ -585,18 +584,18 @@ async def _find_best_distribution(
 
 
 async def _plot_distribution(
+    ctx: TaskContext,
     column: Series,
     column_fields: Series,
     config: FittingConfig,
     plot_name: str,
     distribution_name: str,
     distribution_parameters: dict,
-    output_context: OutputContext,
 ):
     x_min = column_fields[_NUMERIC_LOWER_DIST]
     x_max = column_fields[_NUMERIC_UPPER_DIST]
     x_limits = (x_min, x_max)
-    async with output_context.get_plot(plot_name) as (axes, reference):
+    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
         axes.set_title(f"Distribution of {column.name}")
         axes.set_xlabel(f"Value of {column.name}")
         axes.set_ylabel("Relative Density")
@@ -622,11 +621,11 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
 
 
 async def _get_correlation_graph(
+    ctx: TaskContext,
     logger: Logger,
     plot_name: str,
     columns: DataFrame,
     fields: DataFrame,
-    output_context: OutputContext,
 ) -> Optional[FileReference]:
     filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
     if len(filtered_column_names) < 2:
@@ -635,7 +634,7 @@ async def _get_correlation_graph(
     logger.debug("Computing correlation between columns %s", filtered_columns.columns)
     correlation = filtered_columns.corr()
     mask = triu(ones_like(correlation, dtype=bool))
-    async with output_context.get_plot(plot_name) as (axes, reference):
+    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
         figure = axes.figure
         if isinstance(figure, Figure):
             width_offset = 3
@@ -724,17 +723,17 @@ def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[
 
 
 async def _get_seasonality_graphs(
+    ctx: TaskContext,
     column_name: str,
     column_plot_base: str,
     time_base_column: str,
     seasonality: DecomposeResult,
-    output_context: OutputContext,
 ) -> _PerTimeBaseSeasonalityGraphs:
     xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
 
     @asynccontextmanager
     async def get_plot(plot_type: str):
-        async with output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
+        async with ctx.output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
             axes.set_title(f"{plot_type} of {column_name} over {time_base_column}")
             axes.set_xlabel(time_base_column)
             axes.set_ylabel(f"{plot_type} of {column_name}")

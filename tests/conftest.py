@@ -1,10 +1,14 @@
+from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
+from typing import AsyncIterator, Tuple
 
+from matplotlib.axes import Axes
 from pytest import fixture
 
-from edp.context import OutputDaseenContext, OutputLocalFilesContext
+from edp.context import OutputContext, OutputDaseenContext, OutputLocalFilesContext
 from edp.task import SimpleTaskContext
+from edp.types import ExtendedDatasetProfile, FileReference
 
 DIR = Path(__file__).parent.absolute()
 
@@ -24,8 +28,8 @@ def output_context(output_directory):
 
 
 @fixture
-def ctx():
-    return SimpleTaskContext(getLogger("TEST"))
+def ctx(output_context):
+    return SimpleTaskContext(getLogger("TEST"), output_context)
 
 
 @fixture
@@ -41,3 +45,12 @@ def daseen_output_context(monkeypatch, output_directory):
             elastic_url="http://elastic",
             elastic_apikey="APIKEY",
         )
+
+
+class DummyOutputContext(OutputContext):
+    async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference:
+        raise NotImplementedError()
+
+    @asynccontextmanager
+    def get_plot(self, name: str) -> AsyncIterator[Tuple[Axes, FileReference]]:
+        raise NotImplementedError()

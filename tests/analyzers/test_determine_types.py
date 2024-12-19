@@ -16,6 +16,7 @@ from edp.analyzers.pandas.type_parser import (
     parse_types,
 )
 from edp.task import SimpleTaskContext
+from tests.conftest import DummyOutputContext
 
 
 # Test type parsing
@@ -529,7 +530,7 @@ def expect_datetime_column(col: list | Series, expected_dtype=None):
 def parse_column(col: list | Series, expected_dtype=None):
     COL_ID = "col"
     df = DataFrame(col, columns=[COL_ID])
-    ctx = SimpleTaskContext(getLogger("TEST"))
+    ctx = SimpleTaskContext(getLogger("TEST"), DummyOutputContext())
     result = ctx.exec(parse_types, df)
     cols = result.all_cols
     assert len(cols.ids) == 1

@@ -61,12 +61,12 @@ def config_data(user_provided_data):
 
 @fixture
 def analyse_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[FileReference]]:
-    return lambda path: Service().analyse_asset(ctx, path, config_data, output_context)
+    return lambda path: Service().analyse_asset(ctx, config_data, path)
 
 
 @fixture
 def compute_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[ComputedEdpData]]:
-    return lambda path: Service()._compute_asset(ctx, path, config_data, output_context)
+    return lambda path: Service()._compute_asset(ctx, config_data, path)
 
 
 @mark.asyncio
@@ -138,7 +138,7 @@ async def test_analyse_roundtrip_csv(analyse_asset_fn, output_context, config_da
 async def test_analyse_csv_no_headers(ctx, user_provided_data, output_context):
     # We can't use the default config.
     config_data = Config(userProvidedEdpData=user_provided_data)
-    edp = await Service()._compute_asset(ctx, CSV_HEADERLESS_PATH, config_data, output_context)
+    edp = await Service()._compute_asset(ctx, config_data, CSV_HEADERLESS_PATH)
 
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
@@ -207,7 +207,7 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
 
 @mark.asyncio
 async def test_analyse_csv_daseen_context(ctx, daseen_output_context, config_data):
-    await Service().analyse_asset(ctx, CSV_PATH, config_data, daseen_output_context)
+    await Service().analyse_asset(ctx, config_data, CSV_PATH)
 
 
 def _assert_pickle_temporal_consistencies(

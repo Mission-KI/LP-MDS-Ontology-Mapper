@@ -8,7 +8,6 @@ from warnings import warn
 from pydantic import BaseModel
 
 from edp.compression import DECOMPRESSION_ALGORITHMS
-from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import IMPORTERS
 from edp.task import TaskContext
@@ -35,38 +34,32 @@ class Service:
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(
-        self, ctx: TaskContext, path: Path, config_data: Config, output_context: OutputContext
-    ) -> FileReference:
+    async def analyse_asset(self, ctx: TaskContext, config: Config, path: Path) -> FileReference:
         """Let the service analyse the given asset
 
         Parameters
         ----------
         ctx : TaskContext
-            Gives access to the appriopriate logger and allows executing sub-tasks.
+            Gives access to the appriopriate logger and output_context and allows executing sub-tasks.
         path : Path
              Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
         config_data : Config
             The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
             by the user.
-        output_context : OutputContext
-            An instance of "OutputContext" child class. These determine, where and how the generated data gets stored.
 
         Returns
         -------
         FileReference
             File path or URL to the generated EDP.
         """
-        computed_data = await self._compute_asset(ctx, path, config_data, output_context)
-        user_data = config_data.userProvidedEdpData
+        computed_data = await self._compute_asset(ctx, config, path)
+        user_data = config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
-        return await output_context.write_edp(json_name, edp)
+        return await ctx.output_context.write_edp(json_name, edp)
 
-    async def _compute_asset(
-        self, ctx: TaskContext, path: Path, config_data: Config, output_context: OutputContext
-    ) -> ComputedEdpData:
+    async def _compute_asset(self, ctx: TaskContext, config: Config, path: Path) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
@@ -85,7 +78,7 @@ class Service:
                 continue
             analyzer = await ctx.exec(IMPORTERS[file_type], child_file)
             data_structures.add(analyzer.data_set_type)
-            dataset_result = await ctx.exec(analyzer.analyze, output_context)
+            dataset_result = await ctx.exec(analyzer.analyze)
             if not isinstance(dataset_result, StructuredDataSet):
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
             datasets.append(dataset_result)
@@ -104,13 +97,15 @@ class Service:
             dataTypes=data_structures,
             structuredDatasets=datasets,
         )
-        computed_edp_data = await self._add_augmentation(ctx, config_data, computed_edp_data)
+        computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
-    async def _walk_all_files(self, ctx: TaskContext, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
+    async def _walk_all_files(
+        self, ctx: TaskContext, base_path: Path, path: Path, compressions: Set[str]
+    ) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""
 
         if path.is_file():

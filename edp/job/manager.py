@@ -79,11 +79,10 @@ class AnalysisJobManager:
             job = await session.get_job(job_id)
             self._logger.info("Starting job %s...", job_id)
             try:
-                ctx = SimpleTaskContext(getLogger("process_job"))
                 output_context = OutputLocalFilesContext(job.result_dir)
-                await self._service.analyse_asset(
-                    ctx, job.input_data_dir, Config(userProvidedEdpData=job.user_data), output_context
-                )
+                ctx = SimpleTaskContext(getLogger("process_job"), output_context)
+                config = Config(userProvidedEdpData=job.user_data)
+                await self._service.analyse_asset(ctx, config, job.input_data_dir)
                 await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
                 job.update_state(JobState.COMPLETED)
                 job.finished = datetime.now(tz=UTC)
