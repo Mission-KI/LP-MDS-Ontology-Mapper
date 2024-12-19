@@ -3,7 +3,6 @@ from collections.abc import Hashable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from enum import Enum
-from logging import Logger, getLogger
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Tuple
@@ -135,7 +134,6 @@ class _DatetimeColumnTemporalConsistency:
 
 class Pandas(Analyzer):
     def __init__(self, data: DataFrame, file: File):
-        self._logger = getLogger(__name__)
         self._data = data
         self._file = file
         self._fitting_config = FittingConfig()
@@ -156,7 +154,7 @@ class Pandas(Analyzer):
 
     async def analyze(self, ctx: TaskContext):
         row_count = len(self._data.index)
-        self._logger.info(
+        ctx.logger.info(
             "Started structured data analysis with dataset containing %d rows",
             row_count,
         )
@@ -168,13 +166,13 @@ class Pandas(Analyzer):
 
         datetime_cols = type_parser_results.datetime_cols
         datetime_common_fields = common_fields.loc[datetime_cols.ids]
-        datetime_fields = await self._compute_datetime_fields(datetime_cols.data)
+        datetime_fields = await self._compute_datetime_fields(ctx, datetime_cols.data)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
-        datetime_index = await _determine_datetime_index(self._logger, datetime_cols.data)
+        datetime_index = await _determine_datetime_index(ctx, datetime_cols.data)
         datetime_column_name: Optional[str] = None
         datetime_column_periodicity: Optional[_DatetimeColumnTemporalConsistency] = None
         if datetime_index is not None:
-            self._logger.info('Using "%s" as index', datetime_index.name)
+            ctx.logger.info('Using "%s" as index', datetime_index.name)
             type_parser_results.set_index(datetime_index)
             datetime_column_name = str(datetime_index.name)
             datetime_column_periodicity = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY][datetime_column_name]
@@ -182,6 +180,7 @@ class Pandas(Analyzer):
         numeric_cols = type_parser_results.numeric_cols
         numeric_common_fields = common_fields.loc[numeric_cols.ids]
         numeric_fields = await self._compute_numeric_fields(
+            ctx,
             numeric_cols.data,
             numeric_common_fields,
             datetime_column_periodicity,
@@ -202,6 +201,7 @@ class Pandas(Analyzer):
         ]
         transformed_datetime_columns = [
             await self._transform_datetime_results(
+                ctx,
                 datetime_cols.get_col(id),
                 _get_single_row(id, datetime_fields),
                 datetime_cols.get_info(id),
@@ -209,7 +209,7 @@ class Pandas(Analyzer):
             for id in datetime_cols.ids
         ]
         transformed_string_columns = [
-            await self._transform_string_results(string_cols.get_col(id), _get_single_row(id, string_fields))
+            await self._transform_string_results(ctx, string_cols.get_col(id), _get_single_row(id, string_fields))
             for id in string_cols.ids
         ]
 
@@ -218,7 +218,6 @@ class Pandas(Analyzer):
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
             ctx,
-            self._logger,
             self._file.output_reference + "_correlations",
             correlation_columns,
             correlation_fields,
@@ -254,6 +253,7 @@ class Pandas(Analyzer):
 
     async def _compute_numeric_fields(
         self,
+        ctx: TaskContext,
         columns: DataFrame,
         common_fields: DataFrame,
         index_column_periodicity: Optional[_DatetimeColumnTemporalConsistency],
@@ -295,7 +295,7 @@ class Pandas(Analyzer):
             [
                 fields,
                 await _get_distributions(
-                    self._logger,
+                    ctx,
                     columns,
                     concat([common_fields, fields], axis=1),
                     self._fitting_config,
@@ -306,10 +306,10 @@ class Pandas(Analyzer):
             axis=1,
         )
         if isinstance(columns.index, DatetimeIndex) and (index_column_periodicity is not None):
-            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(self._logger, columns, index_column_periodicity)
+            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(ctx, columns, index_column_periodicity)
         return fields
 
-    async def _compute_datetime_fields(self, columns: DataFrame) -> DataFrame:
+    async def _compute_datetime_fields(self, ctx: TaskContext, columns: DataFrame) -> DataFrame:
         computed = DataFrame(index=columns.columns)
         computed[_DATETIME_EARLIEST] = columns.min()
         computed[_DATETIME_LATEST] = columns.max()
@@ -321,7 +321,7 @@ class Pandas(Analyzer):
         computed[_DATETIME_MONOTONIC_DECREASING] = Series(
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
-        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await _compute_temporal_consistency(self._logger, columns)
+        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await _compute_temporal_consistency(ctx, columns)
         return computed
 
     async def _transform_numeric_results(
@@ -331,7 +331,7 @@ class Pandas(Analyzer):
         computed_fields: Series,
         datetime_index_column: Optional[str],
     ) -> NumericColumn:
-        self._logger.debug('Transforming numeric column "%s" results to EDP', column.name)
+        ctx.logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         column_plot_base = self._file.output_reference + "_" + str(column.name)
         box_plot = await _generate_box_plot(ctx, column_plot_base + "_box_plot", column)
 
@@ -394,9 +394,9 @@ class Pandas(Analyzer):
         return column_result
 
     async def _transform_datetime_results(
-        self, column: Series, computed_fields: Series, info: DatetimeColumnInfo
+        self, ctx: TaskContext, column: Series, computed_fields: Series, info: DatetimeColumnInfo
     ) -> DateTimeColumn:
-        self._logger.debug('Transforming datetime column "%s" results to EDP', column.name)
+        ctx.logger.debug('Transforming datetime column "%s" results to EDP', column.name)
         temporal_consistency: Optional[_DatetimeColumnTemporalConsistency] = computed_fields[
             _DATETIME_TEMPORAL_CONSISTENCY
         ]
@@ -418,8 +418,10 @@ class Pandas(Analyzer):
             format=info.get_format(),
         )
 
-    async def _transform_string_results(self, column: Series, computed_fields: Series) -> StringColumn:
-        self._logger.debug('Transforming string column "%s" results to EDP', column.name)
+    async def _transform_string_results(
+        self, ctx: TaskContext, column: Series, computed_fields: Series
+    ) -> StringColumn:
+        ctx.logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
             name=str(column.name),
             nonNullCount=computed_fields[_COMMON_NON_NULL],
@@ -436,17 +438,14 @@ async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -
     return reference
 
 
-async def _compute_temporal_consistency(logger: Logger, columns: DataFrame) -> Series:
+async def _compute_temporal_consistency(ctx: TaskContext, columns: DataFrame) -> Series:
     return Series(
-        {
-            name: _compute_temporal_consistency_for_column(logger, DatetimeIndex(columns[name]))
-            for name in columns.columns
-        }
+        {name: _compute_temporal_consistency_for_column(ctx, DatetimeIndex(columns[name])) for name in columns.columns}
     )
 
 
 def _compute_temporal_consistency_for_column(
-    logger: Logger, index: DatetimeIndex
+    ctx: TaskContext, index: DatetimeIndex
 ) -> Optional[_DatetimeColumnTemporalConsistency]:
     index = index.sort_values(ascending=True)
     row_count = len(index)
@@ -458,7 +457,7 @@ def _compute_temporal_consistency_for_column(
             "Can not analyze temporal consistency, time base contains too few unique timestamps. "
             f"Have {unique_timestamps}, need at least {TIME_BASE_THRESHOLD}."
         )
-        logger.warning(message)
+        ctx.logger.warning(message)
         warn(message)
         return None
 
@@ -468,7 +467,7 @@ def _compute_temporal_consistency_for_column(
     if new_count < row_count:
         empty_index_count = row_count - new_count
         message = f"Filtered out {empty_index_count} rows, because their index was empty"
-        logger.warning(message)
+        ctx.logger.warning(message)
         warn(message)
         row_count = new_count
 
@@ -515,7 +514,7 @@ def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -
 
 
 async def _get_distributions(
-    logger: Logger,
+    ctx: TaskContext,
     columns: DataFrame,
     fields: DataFrame,
     config: FittingConfig,
@@ -534,7 +533,7 @@ async def _get_distributions(
                 workers,
             )
         )
-        logger.debug("Computed %d/%d distributions", index, len(columns.columns))
+        ctx.logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
     data_frame = DataFrame(
         distributions,
@@ -622,7 +621,6 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
 
 async def _get_correlation_graph(
     ctx: TaskContext,
-    logger: Logger,
     plot_name: str,
     columns: DataFrame,
     fields: DataFrame,
@@ -631,7 +629,7 @@ async def _get_correlation_graph(
     if len(filtered_column_names) < 2:
         return None
     filtered_columns = columns[filtered_column_names]
-    logger.debug("Computing correlation between columns %s", filtered_columns.columns)
+    ctx.logger.debug("Computing correlation between columns %s", filtered_columns.columns)
     correlation = filtered_columns.corr()
     mask = triu(ones_like(correlation, dtype=bool))
     async with ctx.output_context.get_plot(plot_name) as (axes, reference):
@@ -658,11 +656,11 @@ async def _get_correlation_graph(
             cmap=get_cmap(),
             ax=axes,
         )
-    logger.debug("Finished computing correlations")
+    ctx.logger.debug("Finished computing correlations")
     return reference
 
 
-async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optional[DatetimeIndex]:
+async def _determine_datetime_index(ctx: TaskContext, columns: DataFrame) -> Optional[DatetimeIndex]:
     # TODO: Remove this function. In future release, there will not be any single primary date time column.
     #       All date time columns will be evaluated against all numeric rows rows for analysis.
     frequency = "infer"
@@ -683,18 +681,18 @@ async def _determine_datetime_index(logger: Logger, columns: DataFrame) -> Optio
 
     first_column = columns.iloc[:, 0]
     warning_text = f'Did not find a monotonic datetime column, will use "{first_column.name}" as index'
-    logger.warning(warning_text)
+    ctx.logger.warning(warning_text)
     warn(warning_text, RuntimeWarning)
     return DatetimeIndex(data=first_column, freq=frequency)
 
 
 async def _get_seasonalities(
-    logger: Logger,
+    ctx: TaskContext,
     columns: DataFrame,
     index_column_periodicity: _DatetimeColumnTemporalConsistency,
 ) -> Series:
     row_count = len(columns.index)
-    logger.info("Starting seasonality analysis on %d rows", row_count)
+    ctx.logger.info("Starting seasonality analysis on %d rows", row_count)
 
     filtered_columns = columns.loc[index_column_periodicity.cleaned_index]
     distincts = index_column_periodicity[index_column_periodicity.period].differentAbundancies
@@ -704,7 +702,7 @@ async def _get_seasonalities(
             for name, column in filtered_columns.items()
         }
     )
-    logger.info(
+    ctx.logger.info(
         "Finished seasonality analysis, found highest periodicity at %s level",
         index_column_periodicity.period,
     )
