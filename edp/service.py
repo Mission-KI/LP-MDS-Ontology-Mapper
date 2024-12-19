@@ -83,7 +83,7 @@ class Service:
                 ctx.logger.warning(text)
                 warn(text, RuntimeWarning)
                 continue
-            analyzer = await IMPORTERS[file_type](child_file)
+            analyzer = await ctx.exec(IMPORTERS[file_type], child_file)
             data_structures.add(analyzer.data_set_type)
             dataset_result = await ctx.exec(analyzer.analyze, output_context)
             if not isinstance(dataset_result, StructuredDataSet):

@@ -5,8 +5,9 @@ from edp.analyzers import Analyzer as _Analyzer
 from edp.file import File as _File
 from edp.importers.pandas import csv_importer, xls_importer, xlsx_importer
 from edp.importers.python import pickle as pickle_importer
+from edp.task import TaskContext
 
-Importer = _Callable[[_File], _Awaitable[_Analyzer]]
+Importer = _Callable[[TaskContext, _File], _Awaitable[_Analyzer]]
 
 # Dictionary mapping a file extension to Importer
 IMPORTERS: dict[str, Importer] = {

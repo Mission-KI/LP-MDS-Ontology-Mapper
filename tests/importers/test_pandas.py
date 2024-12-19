@@ -10,9 +10,9 @@ XLSX_PATH: Path = DIR / "data/test.xlsx"
 XLS_PATH: Path = DIR / "data/test.xls"
 
 
-async def test_import_csv():
+async def test_import_csv(ctx):
     file = get_file(CSV_PATH)
-    analyzer = await csv_importer(file)
+    analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -22,9 +22,9 @@ async def test_import_csv():
     assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
-async def test_import_csv_no_headers():
+async def test_import_csv_no_headers(ctx):
     file = get_file(CSV_HEADERLESS_PATH)
-    analyzer = await csv_importer(file)
+    analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -34,7 +34,7 @@ async def test_import_csv_no_headers():
     assert headers == ["col000", "col001", "col002", "col003", "col004"]
 
 
-async def test_import_csv_with_clevercsv(tmp_path: Path):
+async def test_import_csv_with_clevercsv(ctx, tmp_path: Path):
     """Test the advanced detection of clevercsv.
 
     The standard csv would fail with 'Could not determine delimiter'
@@ -48,7 +48,7 @@ async def test_import_csv_with_clevercsv(tmp_path: Path):
 """
     )
     file = get_file(csv_file)
-    analyzer = await csv_importer(file)
+    analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -60,7 +60,7 @@ async def test_import_csv_with_clevercsv(tmp_path: Path):
     assert first_row.to_list() == [2022.0, 28.0, 16.8, 49.0, 5.7, 78.0, 4.5]
 
 
-async def test_import_csv_with_quoted_strings(tmp_path: Path):
+async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
     csv_file = tmp_path / "clever.csv"
     csv_file.write_text(
         """id;value;num
@@ -69,7 +69,7 @@ async def test_import_csv_with_quoted_strings(tmp_path: Path):
 """
     )
     file = get_file(csv_file)
-    analyzer = await csv_importer(file)
+    analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     assert data.to_dict() == {
         "id": {0: 1, 1: 2},  # TODO(KB) index needs to be fixed
@@ -78,9 +78,9 @@ async def test_import_csv_with_quoted_strings(tmp_path: Path):
     }
 
 
-async def test_import_xlsx():
+async def test_import_xlsx(ctx):
     file = get_file(XLSX_PATH)
-    analyzer = await xlsx_importer(file)
+    analyzer = await ctx.exec(xlsx_importer, file)
     data = analyzer._data
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -90,9 +90,9 @@ async def test_import_xlsx():
     assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
-async def test_import_xls():
+async def test_import_xls(ctx):
     file = get_file(XLS_PATH)
-    analyzer = await xls_importer(file)
+    analyzer = await ctx.exec(xls_importer, file)
     data = analyzer._data
     row_count = len(data.index)
     col_count = len(data.columns)
