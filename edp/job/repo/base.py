@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator, Optional
+from uuid import UUID
 
 from edp.job.types import JobState, JobView
 from edp.types import UserProvidedEdpData
@@ -12,7 +13,7 @@ class Job(ABC):
 
     @property
     @abstractmethod
-    def job_id(self) -> str: ...
+    def job_id(self) -> UUID: ...
 
     @property
     @abstractmethod
@@ -53,12 +54,12 @@ class JobSession(ABC):
     """Abstract JobSession for creating and finding jobs. It is instantiated by the JobRepository."""
 
     @abstractmethod
-    async def create_job(self, job_id: str, user_data: UserProvidedEdpData, job_base_dir: Path) -> Job:
+    async def create_job(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path) -> Job:
         """Create a new job."""
         ...
 
     @abstractmethod
-    async def get_job(self, job_id: str) -> Job:
+    async def get_job(self, job_id: UUID) -> Job:
         """Find a job by ID."""
         ...
 

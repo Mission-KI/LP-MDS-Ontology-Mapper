@@ -1,4 +1,5 @@
 from enum import Enum
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +13,7 @@ class JobState(str, Enum):
 
 
 class JobView(BaseModel):
-    job_id: str = Field(description="Job ID", frozen=True)
+    job_id: UUID = Field(description="Job ID", frozen=True)
     state: JobState = Field(
         description="""Job state:\n
 - WAITING_FOR_DATA: job is waiting for data upload\n

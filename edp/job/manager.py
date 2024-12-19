@@ -2,7 +2,7 @@ from logging import getLogger
 from pathlib import Path
 from shutil import copyfileobj
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from edp.compression.zip import ZipAlgorithm
 from edp.config import AppConfig
@@ -20,17 +20,17 @@ class AnalysisJobManager:
         self._logger = getLogger(__name__)
         self._service = Service()
 
-    async def create_job(self, user_data: UserProvidedEdpData) -> str:
+    async def create_job(self, user_data: UserProvidedEdpData) -> UUID:
         """Create a job based on the user provided EDP data.
         The job gets an ID and a job working directory and is initially in state 'WAITING_FOR_DATA'.
         Returns Job-ID.
         """
 
         async with self._job_repo.new_session() as session:
-            job_id = str(uuid4())
+            job_id = uuid4()
 
             # Create job dir
-            job_base_dir = self._app_config.working_dir / job_id
+            job_base_dir = self._app_config.working_dir / str(job_id)
             job_base_dir.mkdir(parents=True)
 
             await session.create_job(
@@ -42,14 +42,14 @@ class AnalysisJobManager:
             self._logger.info("Job created: %s", job_id)
             return job_id
 
-    async def get_job_view(self, job_id: str) -> JobView:
+    async def get_job_view(self, job_id: UUID) -> JobView:
         """Get a JobView by ID."""
 
         async with self._job_repo.new_session() as session:
             job = await session.get_job(job_id)
             return job.to_job_view()
 
-    async def get_zipped_result(self, job_id: str) -> Path:
+    async def get_zipped_result(self, job_id: UUID) -> Path:
         """If an analysis job has reached state COMPLETED, this call returns the path to the zipped EDP including images."""
 
         async with self._job_repo.new_session() as session:
@@ -58,7 +58,7 @@ class AnalysisJobManager:
                 raise RuntimeError(f"There is no result for job {job.job_id}")
             return job.zip_archive
 
-    async def process_job(self, job_id: str):
+    async def process_job(self, job_id: UUID):
         """If the job is in state 'QUEUED' process the job.
         During processing it changes to state 'PROCESSING'. When finished it changes to 'COMPLETED' or 'FAILED'.
         Processing involves analyzing the asset and zipping the result.
@@ -88,7 +88,7 @@ class AnalysisJobManager:
                 job.update_state(JobState.FAILED, f"Processing failed: {exception}")
                 self._logger.error("Job %s has failed", job.job_id, exc_info=exception)
 
-    async def store_input_file(self, job_id: str, filename: Optional[str], file):
+    async def store_input_file(self, job_id: UUID, filename: Optional[str], file):
         """Store uploaded job data which will be analyzed later.
         The content of the given file (either a TemporaryFile or a FastAPI UploadFile) is copied to a file named 'filename' in the job working dir.
         This must be called exactly once when in state 'WAITING_FOR_DATA'. If an error occurs this needs to be repeated.

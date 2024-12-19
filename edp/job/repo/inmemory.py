@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator, Optional
+from uuid import UUID
 
 from edp.job.repo import Job, JobRepository, JobSession
 from edp.job.types import JobState
@@ -8,7 +9,7 @@ from edp.types import UserProvidedEdpData
 
 
 class InMemoryJob(Job):
-    def __init__(self, job_id: str, user_data: UserProvidedEdpData, job_base_dir: Path):
+    def __init__(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
         self._job_id = job_id
         self._user_data = user_data
         self._job_base_dir = job_base_dir
@@ -16,7 +17,7 @@ class InMemoryJob(Job):
         self._state_detail: Optional[str] = None
 
     @property
-    def job_id(self) -> str:
+    def job_id(self) -> UUID:
         return self._job_id
 
     @property
@@ -41,10 +42,10 @@ class InMemoryJob(Job):
 
 
 class InMemoryJobSession(JobSession):
-    def __init__(self, jobs: dict[str, InMemoryJob]):
+    def __init__(self, jobs: dict[UUID, InMemoryJob]):
         self._jobs = jobs
 
-    async def create_job(self, job_id: str, user_data: UserProvidedEdpData, job_base_dir: Path):
+    async def create_job(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
         job = InMemoryJob(
             job_id=job_id,
             user_data=user_data,
@@ -53,7 +54,7 @@ class InMemoryJobSession(JobSession):
         self._jobs[job_id] = job
         return job
 
-    async def get_job(self, job_id: str):
+    async def get_job(self, job_id: UUID):
         if job_id not in self._jobs:
             raise RuntimeError(f"Job {job_id} doesn't exist.")
         return self._jobs[job_id]
@@ -61,7 +62,7 @@ class InMemoryJobSession(JobSession):
 
 class InMemoryJobRepository(JobRepository):
     def __init__(self):
-        self._jobs = dict[str, InMemoryJob]()
+        self._jobs = dict[UUID, InMemoryJob]()
 
     @asynccontextmanager
     async def new_session(self) -> AsyncIterator[JobSession]:

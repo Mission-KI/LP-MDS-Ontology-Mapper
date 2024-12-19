@@ -1,5 +1,6 @@
 from enum import Enum
 from tempfile import TemporaryFile
+from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -49,7 +50,7 @@ def get_job_api_router(app_config: AppConfig):
         },
     )
     async def upload_analysis_data(
-        job_id: str, request: Request, filename: str, background_tasks: BackgroundTasks
+        job_id: UUID, request: Request, filename: str, background_tasks: BackgroundTasks
     ) -> JobView:
         """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
 
@@ -76,7 +77,7 @@ def get_job_api_router(app_config: AppConfig):
         tags=[Tags.AnalysisJob],
     )
     async def upload_analysis_data_multipart(
-        job_id: str, upload_file: UploadFile, background_tasks: BackgroundTasks
+        job_id: UUID, upload_file: UploadFile, background_tasks: BackgroundTasks
     ) -> JobView:
         """Upload a file to be analyzed for a previously created job. This starts (or enqueues) the analysis job.
 
@@ -92,7 +93,7 @@ def get_job_api_router(app_config: AppConfig):
         return await job_manager.get_job_view(job_id)
 
     @router.get("/analysisjob/{job_id}/status", tags=[Tags.AnalysisJob], summary="Get analysis job status")
-    async def get_status(job_id: str) -> JobView:
+    async def get_status(job_id: UUID) -> JobView:
         """Returns infos about the job."""
 
         return await job_manager.get_job_view(job_id)
@@ -109,7 +110,7 @@ def get_job_api_router(app_config: AppConfig):
             }
         },
     )
-    async def get_result(job_id: str):
+    async def get_result(job_id: UUID):
         """If an analysis job has reached state COMPLETED, this call returns the zipped EDP including images."""
 
         zip_archive = await job_manager.get_zipped_result(job_id)
@@ -127,7 +128,7 @@ def get_job_api_router(app_config: AppConfig):
             }
         },
     )
-    async def get_report(job_id: str):
+    async def get_report(job_id: UUID):
         """If an analysis job has reached state COMPLETED, this call returns the PDF report."""
         raise NotImplementedError()
 
