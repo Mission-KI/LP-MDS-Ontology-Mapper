@@ -33,6 +33,7 @@ from edp.analyzers.pandas.type_parser import (
 )
 from edp.context import OutputContext
 from edp.file import File
+from edp.task import TaskContext
 from edp.types import (
     DataSetType,
     DateTimeColumn,
@@ -154,14 +155,14 @@ class Pandas(Analyzer):
     def data_set_type(self):
         return DataSetType.structured
 
-    async def analyze(self, output_context: OutputContext):
+    async def analyze(self, ctx: TaskContext, output_context: OutputContext):
         row_count = len(self._data.index)
         self._logger.info(
             "Started structured data analysis with dataset containing %d rows",
             row_count,
         )
 
-        type_parser_results = parse_types(self._data)
+        type_parser_results = ctx.exec(parse_types, self._data)
 
         all_cols = type_parser_results.all_cols
         common_fields = await self._compute_common_fields(all_cols.data)

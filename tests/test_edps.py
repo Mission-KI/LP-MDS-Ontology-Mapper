@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
-from typing import List
+from pathlib import Path
+from typing import Awaitable, Callable, List
 
 from pytest import fixture, mark, raises
 
@@ -8,10 +8,12 @@ from edp import Service
 from edp.types import (
     Augmentation,
     AugmentedColumn,
+    ComputedEdpData,
     Config,
     DataSetType,
     DataSpace,
     ExtendedDatasetProfile,
+    FileReference,
     License,
     Publisher,
     TemporalConsistency,
@@ -57,16 +59,25 @@ def config_data(user_provided_data):
     return Config(userProvidedEdpData=user_provided_data, augmentedColumns=augmented_columns)
 
 
+@fixture
+def analyse_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[FileReference]]:
+    return lambda path: Service().analyse_asset(ctx, path, config_data, output_context)
+
+
+@fixture
+def compute_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[ComputedEdpData]]:
+    return lambda path: Service()._compute_asset(ctx, path, config_data, output_context)
+
+
 @mark.asyncio
-async def test_load_unknown_dir(output_context, config_data):
-    service = Service()
+async def test_load_unknown_dir(analyse_asset_fn):
     with raises(FileNotFoundError):
-        await service._compute_asset(Path("/does/not/exist/"), config_data, output_context)
+        await analyse_asset_fn(Path("/does/not/exist/"))
 
 
-async def test_analyse_pickle(output_context, config_data):
-    service = Service()
-    computed_data = await service._compute_asset(PICKLE_PATH, config_data, output_context)
+async def test_analyse_pickle(compute_asset_fn, config_data):
+    computed_data = await compute_asset_fn(PICKLE_PATH)
+
     assert len(computed_data.structuredDatasets) == 1
     assert computed_data.periodicity == "hours"
 
@@ -97,11 +108,8 @@ async def test_analyse_pickle(output_context, config_data):
 
 
 @mark.asyncio
-async def test_analyse_csv(output_context, config_data):
-    service = Service()
-    json_file = await service.analyse_asset(CSV_PATH, config_data, output_context)
-    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
-    assert edp.assetId == config_data.userProvidedEdpData.assetId
+async def test_analyse_csv(compute_asset_fn):
+    edp = await compute_asset_fn(CSV_PATH)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -117,12 +125,21 @@ async def test_analyse_csv(output_context, config_data):
 
 
 @mark.asyncio
-async def test_analyse_csv_no_headers(output_context, user_provided_data):
-    config_data = Config(userProvidedEdpData=user_provided_data)
-    service = Service()
-    json_file = await service.analyse_asset(CSV_HEADERLESS_PATH, config_data, output_context)
-    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
+async def test_analyse_roundtrip_csv(analyse_asset_fn, output_context, config_data):
+    edp_file = await analyse_asset_fn(CSV_PATH)
+    edp_file_path = output_context.build_full_path(edp_file)
+    edp = read_edp_file(edp_file_path)
     assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
+
+
+@mark.asyncio
+async def test_analyse_csv_no_headers(ctx, user_provided_data, output_context):
+    # We can't use the default config.
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await Service()._compute_asset(ctx, CSV_HEADERLESS_PATH, config_data, output_context)
+
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -138,11 +155,8 @@ async def test_analyse_csv_no_headers(output_context, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_xlsx(output_context, config_data):
-    service = Service()
-    json_file = await service.analyse_asset(XLSX_PATH, config_data, output_context)
-    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
-    assert edp.assetId == config_data.userProvidedEdpData.assetId
+async def test_analyse_xlsx(compute_asset_fn):
+    edp = await compute_asset_fn(XLSX_PATH)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -158,11 +172,8 @@ async def test_analyse_xlsx(output_context, config_data):
 
 
 @mark.asyncio
-async def test_analyse_xls(output_context, config_data):
-    service = Service()
-    json_file = await service.analyse_asset(XLS_PATH, config_data, output_context)
-    edp: ExtendedDatasetProfile = read_edp(output_context.build_full_path(json_file))
-    assert edp.assetId == config_data.userProvidedEdpData.assetId
+async def test_analyse_xls(compute_asset_fn):
+    edp = await compute_asset_fn(XLS_PATH)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -178,36 +189,25 @@ async def test_analyse_xls(output_context, config_data):
 
 
 @mark.asyncio
-async def test_analyse_zip(output_context, config_data):
-    service = Service()
-    json_file = await service.analyse_asset(ZIP_PATH, config_data, output_context)
-    edp = read_edp(output_context.build_full_path(json_file))
-    assert edp.assetId == config_data.userProvidedEdpData.assetId
+async def test_analyse_zip(compute_asset_fn):
+    edp = await compute_asset_fn(ZIP_PATH)
     assert "zip" in edp.compression.algorithms
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
 
 
 @mark.asyncio
-async def test_raise_on_only_unknown_datasets(tmp_path, output_context, config_data):
-    service = Service()
+async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
     file_path = tmp_path / "unsupported.txt"
     with open(file_path, "wt", encoding="utf-8") as file:
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):
-        await service.analyse_asset(tmp_path, config_data, output_context)
-
-
-def read_edp(json_file: PurePosixPath):
-    with open(json_file, "r") as file:
-        json_data = file.read()
-    return ExtendedDatasetProfile.model_validate_json(json_data)
+        await analyse_asset_fn(tmp_path)
 
 
 @mark.asyncio
-async def test_analyse_csv_daseen_context(daseen_output_context, config_data):
-    service = Service()
-    await service.analyse_asset(CSV_PATH, config_data, daseen_output_context)
+async def test_analyse_csv_daseen_context(ctx, daseen_output_context, config_data):
+    await Service().analyse_asset(ctx, CSV_PATH, config_data, daseen_output_context)
 
 
 def _assert_pickle_temporal_consistencies(
@@ -266,3 +266,9 @@ def _assert_pickle_temporal_consistencies(
     assert year_consistency.stable is True
     assert year_consistency.differentAbundancies == 1
     assert year_consistency.numberOfGaps == 0
+
+
+def read_edp_file(json_file: Path):
+    with open(json_file, "r") as file:
+        json_data = file.read()
+    return ExtendedDatasetProfile.model_validate_json(json_data)

@@ -11,6 +11,7 @@ from edp.context import OutputLocalFilesContext
 from edp.job.repo import Job, JobRepository
 from edp.job.types import JobState, JobView
 from edp.service import Service
+from edp.task import SimpleTaskContext
 from edp.types import Config, UserProvidedEdpData
 
 
@@ -78,9 +79,10 @@ class AnalysisJobManager:
             job = await session.get_job(job_id)
             self._logger.info("Starting job %s...", job_id)
             try:
+                ctx = SimpleTaskContext(getLogger("process_job"))
                 output_context = OutputLocalFilesContext(job.result_dir)
                 await self._service.analyse_asset(
-                    job.input_data_dir, Config(userProvidedEdpData=job.user_data), output_context
+                    ctx, job.input_data_dir, Config(userProvidedEdpData=job.user_data), output_context
                 )
                 await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
                 job.update_state(JobState.COMPLETED)

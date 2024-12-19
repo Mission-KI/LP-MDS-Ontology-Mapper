@@ -1,8 +1,10 @@
+from logging import getLogger
 from pathlib import Path
 
 from pytest import fixture
 
 from edp.context import OutputDaseenContext, OutputLocalFilesContext
+from edp.task import SimpleTaskContext
 
 DIR = Path(__file__).parent.absolute()
 
@@ -19,6 +21,11 @@ def output_directory():
 @fixture
 def output_context(output_directory):
     return OutputLocalFilesContext(output_directory)
+
+
+@fixture
+def ctx():
+    return SimpleTaskContext(getLogger("TEST"))
 
 
 @fixture

@@ -2,24 +2,23 @@ import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from logging import getLogger
-from typing import Any, Dict, Generic, Iterator, Optional, TypeVar, Union
+from typing import Any, Dict, Iterator, Optional, Union
 
 from numpy import any as numpy_any
 from pandas import DataFrame, Index, Series, StringDtype, to_datetime, to_numeric
 from pydantic.dataclasses import dataclass
 
-_logger = getLogger(__name__)
+from edp.task import TaskContext
 
 
 class _BaseColumnInfo(ABC):
     @abstractmethod
-    def cast(self, col: Series) -> Series:
+    def cast(self, ctx: TaskContext, col: Series) -> Series:
         """This shall convert the column to the destination type and return NA for entries it cannot parse."""
 
-    def count_valid_rows(self, col: Series) -> int:
+    def count_valid_rows(self, ctx: TaskContext, col: Series) -> int:
         """This counts how many entries in the column can be converted to the destination type."""
-        converted_col = self.cast(col)
+        converted_col = self.cast(ctx, col)
         return converted_col.notna().sum()
 
 
@@ -41,23 +40,23 @@ class DatetimeColumnInfo(_BaseColumnInfo):
     @abstractmethod
     def _convert_entry(self, element: Any) -> None | datetime: ...
 
-    def count_valid_rows(self, col: Series) -> int:
-        converted_col = self._cast_internal(col)
+    def count_valid_rows(self, ctx: TaskContext, col: Series) -> int:
+        converted_col = self._cast_internal(ctx, col)
         return converted_col.notna().sum()
 
-    def cast(self, col: Series) -> Series:
+    def cast(self, ctx: TaskContext, col: Series) -> Series:
         if self.get_kind() == DatetimeKind.TIME:
-            _logger.warning(
+            ctx.logger.warning(
                 "Column '%s' contains pure times without dates. This is handled as a string column.", col.name
             )
             return col.astype(StringDtype())
         elif self.get_kind() == DatetimeKind.DATE:
-            _logger.warning("Column '%s' contains pure dates without times.", col.name)
-            return self._cast_internal(col)
+            ctx.logger.warning("Column '%s' contains pure dates without times.", col.name)
+            return self._cast_internal(ctx, col)
         else:
-            return self._cast_internal(col)
+            return self._cast_internal(ctx, col)
 
-    def _cast_internal(self, col: Series) -> Series:
+    def _cast_internal(self, ctx: TaskContext, col: Series) -> Series:
         col_converted = col.apply(self._convert_entry)
         col_valid = col_converted[col_converted.notna()]
         count_with_timezone = col_valid.apply(lambda timestamp: timestamp.tzinfo is not None).sum()
@@ -68,7 +67,7 @@ class DatetimeColumnInfo(_BaseColumnInfo):
             return to_datetime(col_converted, errors="coerce", utc=False)
         else:
             if count_without_timezone > 0:
-                _logger.warning(
+                ctx.logger.warning(
                     "Found datetime column '%s' which contains entries partially with and without timezone. For entries without timezone UTC is assumed.",
                     col.name,
                 )
@@ -126,18 +125,18 @@ class DatetimePatternColumnInfo(DatetimeColumnInfo):
 
 @dataclass(frozen=True)
 class NumericColumnInfo(_BaseColumnInfo):
-    def count_valid_rows(self, col: Series) -> int:
+    def count_valid_rows(self, ctx: TaskContext, col: Series) -> int:
         col_numeric = to_numeric(self._preprocess(col), errors="coerce")
         return col_numeric.notna().sum()
 
-    def cast(self, col: Series) -> Series:
+    def cast(self, ctx: TaskContext, col: Series) -> Series:
         # Convert to numeric type and set incompatible values to float.nan.
         col_numeric = to_numeric(self._preprocess(col), errors="coerce")
         # Narrow type to one supporting pd.NA (Int64 or Float64).
         col_numeric_nullable = self._cast_to_pandas_type(col_numeric)
         # Downcast to most specific type (e.g. UInt8, Int16, Float32 etc.)
         col_result = self._downcast(col_numeric_nullable)
-        _logger.debug("Casting column '%s' to numeric dtype %s", col.name, col_result.dtype)
+        ctx.logger.debug("Casting column '%s' to numeric dtype %s", col.name, col_result.dtype)
         return col_result
 
     def _preprocess(self, col: Series) -> Series:
@@ -178,17 +177,14 @@ class NumericColumnInfo(_BaseColumnInfo):
 
 @dataclass(frozen=True)
 class StringColumnInfo(_BaseColumnInfo):
-    def cast(self, col: Series) -> Series:
+    def cast(self, ctx: TaskContext, col: Series) -> Series:
         return col.astype(StringDtype())
 
 
 ColumnInfo = Union[DatetimeColumnInfo, NumericColumnInfo, StringColumnInfo]
 
 
-TColumnInfo = TypeVar("TColumnInfo", bound=ColumnInfo)
-
-
-class ColumnsWrapper(Generic[TColumnInfo]):
+class ColumnsWrapper[TColumnInfo: ColumnInfo]:
     def __init__(self, all_data: DataFrame, infos: dict[str, TColumnInfo]):
         self._all_data = all_data
         self._infos = infos
@@ -272,37 +268,37 @@ MIN_CONVERSION_RATIO = 0.5
 SAMPLE_SIZE = 1000
 
 
-def parse_types(data: DataFrame) -> Result:
+def parse_types(ctx: TaskContext, data: DataFrame) -> Result:
     column_infos = dict[str, ColumnInfo]()
     results_data = DataFrame(index=data.index)
 
     for column_name, column in data.items():
         if not isinstance(column_name, str):
             raise RuntimeError(f"Column {column_name} needs a label.")
-        converted_column, col_info = _determine_type(column)
+        converted_column, col_info = _determine_type(ctx, column)
         column_infos[column_name] = col_info
         results_data[column_name] = converted_column
 
     result = Result(results_data, column_infos)
 
-    _logger.debug("Found Numeric columns: %s", result.numeric_cols.ids)
-    _logger.debug("Found DateTime columns: %s", result.datetime_cols.ids)
-    _logger.debug("Found String columns: %s", result.string_cols.ids)
+    ctx.logger.debug("Found Numeric columns: %s", result.numeric_cols.ids)
+    ctx.logger.debug("Found DateTime columns: %s", result.datetime_cols.ids)
+    ctx.logger.debug("Found String columns: %s", result.string_cols.ids)
 
     return result
 
 
-def _determine_type(column: Series) -> tuple[Series, ColumnInfo]:
+def _determine_type(ctx: TaskContext, column: Series) -> tuple[Series, ColumnInfo]:
     column = column[column.notna()]
     column_sample = column.sample(SAMPLE_SIZE) if len(column.index) > SAMPLE_SIZE else column
     # determine best type match based on the sample
-    preferred_col_info = _determine_best_type_match(column_sample)
-    return _do_type_conversion(column, preferred_col_info)
+    preferred_col_info = _determine_best_type_match(ctx, column_sample)
+    return _do_type_conversion(ctx, column, preferred_col_info)
 
 
-def _determine_best_type_match(column: Series) -> Optional[ColumnInfo]:
+def _determine_best_type_match(ctx: TaskContext, column: Series) -> Optional[ColumnInfo]:
     # match: matched_colinfo, valid_count
-    matches = [match for match in _try_type_conversions(column)]
+    matches = [match for match in _try_type_conversions(ctx, column)]
     if len(matches) > 0:
         # best match is the one with highest valid_count
         best_match = max(matches, key=lambda match: match[1])
@@ -311,15 +307,15 @@ def _determine_best_type_match(column: Series) -> Optional[ColumnInfo]:
         return None
 
 
-def _try_type_conversions(column: Series) -> Iterator[tuple[ColumnInfo, int]]:
+def _try_type_conversions(ctx: TaskContext, column: Series) -> Iterator[tuple[ColumnInfo, int]]:
     # passed columns don't contain NA values anymore
     count = len(column.index)
     if count == 0:
         return
 
     for column_info in ALLOWED_COLUMN_INFOS:
-        valid_count = column_info.count_valid_rows(column)
-        _logger.debug(
+        valid_count = column_info.count_valid_rows(ctx, column)
+        ctx.logger.debug(
             "Trying to convert column '%s' with %s, found %d valid rows out of %d.",
             column.name,
             column_info,
@@ -331,14 +327,16 @@ def _try_type_conversions(column: Series) -> Iterator[tuple[ColumnInfo, int]]:
             yield column_info, valid_count
 
 
-def _do_type_conversion(column: Series, column_info: Optional[ColumnInfo]) -> tuple[Series, ColumnInfo]:
+def _do_type_conversion(
+    ctx: TaskContext, column: Series, column_info: Optional[ColumnInfo]
+) -> tuple[Series, ColumnInfo]:
     if column_info is not None:
         count = len(column.index)
         # convert the whole column based on the preferred column info
-        converted_col = column_info.cast(column)
+        converted_col = column_info.cast(ctx, column)
         count_na = converted_col.isna().sum()
         if count_na > 0:
-            _logger.warning(
+            ctx.logger.warning(
                 "Couldn't convert some entries of column '%s' using %s (%d invalid of %d non-null entries).",
                 column.name,
                 column_info,
@@ -346,14 +344,14 @@ def _do_type_conversion(column: Series, column_info: Optional[ColumnInfo]) -> tu
                 count,
             )
         else:
-            _logger.debug(
+            ctx.logger.debug(
                 "Converting all %d non-null entries of column '%s' using %s.", count, column.name, column_info
             )
         return converted_col, column_info
 
     # string column as fallback
-    _logger.debug("Converting column '%s' using FALLBACK %s.", column.name, FALLBACK_COLUMN_INFO)
-    return FALLBACK_COLUMN_INFO.cast(column), FALLBACK_COLUMN_INFO
+    ctx.logger.debug("Converting column '%s' using FALLBACK %s.", column.name, FALLBACK_COLUMN_INFO)
+    return FALLBACK_COLUMN_INFO.cast(ctx, column), FALLBACK_COLUMN_INFO
 
 
 def _check_conversion_ratio_passed(valid_count, count):

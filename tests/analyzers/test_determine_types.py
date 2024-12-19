@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from logging import getLogger
 
 import numpy.dtypes as numpytype
 import pandas as pd
@@ -14,6 +15,7 @@ from edp.analyzers.pandas.type_parser import (
     StringColumnInfo,
     parse_types,
 )
+from edp.task import SimpleTaskContext
 
 
 # Test type parsing
@@ -527,7 +529,8 @@ def expect_datetime_column(col: list | Series, expected_dtype=None):
 def parse_column(col: list | Series, expected_dtype=None):
     COL_ID = "col"
     df = DataFrame(col, columns=[COL_ID])
-    result = parse_types(df)
+    ctx = SimpleTaskContext(getLogger("TEST"))
+    result = ctx.exec(parse_types, df)
     cols = result.all_cols
     assert len(cols.ids) == 1
     converted_col = cols.get_col(COL_ID)

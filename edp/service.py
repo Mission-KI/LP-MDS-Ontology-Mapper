@@ -11,6 +11,7 @@ from edp.compression import DECOMPRESSION_ALGORITHMS
 from edp.context import OutputContext
 from edp.file import File, calculate_size
 from edp.importers import IMPORTERS
+from edp.task import TaskContext
 from edp.types import (
     AugmentedColumn,
     Compression,
@@ -27,18 +28,22 @@ from edp.types import (
 
 class Service:
     def __init__(self):
-        self._logger = getLogger(__name__)
-        self._logger.info("Initializing")
+        _logger = getLogger(__name__)
+        _logger.info("Initializing")
 
-        self._logger.info("The following data types are supported: [%s]", ", ".join(IMPORTERS))
+        _logger.info("The following data types are supported: [%s]", ", ".join(IMPORTERS))
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
-        self._logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
+        _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> FileReference:
+    async def analyse_asset(
+        self, ctx: TaskContext, path: Path, config_data: Config, output_context: OutputContext
+    ) -> FileReference:
         """Let the service analyse the given asset
 
         Parameters
         ----------
+        ctx : TaskContext
+            Gives access to the appriopriate logger and allows executing sub-tasks.
         path : Path
              Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
         config_data : Config
@@ -52,14 +57,16 @@ class Service:
         FileReference
             File path or URL to the generated EDP.
         """
-        computed_data = await self._compute_asset(path, config_data, output_context)
+        computed_data = await self._compute_asset(ctx, path, config_data, output_context)
         user_data = config_data.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
         return await output_context.write_edp(json_name, edp)
 
-    async def _compute_asset(self, path: Path, config_data: Config, output_context: OutputContext) -> ComputedEdpData:
+    async def _compute_asset(
+        self, ctx: TaskContext, path: Path, config_data: Config, output_context: OutputContext
+    ) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compressions: Set[str] = set()
@@ -68,17 +75,17 @@ class Service:
         data_structures: Set[DataSetType] = set()
         base_path = path if path.is_dir() else path.parent
 
-        async for child_file in self._walk_all_files(base_path, path, compressions):
+        async for child_file in self._walk_all_files(ctx, base_path, path, compressions):
             file_type = child_file.type
             extracted_size += child_file.size
             if file_type not in IMPORTERS:
                 text = f'Import for "{file_type}" not yet supported'
-                self._logger.warning(text)
+                ctx.logger.warning(text)
                 warn(text, RuntimeWarning)
                 continue
             analyzer = await IMPORTERS[file_type](child_file)
             data_structures.add(analyzer.data_set_type)
-            dataset_result = await analyzer.analyze(output_context)
+            dataset_result = await ctx.exec(analyzer.analyze, output_context)
             if not isinstance(dataset_result, StructuredDataSet):
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
             datasets.append(dataset_result)
@@ -97,13 +104,13 @@ class Service:
             dataTypes=data_structures,
             structuredDatasets=datasets,
         )
-        computed_edp_data = await self._add_augmentation(config_data, computed_edp_data)
+        computed_edp_data = await self._add_augmentation(ctx, config_data, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
-    async def _walk_all_files(self, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
+    async def _walk_all_files(self, ctx: TaskContext, base_path: Path, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""
 
         if path.is_file():
@@ -113,14 +120,14 @@ class Service:
             else:
                 compressions.add(file.type)
                 async with self._extract(file) as extracted_path:
-                    async for child_file in self._walk_all_files(base_path, extracted_path, compressions):
+                    async for child_file in self._walk_all_files(ctx, base_path, extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
             for file_path in path.iterdir():
-                async for child_file in self._walk_all_files(base_path, file_path, compressions):
+                async for child_file in self._walk_all_files(ctx, base_path, file_path, compressions):
                     yield child_file
         else:
-            self._logger.warning('Can not extract or analyse "%s"', path)
+            ctx.logger.warning('Can not extract or analyse "%s"', path)
 
     @asynccontextmanager
     async def _extract(self, file: File) -> AsyncIterator[Path]:
@@ -142,7 +149,7 @@ class Service:
         finally:
             rmtree(directory.absolute())
 
-    async def _add_augmentation(self, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
+    async def _add_augmentation(self, ctx: TaskContext, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
         structured_datasets = {dataset.name: dataset.get_columns_dict() for dataset in edp.structuredDatasets}
 
         def _get_all_matching_columns(name: str) -> Iterator[_BaseColumn]:
@@ -155,7 +162,7 @@ class Service:
             if len(columns) == 0:
                 message = f'No column "{augmented_column.name}" found in any dataset!'
                 warn(message)
-                self._logger.warning(message)
+                ctx.logger.warning(message)
                 return
             for column in columns:
                 column.augmentation = augmented_column.augmentation
@@ -165,7 +172,7 @@ class Service:
                 dataset[augmented_column.name].augmentation = augmented_column.augmentation
             except KeyError:
                 message = f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.file}'
-                self._logger.warning(message)
+                ctx.logger.warning(message)
                 warn(message)
 
         for augmented_column in config_data.augmentedColumns:
@@ -177,7 +184,7 @@ class Service:
                 except KeyError:
                     message = f'"{augmented_column}" is not a known structured dataset!"'
                     warn(message)
-                    self._logger.warning(message)
+                    ctx.logger.warning(message)
                     continue
                 augment_column_in_file(augmented_column, dataset)
 
