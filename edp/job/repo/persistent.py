@@ -24,6 +24,7 @@ class DbJob(SQLModel, Job, table=True):
     f_started: Optional[datetime] = Field(sa_column_kwargs={"name": "started"})
     f_finished: Optional[datetime] = Field(sa_column_kwargs={"name": "finished"})
     f_user_data: str = Field(sa_column_kwargs={"name": "user_data"})
+    # tasks: list["DbTask"] = Relationship(back_populates="job")
 
     def __init__(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
         self.id = job_id
@@ -82,6 +83,17 @@ class DbJob(SQLModel, Job, table=True):
     @property
     def job_base_dir(self) -> Path:
         return Path(self.f_job_base_dir)
+
+
+# class DbTask(SQLModel, table=True):
+#     __tablename__ = "task"
+
+#     id: UUID = Field(primary_key=True)
+#     name: str
+#     started: Optional[datetime]
+#     finished: Optional[datetime]
+#     job_id: UUID = Field(foreign_key="job.id")
+#     job: DbJob = Relationship(back_populates="tasks")
 
 
 class DbJobSession(JobSession):
