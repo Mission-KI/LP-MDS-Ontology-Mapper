@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from logging import getLogger
 from pathlib import Path
 from shutil import copyfileobj
@@ -70,6 +71,7 @@ class AnalysisJobManager:
             if job.state != JobState.QUEUED:
                 raise RuntimeError(f"Job can't be processed because it's in state {job.state}.")
             job.update_state(JobState.PROCESSING)
+            job.started = datetime.now(tz=UTC)
 
         # In a new session do the actual processing.
         async with self._job_repo.new_session() as session:
@@ -82,10 +84,12 @@ class AnalysisJobManager:
                 )
                 await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
                 job.update_state(JobState.COMPLETED)
+                job.finished = datetime.now(tz=UTC)
                 self._logger.info("Job %s completed.", job.job_id)
 
             except Exception as exception:
                 job.update_state(JobState.FAILED, f"Processing failed: {exception}")
+                job.finished = datetime.now(tz=UTC)
                 self._logger.error("Job %s has failed", job.job_id, exc_info=exception)
 
     async def store_input_file(self, job_id: UUID, filename: Optional[str], file):

@@ -11,10 +11,12 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import FileResponse
+from sqlmodel import create_engine
 
 from edp.config import AppConfig
 from edp.job.manager import AnalysisJobManager
-from edp.job.repo import InMemoryJobRepository
+from edp.job.repo.base import JobRepository
+from edp.job.repo.persistent import DbJobRepository
 from edp.job.types import JobView
 from edp.types import UserProvidedEdpData
 
@@ -24,7 +26,7 @@ class Tags(str, Enum):
 
 
 def get_job_api_router(app_config: AppConfig):
-    job_repo = InMemoryJobRepository()
+    job_repo = create_job_repository(app_config)
     job_manager = AnalysisJobManager(app_config, job_repo)
     router = APIRouter()
 
@@ -133,3 +135,9 @@ def get_job_api_router(app_config: AppConfig):
         raise NotImplementedError()
 
     return router
+
+
+def create_job_repository(app_config: AppConfig) -> JobRepository:
+    # return InMemoryJobRepository()
+    db_engine = create_engine(app_config.db_url)
+    return DbJobRepository(db_engine)

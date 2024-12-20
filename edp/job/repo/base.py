@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import AsyncIterator, Optional
 from uuid import UUID
@@ -25,6 +26,30 @@ class Job(ABC):
 
     @abstractmethod
     def update_state(self, state: JobState, detail: Optional[str] = None) -> None: ...
+
+    @property
+    @abstractmethod
+    def asset_id(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def asset_version(self) -> Optional[str]: ...
+
+    @property
+    @abstractmethod
+    def started(self) -> Optional[datetime]: ...
+
+    @started.setter
+    @abstractmethod
+    def started(self, started: Optional[datetime]): ...
+
+    @property
+    @abstractmethod
+    def finished(self) -> Optional[datetime]: ...
+
+    @finished.setter
+    @abstractmethod
+    def finished(self, finished: Optional[datetime]): ...
 
     @property
     @abstractmethod

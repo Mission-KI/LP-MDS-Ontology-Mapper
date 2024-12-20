@@ -38,6 +38,8 @@ dependencies = [
     "clevercsv>=0.8.2",
     "openpyxl",
     "xlrd",
+    "sqlmodel",
+    "psycopg2-binary",
 ]
 
 [project.scripts]

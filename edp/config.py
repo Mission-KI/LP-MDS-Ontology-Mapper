@@ -10,7 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppConfig(BaseSettings):
     working_dir: Path = Field(description="Working directory used for job data", default=Path.cwd())
     host: str = Field(description="Bind FastAPI to host", default="127.0.0.1")
-    # api_key: str = Field(description="API key", exclude=True)     # example for required secret setting
+    db_url: str = Field(
+        description="DB connection URL", exclude=True, examples=["postgresql://user:pass@localhost:5432/edps"]
+    )
 
     model_config = SettingsConfigDict(env_file="edp/.env")
 
