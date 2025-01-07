@@ -16,6 +16,7 @@ from sqlmodel import create_engine
 from edp.config import AppConfig
 from edp.job.manager import AnalysisJobManager
 from edp.job.repo.base import JobRepository
+from edp.job.repo.inmemory import InMemoryJobRepository
 from edp.job.repo.persistent import DbJobRepository
 from edp.job.types import JobView
 from edp.types import UserProvidedEdpData
@@ -138,6 +139,9 @@ def get_job_api_router(app_config: AppConfig):
 
 
 def create_job_repository(app_config: AppConfig) -> JobRepository:
-    # return InMemoryJobRepository()
-    db_engine = create_engine(app_config.db_url)
-    return DbJobRepository(db_engine)
+    db_url = app_config.db_url
+    if db_url is None:
+        return InMemoryJobRepository()
+    else:
+        db_engine = create_engine(str(db_url))
+        return DbJobRepository(db_engine)

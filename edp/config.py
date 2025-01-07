@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Optional
 
-from pydantic import Field
+from pydantic import AnyUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,8 +11,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppConfig(BaseSettings):
     working_dir: Path = Field(description="Working directory used for job data", default=Path.cwd())
     host: str = Field(description="Bind FastAPI to host", default="127.0.0.1")
-    db_url: str = Field(
-        description="DB connection URL", exclude=True, examples=["postgresql://user:pass@localhost:5432/edps"]
+    db_url: Optional[AnyUrl] = Field(
+        description="DB connection URL for persisting jobs; None uses in-memory repository",
+        exclude=True,
+        examples=["postgresql://user:pass@localhost:5432/edps"],
+        default=None,
     )
 
     model_config = SettingsConfigDict(env_file="edp/.env")
