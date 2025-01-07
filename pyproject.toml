@@ -68,6 +68,9 @@ where = ["."]
 include = ["edp*"]
 exclude = ["test*"]
 
+[tool.setuptools.package-data]
+"edp" = ["styles/*.mplstyle"]
+
 [tool.setuptools.dynamic]
 version = { file = "dist/VERSION.txt" }
 
