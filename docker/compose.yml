@@ -21,7 +21,7 @@ services:
       - edps-work:/work
     environment:
       HOST: "0.0.0.0"
-      DB_URL: "postgresql://${DB_USER}:${DB_PASSWORD}@edps-db:5432/${DB_NAME}"
+      DB_URL: "postgresql+pg8000://${DB_USER}:${DB_PASSWORD}@edps-db:5432/${DB_NAME}"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.edp.rule=Host(`${HOSTNAME}`)"

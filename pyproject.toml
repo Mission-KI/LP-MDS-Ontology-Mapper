@@ -39,7 +39,7 @@ dependencies = [
     "openpyxl",
     "xlrd",
     "sqlmodel",
-    "psycopg2-binary",
+    "pg8000",
 ]
 
 [project.scripts]
