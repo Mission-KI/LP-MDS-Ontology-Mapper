@@ -123,4 +123,4 @@ ignore-packages = [
     "fitter",
 ]
 partial-match = true
-allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0"
+allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0"
