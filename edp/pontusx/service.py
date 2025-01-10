@@ -12,6 +12,7 @@ from edp.context import OutputLocalFilesContext
 from edp.pontusx.args import Args
 from edp.pontusx.metadata import DDO, read_custom_data_file, read_ddo_file
 from edp.service import Service
+from edp.task import SimpleTaskContext
 from edp.types import Config, DataSpace, License, Publisher, UserProvidedEdpData
 
 PONTUSX_DS_NAME = "Pontus-X"
@@ -87,8 +88,8 @@ async def run_service(logger: Logger, args: Args):
         output_context = OutputLocalFilesContext(output_dir)
 
         logger.info("Processing asset..")
-        edps_service = Service()
-        await edps_service.analyse_asset(temp_raw_data_file, edps_config, output_context)
+        ctx = SimpleTaskContext(logger, output_context)
+        await Service().analyse_asset(ctx, edps_config, temp_raw_data_file)
 
         logger.info("Zipping EDP..")
         target_archive = args.output_dir / f"{sanitize_file_part(user_edp_data.assetId)}.zip"
