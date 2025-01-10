@@ -9,6 +9,7 @@ env:
     OPENAPI_SCHEMA: edps_openapi_${{ github.ref_name }}.json
     IMAGE_PATH: beebucket/edps
     WHEEL_NAME: edps.whl
+    LICENSES_ARTIFACT_NAME: licenses.csv
 
 jobs:
     build_wheel:
@@ -75,13 +76,13 @@ jobs:
         -   name: Install
             run: pip install .[test]
         -   name: Run pip-licenses
-            run: pip-licenses --format=csv --with-url --order=license | tee license-report.csv
+            run: pip-licenses --format=csv --with-url --order=license | tee ${{ env.LICENSES_ARTIFACT_NAME }}
 
         -   name: Upload License Report
             uses: actions/upload-artifact@v4
             with:
-                name: license-report
-                path: license-report.csv
+                name: ${{ env.LICENSES_ARTIFACT_NAME }}
+                path: ${{ env.LICENSES_ARTIFACT_NAME }}
 
     build_and_release_docker:
         runs-on: ubuntu-24.04
@@ -142,6 +143,7 @@ jobs:
         -   build_wheel
         -   generate_schemas
         -   build_and_release_docker
+        -   license_report
         env:
             ARTIFACTS_DIR: ${{ github.workspace }}/release_artifacts
         steps:
@@ -158,6 +160,10 @@ jobs:
         -   uses: actions/download-artifact@v4
             with:
                 name: ${{ env.OPENAPI_SCHEMA }}
+                path: ${{ env.ARTIFACTS_DIR }}
+        -   uses: actions/download-artifact@v4
+            with:
+                name: ${{ env.LICENSES_ARTIFACT_NAME }}
                 path: ${{ env.ARTIFACTS_DIR }}
         -   name: Release
             uses: softprops/action-gh-release@v2
