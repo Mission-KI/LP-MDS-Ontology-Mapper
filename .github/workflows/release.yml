@@ -84,7 +84,7 @@ jobs:
         -   name: Install
             run: pip install ${{ steps.download_wheel.outputs.download-path }}[test]
         -   name: Run pip-licenses
-            run: pip-licenses --format=csv --with-url --order=license --output-file ${{ env.LICENSES_ARTIFACT_NAME }}
+            run: pip-licenses --format=csv --with-url --with-authors --order=license --output-file ${{ env.LICENSES_ARTIFACT_NAME }}
         -   name: Upload License Report
             uses: actions/upload-artifact@v4
             with:
