@@ -15,6 +15,10 @@ and create a draft for a release. You can then review it and decide to publish o
 
 See [Scripts README](scripts/README.md).
 
+## Docker
+
+See [Docker README](docker/README.md).
+
 # Job API
 
 See [Job API README](edp/job/README.md).
