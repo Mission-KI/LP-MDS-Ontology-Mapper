@@ -1,6 +1,7 @@
 services:
   edps:
     image: beebucket/edps:${EDPS_VERSION}
+    entrypoint: edps_jobapi
     # deploy:
     #   resources:
     #     limits:
