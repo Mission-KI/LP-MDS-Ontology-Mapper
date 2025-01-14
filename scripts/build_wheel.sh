@@ -1,6 +1,8 @@
-# !/bin/bash
+#!/bin/bash
 
 set -euo pipefail
+
+pushd $(dirname "$0")/..
 
 DISTRIBUTION_DIR="./dist"
 
