@@ -1,6 +1,6 @@
 services:
   edps:
-    image: beebucket/edps:latest
+    image: beebucket/edps:${EDPS_VERSION}
     # deploy:
     #   resources:
     #     limits:
@@ -24,7 +24,7 @@ services:
       DB_URL: "postgresql+pg8000://${DB_USER}:${DB_PASSWORD}@edps-db:5432/${DB_NAME}"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.edp.rule=Host(`${HOSTNAME}`)"
+      - "traefik.http.routers.edp.rule=Host(`${TRAEFIK_HOSTNAME}`)"
       - "traefik.http.routers.edp.entrypoints=websecure"
       - "traefik.http.routers.edp.tls=true"
       - "traefik.http.routers.edp.tls.certresolver=letsencrypt"
@@ -46,7 +46,7 @@ services:
       # alternative challenge mechanism via http
       # - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${CERT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_CERT_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
