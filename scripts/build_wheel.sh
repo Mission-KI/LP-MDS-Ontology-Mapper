@@ -4,7 +4,7 @@ set -euo pipefail
 
 DISTRIBUTION_DIR="./dist"
 
-rm -rf ${DISTRIBUTION_DIR} build *.egg-info **/__pycache__
+rm -rf ${DISTRIBUTION_DIR} build **/*.egg-info **/__pycache__
 mkdir -p ${DISTRIBUTION_DIR}
 echo "${VERSION}" > "${DISTRIBUTION_DIR}/VERSION.txt"
 pip wheel build --no-deps --no-input --no-binary :all: --wheel-dir ${DISTRIBUTION_DIR} .
