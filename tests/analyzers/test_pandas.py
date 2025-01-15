@@ -1,6 +1,6 @@
 from pandas import DataFrame
 
-from edp.analyzers.pandas import _COMMON_UNIQUE, _get_correlation_graph
+from edps.analyzers.pandas import _COMMON_UNIQUE, _get_correlation_graph
 
 
 async def test_correlation(ctx):

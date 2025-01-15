@@ -7,7 +7,7 @@ from typing import Union, get_args, get_origin
 
 from pydantic import AnyUrl, BaseModel
 
-from edp.types import ExtendedDatasetProfile
+from edps.types import ExtendedDatasetProfile
 
 logger = getLogger(__name__)
 

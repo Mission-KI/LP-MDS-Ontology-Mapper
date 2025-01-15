@@ -6,7 +6,7 @@ import pandas as pd
 from pandas import DataFrame, Series, Timestamp
 from pytest import fixture, mark
 
-from edp.analyzers.pandas.type_parser import (
+from edps.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
     DatetimeIsoColumnInfo,
     DatetimeKind,
@@ -15,7 +15,7 @@ from edp.analyzers.pandas.type_parser import (
     StringColumnInfo,
     parse_types,
 )
-from edp.task import SimpleTaskContext
+from edps.task import SimpleTaskContext
 from tests.conftest import DummyOutputContext
 
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from edp.file import File
-from edp.importers.pandas import csv_importer, xls_importer, xlsx_importer
+from edps.file import File
+from edps.importers.pandas import csv_importer, xls_importer, xlsx_importer
 
 DIR = Path(__file__).parent.parent
 CSV_PATH = DIR / "data/test.csv"

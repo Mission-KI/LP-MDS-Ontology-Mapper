@@ -1,6 +1,6 @@
 from logging import getLogger
 
-from edp.task import SimpleTaskContext, TaskContext
+from edps.task import SimpleTaskContext, TaskContext
 
 
 async def test_task(output_context):

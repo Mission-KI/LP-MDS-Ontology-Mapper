@@ -4,8 +4,8 @@ from logging import getLogger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from edp.pontusx.args import get_args
-from edp.pontusx.service import run_service
+from pontusx.args import get_args
+from pontusx.service import run_service
 
 # PYTHON_BIN: str = sys.executable
 EDPS_DIR = Path(__file__).parent.parent.parent

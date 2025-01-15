@@ -6,9 +6,9 @@ from typing import AsyncIterator, Tuple
 from matplotlib.axes import Axes
 from pytest import fixture
 
-from edp.context import OutputContext, OutputDaseenContext, OutputLocalFilesContext
-from edp.task import SimpleTaskContext
-from edp.types import ExtendedDatasetProfile, FileReference
+from edps.context import OutputContext, OutputDaseenContext, OutputLocalFilesContext
+from edps.task import SimpleTaskContext
+from edps.types import ExtendedDatasetProfile, FileReference
 
 DIR = Path(__file__).parent.absolute()
 

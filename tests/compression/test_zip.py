@@ -2,7 +2,7 @@ from zipfile import ZipFile
 
 from pytest import mark, raises
 
-from edp.compression.zip import ZipAlgorithm
+from edps.compression.zip import ZipAlgorithm
 
 
 @mark.asyncio

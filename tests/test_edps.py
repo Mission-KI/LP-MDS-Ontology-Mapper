@@ -4,8 +4,8 @@ from typing import Awaitable, Callable, List
 
 from pytest import fixture, mark, raises
 
-from edp import Service
-from edp.types import (
+from edps import Service
+from edps.types import (
     Augmentation,
     AugmentedColumn,
     ComputedEdpData,
