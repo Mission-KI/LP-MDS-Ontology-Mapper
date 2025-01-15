@@ -7,7 +7,7 @@ RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
     --mount=type=bind,src=dist,target=${WHEELS_DIR},readonly \
     python3 -m venv /venv && \
     /venv/bin/pip install --upgrade pip && \
-    /venv/bin/pip install ${WHEELS_DIR}/edp*.whl
+    /venv/bin/pip install ${WHEELS_DIR}/edps*.whl
 
 # Second Stage: Production environment
 FROM python:3.12-slim AS runner

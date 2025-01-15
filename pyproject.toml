@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "edp"
+name = "edps"
 dynamic = ["version"]
 authors = [
     { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
@@ -43,10 +43,10 @@ dependencies = [
 ]
 
 [project.scripts]
-export_edps_schema = "edp.types:export_edp_schema"
-export_openapi_schema = "edp.__main__:cmdline_export_openapi_schema"
-edps = "edp.__main__:main"
-pontusx = "edp.pontusx.__main__:main"
+export_edps_schema = "edps.types:export_edp_schema"
+export_openapi_schema = "jobapi.__main__:cmdline_export_openapi_schema"
+edps = "jobapi.__main__:main"
+pontusx = "pontusx.__main__:main"
 
 [project.optional-dependencies]
 test = [
@@ -64,15 +64,13 @@ test = [
     "pre-commit>=4.0.1",
     "pip-licenses>=5.0.0",
 ]
-dev = ["edp[test]"]
+dev = ["edps[test]"]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["edp*"]
-exclude = ["test*"]
+where = ["src"]
 
 [tool.setuptools.package-data]
-"edp" = ["styles/*.mplstyle"]
+"edps" = ["styles/*.mplstyle"]
 
 [tool.setuptools.dynamic]
 version = { file = "dist/VERSION.txt" }
@@ -119,7 +117,7 @@ ignore_missing_imports = true
 [tool.pip-licenses]
 from = "classifier"
 ignore-packages = [
-    "edp",
+    "edps",
     "chardet",
     "fitter",
 ]

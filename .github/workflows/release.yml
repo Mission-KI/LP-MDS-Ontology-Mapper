@@ -31,7 +31,7 @@ jobs:
         -   uses: actions/upload-artifact@v4
             with:
                 name: ${{ env.WHEEL_NAME }}
-                path: "${{ env.DISTRIBUTION_DIR }}/edp*.whl"
+                path: "${{ env.DISTRIBUTION_DIR }}/edps*.whl"
                 if-no-files-found: error
 
     generate_schemas:
