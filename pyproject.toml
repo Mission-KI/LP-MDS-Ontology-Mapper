@@ -43,10 +43,10 @@ dependencies = [
 ]
 
 [project.scripts]
-export_edps_schema = "edps.types:export_edp_schema"
-export_openapi_schema = "jobapi.__main__:cmdline_export_openapi_schema"
-edps = "jobapi.__main__:main"
-pontusx = "pontusx.__main__:main"
+edps_export_edp_schema = "edps.types:export_edp_schema"
+edps_export_openapi_schema = "jobapi.__main__:cmdline_export_openapi_schema"
+edps_jobapi = "jobapi.__main__:main"
+edps_pontusx = "pontusx.__main__:main"
 
 [project.optional-dependencies]
 test = [

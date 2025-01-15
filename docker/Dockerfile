@@ -35,4 +35,4 @@ ENV WORKING_DIR=/work
 USER appuser
 
 # Start the application
-CMD ["edps"]
+CMD ["edps_jobapi"]

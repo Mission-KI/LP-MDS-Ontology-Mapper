@@ -53,13 +53,13 @@ jobs:
         -   name: Install
             run: pip install ${{ steps.download_wheel.outputs.download-path }}
         -   name: Generate EDPS Schema
-            run: export_edps_schema --output ${{ env.EDPS_SCHEMA }}
+            run: edps_export_edp_schema --output ${{ env.EDPS_SCHEMA }}
         -   uses: actions/upload-artifact@v4
             with:
                 name: ${{ env.EDPS_SCHEMA }}
                 path: ${{ env.EDPS_SCHEMA }}
         -   name: Generate OpenAPI Schema
-            run: export_openapi_schema --output ${{ env.OPENAPI_SCHEMA }}
+            run: edps_export_openapi_schema --output ${{ env.OPENAPI_SCHEMA }}
         -   uses: actions/upload-artifact@v4
             with:
                 name: ${{ env.OPENAPI_SCHEMA }}
