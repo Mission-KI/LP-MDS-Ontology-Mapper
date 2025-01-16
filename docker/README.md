@@ -4,8 +4,8 @@
 
 In this directory you find the generic EDPS Dockerfile which is used for both the *Job API* and the *Pontus-X CLI*. The use-case is selected via entrypoint:
 
-- Job API: `edps` (see [Job API README](../edp/job/README.md))
-- Pontus-X CLI: `pontusx` (see [Pontus-X CLI README](../edp/pontusx/README.md))
+- Job API: `edps_jobapi` (see [Job API README](../src/jobapi/README.md))
+- Pontus-X CLI: `edps_pontusx` (see [Pontus-X CLI README](../src/pontusx/README.md))
 
 ## Docker Compose for Job API
 

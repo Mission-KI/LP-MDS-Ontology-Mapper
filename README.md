@@ -21,8 +21,8 @@ See [Docker README](docker/README.md).
 
 # Job API
 
-See [Job API README](edp/job/README.md).
+See [Job API README](src/jobapi/README.md).
 
 # Pontus-X CLI
 
-See [Pontus-X CLI README](edp/pontusx/README.md).
+See [Pontus-X CLI README](src/pontusx/README.md).
