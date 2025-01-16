@@ -7,16 +7,13 @@ from tempfile import TemporaryDirectory
 from pontusx.args import get_args
 from pontusx.service import run_service
 
-# PYTHON_BIN: str = sys.executable
-EDPS_DIR = Path(__file__).parent.parent.parent
-TEST_DATA_DIR = EDPS_DIR / "tests/data"
 DID = "did230948"
 
 
 _logger = getLogger(__file__)
 
 
-async def test_cli():
+async def test_cli(path_data_test_csv, path_data_pontusx_ddo, path_data_pontusx_algocustomdata):
     with TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
         _logger.info("Preparing Pontux-X container data dir: %s", temp_dir)
@@ -25,15 +22,15 @@ async def test_cli():
         (temp_dir_path / f"inputs/{DID}").mkdir(parents=True)
         (temp_dir_path / "outputs").mkdir()
         # Copy DDO to DATA/ddos/DID (without file-extension)
-        shutil.copy(TEST_DATA_DIR / "pontusx/ddo.json", temp_dir_path / f"ddos/{DID}")
+        shutil.copy(path_data_pontusx_ddo, temp_dir_path / f"ddos/{DID}")
         # Copy algoCustomData.json to DATA/inputs/algoCustomData.json
         shutil.copy(
-            TEST_DATA_DIR / "pontusx/algoCustomData.json",
+            path_data_pontusx_algocustomdata,
             temp_dir_path / "inputs/algoCustomData.json",
         )
         # Copy test.csv to DATA/inputs/0 (without file-extension)
         shutil.copy(
-            TEST_DATA_DIR / "test.csv",
+            path_data_test_csv,
             temp_dir_path / f"inputs/{DID}/0",
         )
 

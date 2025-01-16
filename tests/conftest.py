@@ -10,21 +10,60 @@ from edps.context import OutputContext, OutputDaseenContext, OutputLocalFilesCon
 from edps.task import SimpleTaskContext
 from edps.types import ExtendedDatasetProfile, FileReference
 
-DIR = Path(__file__).parent.absolute()
-
-_OUTPUT_PATH = DIR.parent / "output"
+TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
 
 @fixture
-def output_directory():
-    if not _OUTPUT_PATH.exists():
-        _OUTPUT_PATH.mkdir()
-    yield _OUTPUT_PATH
+def path_output():
+    path = TESTS_ROOT_PATH.parent / "output"
+    if not path.exists():
+        path.mkdir()
+    yield path
 
 
 @fixture
-def output_context(output_directory):
-    return OutputLocalFilesContext(output_directory)
+def path_data_test_csv():
+    return TESTS_ROOT_PATH / "data/test.csv"
+
+
+@fixture
+def path_data_test_headerless_csv():
+    return TESTS_ROOT_PATH / "data/test_headerless.csv"
+
+
+@fixture
+def path_data_test_pickle():
+    return TESTS_ROOT_PATH / "data/test.pickle"
+
+
+@fixture
+def path_data_test_xls():
+    return TESTS_ROOT_PATH / "data/test.xls"
+
+
+@fixture
+def path_data_test_xlsx():
+    return TESTS_ROOT_PATH / "data/test.xlsx"
+
+
+@fixture
+def path_data_test_zip():
+    return TESTS_ROOT_PATH / "data/test.zip"
+
+
+@fixture
+def path_data_pontusx_algocustomdata():
+    return TESTS_ROOT_PATH / "data/pontusx/algoCustomData.json"
+
+
+@fixture
+def path_data_pontusx_ddo():
+    return TESTS_ROOT_PATH / "data/pontusx/ddo.json"
+
+
+@fixture
+def output_context(path_output):
+    return OutputLocalFilesContext(path_output)
 
 
 @fixture
@@ -33,12 +72,12 @@ def ctx(output_context):
 
 
 @fixture
-def daseen_output_context(monkeypatch, output_directory):
+def daseen_output_context(monkeypatch, path_output):
     with monkeypatch.context() as monkey:
         monkey.setattr(OutputDaseenContext, "_upload_to_elastic", lambda *args: None)
         monkey.setattr(OutputDaseenContext, "_upload_to_s3", lambda *args: None)
         yield OutputDaseenContext(
-            local_path=output_directory,
+            local_path=path_output,
             s3_access_key_id="ABC",
             s3_secret_access_key="PW",
             s3_bucket_name="dummybucket",

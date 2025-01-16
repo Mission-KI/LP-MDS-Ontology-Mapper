@@ -3,15 +3,9 @@ from pathlib import Path
 from edps.file import File
 from edps.importers.pandas import csv_importer, xls_importer, xlsx_importer
 
-DIR = Path(__file__).parent.parent
-CSV_PATH = DIR / "data/test.csv"
-CSV_HEADERLESS_PATH = DIR / "data/test_headerless.csv"
-XLSX_PATH: Path = DIR / "data/test.xlsx"
-XLS_PATH: Path = DIR / "data/test.xls"
 
-
-async def test_import_csv(ctx):
-    file = get_file(CSV_PATH)
+async def test_import_csv(path_data_test_csv, ctx):
+    file = get_file(path_data_test_csv)
     analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     row_count = len(data.index)
@@ -22,8 +16,8 @@ async def test_import_csv(ctx):
     assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
-async def test_import_csv_no_headers(ctx):
-    file = get_file(CSV_HEADERLESS_PATH)
+async def test_import_csv_no_headers(path_data_test_headerless_csv, ctx):
+    file = get_file(path_data_test_headerless_csv)
     analyzer = await ctx.exec(csv_importer, file)
     data = analyzer._data
     row_count = len(data.index)
@@ -78,8 +72,8 @@ async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
     }
 
 
-async def test_import_xlsx(ctx):
-    file = get_file(XLSX_PATH)
+async def test_import_xlsx(path_data_test_xlsx, ctx):
+    file = get_file(path_data_test_xlsx)
     analyzer = await ctx.exec(xlsx_importer, file)
     data = analyzer._data
     row_count = len(data.index)
@@ -90,8 +84,8 @@ async def test_import_xlsx(ctx):
     assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
-async def test_import_xls(ctx):
-    file = get_file(XLS_PATH)
+async def test_import_xls(path_data_test_xls, ctx):
+    file = get_file(path_data_test_xls)
     analyzer = await ctx.exec(xls_importer, file)
     data = analyzer._data
     row_count = len(data.index)

@@ -20,14 +20,7 @@ from edps.types import (
     UserProvidedEdpData,
 )
 
-DIR = Path(__file__).parent
 ENCODING = "utf-8"
-CSV_PATH: Path = DIR / "data/test.csv"
-CSV_HEADERLESS_PATH = DIR / "data/test_headerless.csv"
-XLSX_PATH: Path = DIR / "data/test.xlsx"
-XLS_PATH: Path = DIR / "data/test.xls"
-PICKLE_PATH = DIR / "data/test.pickle"
-ZIP_PATH = DIR / "data/test.zip"
 
 
 @fixture
@@ -75,8 +68,8 @@ async def test_load_unknown_dir(analyse_asset_fn):
         await analyse_asset_fn(Path("/does/not/exist/"))
 
 
-async def test_analyse_pickle(compute_asset_fn, config_data):
-    computed_data = await compute_asset_fn(PICKLE_PATH)
+async def test_analyse_pickle(path_data_test_pickle, compute_asset_fn, config_data):
+    computed_data = await compute_asset_fn(path_data_test_pickle)
 
     assert len(computed_data.structuredDatasets) == 1
     assert computed_data.periodicity == "hours"
@@ -108,8 +101,8 @@ async def test_analyse_pickle(compute_asset_fn, config_data):
 
 
 @mark.asyncio
-async def test_analyse_csv(compute_asset_fn):
-    edp = await compute_asset_fn(CSV_PATH)
+async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_csv)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -125,8 +118,8 @@ async def test_analyse_csv(compute_asset_fn):
 
 
 @mark.asyncio
-async def test_analyse_roundtrip_csv(analyse_asset_fn, output_context, config_data):
-    edp_file = await analyse_asset_fn(CSV_PATH)
+async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, output_context, config_data):
+    edp_file = await analyse_asset_fn(path_data_test_csv)
     edp_file_path = output_context.build_full_path(edp_file)
     edp = read_edp_file(edp_file_path)
     assert edp.assetId == config_data.userProvidedEdpData.assetId
@@ -135,10 +128,10 @@ async def test_analyse_roundtrip_csv(analyse_asset_fn, output_context, config_da
 
 
 @mark.asyncio
-async def test_analyse_csv_no_headers(ctx, user_provided_data, output_context):
+async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data, output_context):
     # We can't use the default config.
     config_data = Config(userProvidedEdpData=user_provided_data)
-    edp = await Service()._compute_asset(ctx, config_data, CSV_HEADERLESS_PATH)
+    edp = await Service()._compute_asset(ctx, config_data, path_data_test_headerless_csv)
 
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
@@ -155,8 +148,8 @@ async def test_analyse_csv_no_headers(ctx, user_provided_data, output_context):
 
 
 @mark.asyncio
-async def test_analyse_xlsx(compute_asset_fn):
-    edp = await compute_asset_fn(XLSX_PATH)
+async def test_analyse_xlsx(path_data_test_xlsx, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_xlsx)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -172,8 +165,8 @@ async def test_analyse_xlsx(compute_asset_fn):
 
 
 @mark.asyncio
-async def test_analyse_xls(compute_asset_fn):
-    edp = await compute_asset_fn(XLS_PATH)
+async def test_analyse_xls(path_data_test_xls, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_xls)
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -189,8 +182,8 @@ async def test_analyse_xls(compute_asset_fn):
 
 
 @mark.asyncio
-async def test_analyse_zip(compute_asset_fn):
-    edp = await compute_asset_fn(ZIP_PATH)
+async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_zip)
     assert "zip" in edp.compression.algorithms
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -206,8 +199,8 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
 
 
 @mark.asyncio
-async def test_analyse_csv_daseen_context(ctx, daseen_output_context, config_data):
-    await Service().analyse_asset(ctx, config_data, CSV_PATH)
+async def test_analyse_csv_daseen_context(path_data_test_csv, ctx, daseen_output_context, config_data):
+    await Service().analyse_asset(ctx, config_data, path_data_test_csv)
 
 
 def _assert_pickle_temporal_consistencies(
