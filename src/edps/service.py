@@ -5,8 +5,10 @@ from shutil import rmtree
 from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
+from pandas import DataFrame
 from pydantic import BaseModel
 
+from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import File, calculate_size
 from edps.importers import IMPORTERS
@@ -218,17 +220,23 @@ class Service:
         return TemporalCover(earliest=earliest, latest=latest)
 
     def _get_overall_temporal_consistency(self, edp: ComputedEdpData) -> Optional[str]:
+        all_temporal_consistencies = list(self._iterate_all_temporal_consistencies(edp))
+        if len(all_temporal_consistencies) == 0:
+            return None
+        sum_temporal_consistencies = sum(all_temporal_consistencies[1:], all_temporal_consistencies[0])
+        return determine_periodicity(
+            sum_temporal_consistencies["numberOfGaps"], sum_temporal_consistencies["differentAbundancies"]
+        )
+
+    def _iterate_all_temporal_consistencies(self, edp: ComputedEdpData) -> Iterator[DataFrame]:
         for dataset in edp.structuredDatasets:
-            if dataset.primaryDatetimeColumn is not None:
-                try:
-                    column = next(
-                        (column for column in dataset.datetimeColumns if column.name == dataset.primaryDatetimeColumn)
-                    )
-                except StopIteration:
-                    continue
-                if column.periodicity:
-                    return column.periodicity
-        return None
+            for row in dataset.datetimeColumns:
+                dataframe = DataFrame(
+                    index=[item.timeScale for item in row.temporalConsistencies],
+                )
+                dataframe["differentAbundancies"] = [item.differentAbundancies for item in row.temporalConsistencies]
+                dataframe["numberOfGaps"] = [item.numberOfGaps for item in row.temporalConsistencies]
+                yield dataframe
 
 
 def _as_dict(model: BaseModel):

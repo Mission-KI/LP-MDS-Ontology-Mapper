@@ -2,7 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, Optional, Union
+from typing import Any, Dict, Iterator, Optional, Tuple, Union
 
 from numpy import any as numpy_any
 from pandas import DataFrame, Index, Series, StringDtype, to_datetime, to_numeric
@@ -202,6 +202,10 @@ class ColumnsWrapper[TColumnInfo: ColumnInfo]:
 
     def get_col(self, id: str) -> Series:
         return self._all_data.loc[:, id]
+
+    def __iter__(self) -> Iterator[Tuple[str, TColumnInfo, Series]]:
+        for column_name, info in self._infos.items():
+            yield column_name, info, self._all_data[column_name]
 
 
 class Result:

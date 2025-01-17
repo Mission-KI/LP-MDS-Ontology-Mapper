@@ -15,7 +15,6 @@ from matplotlib.pyplot import get_cmap
 from numpy import count_nonzero, linspace, ones_like, triu
 from pandas import (
     DataFrame,
-    DatetimeIndex,
     Series,
     Timedelta,
     UInt64Dtype,
@@ -28,7 +27,9 @@ from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edps.analyzers.base import Analyzer
 from edps.analyzers.pandas.type_parser import (
+    ColumnsWrapper,
     DatetimeColumnInfo,
+    DatetimeKind,
     parse_types,
 )
 from edps.file import File
@@ -119,11 +120,14 @@ class _DatetimeColumnTemporalConsistency:
         self,
         period: str,
         temporal_consistencies: List[TemporalConsistency],
-        cleaned_index: DatetimeIndex,
+        cleaned_series: Series,
     ) -> None:
         self.period = period
         self.temporal_consistencies = temporal_consistencies
-        self.cleaned_index = cleaned_index
+        self.cleaned_series = cleaned_series
+
+    def get_main_temporal_consistency(self) -> TemporalConsistency:
+        return self.__getitem__(self.period)
 
     def __getitem__(self, period: str) -> TemporalConsistency:
         try:
@@ -164,34 +168,24 @@ class Pandas(Analyzer):
         datetime_common_fields = common_fields.loc[datetime_cols.ids]
         datetime_fields = await self._compute_datetime_fields(ctx, datetime_cols.data)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
-        datetime_index = await _determine_datetime_index(ctx, datetime_cols.data)
-        datetime_column_name: Optional[str] = None
-        datetime_column_periodicity: Optional[_DatetimeColumnTemporalConsistency] = None
-        if datetime_index is not None:
-            ctx.logger.info('Using "%s" as index', datetime_index.name)
-            type_parser_results.set_index(datetime_index)
-            datetime_column_name = str(datetime_index.name)
-            datetime_column_periodicity = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY][datetime_column_name]
 
         numeric_cols = type_parser_results.numeric_cols
         numeric_common_fields = common_fields.loc[numeric_cols.ids]
-        numeric_fields = await self._compute_numeric_fields(
-            ctx,
-            numeric_cols.data,
-            numeric_common_fields,
-            datetime_column_periodicity,
-        )
+        numeric_fields = await self._compute_numeric_fields(ctx, numeric_cols.data, numeric_common_fields)
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
         string_cols = type_parser_results.string_cols
         string_fields = common_fields.loc[string_cols.ids]
+
+        timebase_periodicities = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY]
+        seasonality_results = await _compute_seasonality(ctx, datetime_cols, timebase_periodicities, numeric_cols.data)
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
                 ctx,
                 numeric_cols.get_col(id),
                 _get_single_row(id, numeric_fields),
-                datetime_column_name,
+                _get_single_row(id, seasonality_results),
             )
             for id in numeric_cols.ids
         ]
@@ -239,7 +233,6 @@ class Pandas(Analyzer):
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
             correlationGraph=correlation_graph,
-            primaryDatetimeColumn=datetime_column_name,
         )
 
     async def _compute_common_fields(self, columns: DataFrame) -> DataFrame:
@@ -254,7 +247,6 @@ class Pandas(Analyzer):
         ctx: TaskContext,
         columns: DataFrame,
         common_fields: DataFrame,
-        index_column_periodicity: Optional[_DatetimeColumnTemporalConsistency],
     ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
@@ -303,8 +295,6 @@ class Pandas(Analyzer):
             ],
             axis=1,
         )
-        if isinstance(columns.index, DatetimeIndex) and (index_column_periodicity is not None):
-            fields[_NUMERIC_SEASONALITY] = await _get_seasonalities(ctx, columns, index_column_periodicity)
         return fields
 
     async def _compute_datetime_fields(self, ctx: TaskContext, columns: DataFrame) -> DataFrame:
@@ -323,11 +313,7 @@ class Pandas(Analyzer):
         return computed
 
     async def _transform_numeric_results(
-        self,
-        ctx: TaskContext,
-        column: Series,
-        computed_fields: Series,
-        datetime_index_column: Optional[str],
+        self, ctx: TaskContext, column: Series, computed_fields: Series, seasonality_results: Series
     ) -> NumericColumn:
         ctx.logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         column_plot_base = self._file.output_reference + "_" + str(column.name)
@@ -373,22 +359,18 @@ class Pandas(Analyzer):
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
             )
 
-        if (
-            (_NUMERIC_SEASONALITY in computed_fields.index)
-            and (computed_fields[_NUMERIC_SEASONALITY] is not None)
-            and (datetime_index_column is not None)
-        ):
+        for datetime_column_name, seasonality in seasonality_results.items():
             seasonality_graphs = await _get_seasonality_graphs(
                 ctx,
                 str(column.name),
                 column_plot_base,
-                datetime_index_column,
-                computed_fields[_NUMERIC_SEASONALITY],
+                str(datetime_column_name),
+                seasonality,
             )
-            column_result.original_series = [seasonality_graphs.original]
-            column_result.trends = [seasonality_graphs.trend]
-            column_result.seasonalities = [seasonality_graphs.seasonality]
-            column_result.residuals = [seasonality_graphs.residual]
+            column_result.original_series.append(seasonality_graphs.original)
+            column_result.trends.append(seasonality_graphs.trend)
+            column_result.seasonalities.append(seasonality_graphs.seasonality)
+            column_result.residuals.append(seasonality_graphs.residual)
         return column_result
 
     async def _transform_datetime_results(
@@ -437,19 +419,22 @@ async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -
 
 
 async def _compute_temporal_consistency(ctx: TaskContext, columns: DataFrame) -> Series:
-    return Series(
-        {name: _compute_temporal_consistency_for_column(ctx, DatetimeIndex(columns[name])) for name in columns.columns}
-    )
+    return Series({name: _compute_temporal_consistency_for_column(ctx, column) for name, column in columns.items()})
+
+
+def determine_periodicity(gaps: Series, distincts: Series) -> str:
+    diff = distincts - gaps
+    return str(diff.idxmax())
 
 
 def _compute_temporal_consistency_for_column(
-    ctx: TaskContext, index: DatetimeIndex
+    ctx: TaskContext, column: Series
 ) -> Optional[_DatetimeColumnTemporalConsistency]:
-    index = index.sort_values(ascending=True)
-    row_count = len(index)
+    column = column.sort_values(ascending=True)
+    row_count = len(column)
 
     TIME_BASE_THRESHOLD = 15
-    unique_timestamps = index.nunique()
+    unique_timestamps = column.nunique()
     if unique_timestamps < TIME_BASE_THRESHOLD:
         message = (
             "Can not analyze temporal consistency, time base contains too few unique timestamps. "
@@ -460,8 +445,8 @@ def _compute_temporal_consistency_for_column(
         return None
 
     # Remove null entries
-    index = index[index.notnull()]  # type: ignore
-    new_count = len(index)
+    column = column[column.notnull()]  # type: ignore
+    new_count = len(column)
     if new_count < row_count:
         empty_index_count = row_count - new_count
         message = f"Filtered out {empty_index_count} rows, because their index was empty"
@@ -481,18 +466,17 @@ def _compute_temporal_consistency_for_column(
         "years": Timedelta(days=365),
     }
 
-    deltas = index[1:] - index[:-1]
+    deltas = column.diff()[1:]
     gaps = Series(
         {label: count_nonzero(deltas > time_base) for label, time_base in granularities.items()},
         dtype=UInt64Dtype(),
     )
     distincts = Series(
-        {label: len(index.round(time_base).unique()) for label, time_base in granularities.items()},  # type: ignore
+        {label: column.dt.round(time_base).nunique() for label, time_base in granularities.items()},  # type: ignore
         dtype=UInt64Dtype(),
     )
     stable = distincts == 1
-    diff = distincts - gaps
-    periodicity: str = diff.idxmax()  # type: ignore
+    periodicity = determine_periodicity(gaps, distincts)
     temporal_consistencies = [
         TemporalConsistency(
             timeScale=time_base,
@@ -503,7 +487,7 @@ def _compute_temporal_consistency_for_column(
         for time_base in granularities
     ]
 
-    return _DatetimeColumnTemporalConsistency(periodicity, temporal_consistencies, index)
+    return _DatetimeColumnTemporalConsistency(periodicity, temporal_consistencies, column)
 
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
@@ -658,53 +642,49 @@ async def _get_correlation_graph(
     return reference
 
 
-async def _determine_datetime_index(ctx: TaskContext, columns: DataFrame) -> Optional[DatetimeIndex]:
-    # TODO: Remove this function. In future release, there will not be any single primary date time column.
-    #       All date time columns will be evaluated against all numeric rows rows for analysis.
-    frequency = "infer"
-    number_columns = len(columns.columns)
-    if number_columns == 0:
-        return None
-
-    if number_columns == 1:
-        return DatetimeIndex(data=columns.iloc[:, 0], freq=frequency)
-
-    for _, column in columns.items():
-        if column.is_monotonic_increasing:
-            return DatetimeIndex(data=column, freq=frequency)
-
-    for _, column in columns.items():
-        if column.is_monotonic_decreasing:
-            return DatetimeIndex(data=column, freq=frequency)
-
-    first_column = columns.iloc[:, 0]
-    warning_text = f'Did not find a monotonic datetime column, will use "{first_column.name}" as index'
-    ctx.logger.warning(warning_text)
-    warn(warning_text, RuntimeWarning)
-    return DatetimeIndex(data=first_column, freq=frequency)
-
-
-async def _get_seasonalities(
+async def _compute_seasonality(
     ctx: TaskContext,
-    columns: DataFrame,
-    index_column_periodicity: _DatetimeColumnTemporalConsistency,
-) -> Series:
-    row_count = len(columns.index)
-    ctx.logger.info("Starting seasonality analysis on %d rows", row_count)
+    datetime_columns: ColumnsWrapper[DatetimeColumnInfo],
+    datetime_column_periodicities: Series,
+    numeric_columns: DataFrame,
+) -> DataFrame:
+    datetime_count = len(datetime_columns.ids)
+    row_count = len(numeric_columns.index)
+    ctx.logger.info("Starting seasonality analysis on %d rows over %d time bases", row_count, datetime_count)
 
-    filtered_columns = columns.loc[index_column_periodicity.cleaned_index]
-    distincts = index_column_periodicity[index_column_periodicity.period].differentAbundancies
-    series: Series = Series(
-        {
-            name: _seasonal_decompose_column(column=column, distinct_count=distincts)
-            for name, column in filtered_columns.items()
-        }
-    )
-    ctx.logger.info(
-        "Finished seasonality analysis, found highest periodicity at %s level",
-        index_column_periodicity.period,
-    )
-    return series
+    dataframe = DataFrame(index=numeric_columns.columns, columns=datetime_columns.ids, dtype=object)
+
+    periodicity: _DatetimeColumnTemporalConsistency
+    for datetime_column_name, periodicity in datetime_column_periodicities.items():
+        datetime_type = datetime_columns.get_info(str(datetime_column_name))
+
+        if datetime_type == DatetimeKind.DATE:
+            message = (
+                f'Column "{datetime_column_name}" has date only format. This might impede the seasonality analysis. '
+                "To fix this, supply it as datetime, preferably in the ISO8601 format."
+            )
+            warn(message)
+            ctx.logger.warning(message)
+        elif datetime_type == DatetimeKind.TIME:
+            message = (
+                f'Column "{datetime_column_name}" has time only format. It will be skipped for seasonality analysis'
+            )
+            warn(message)
+            ctx.logger.warning(message)
+            continue
+
+        different_abundances = periodicity.get_main_temporal_consistency().differentAbundancies
+        filtered_numeric_columns = numeric_columns.loc[periodicity.cleaned_series.index].set_index(
+            periodicity.cleaned_series, inplace=False
+        )
+
+        for numeric_column_name, numeric_column in filtered_numeric_columns.items():
+            dataframe.loc[str(numeric_column_name), str(datetime_column_name)] = _seasonal_decompose_column(
+                numeric_column, different_abundances
+            )
+
+    ctx.logger.info("Finished seasonality analysis.")
+    return dataframe
 
 
 def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[DecomposeResult]:
@@ -722,7 +702,7 @@ async def _get_seasonality_graphs(
     ctx: TaskContext,
     column_name: str,
     column_plot_base: str,
-    time_base_column: str,
+    time_base_column_name: str,
     seasonality: DecomposeResult,
 ) -> _PerTimeBaseSeasonalityGraphs:
     xlim = seasonality._observed.index[0], seasonality._observed.index[-1]
@@ -730,8 +710,8 @@ async def _get_seasonality_graphs(
     @asynccontextmanager
     async def get_plot(plot_type: str):
         async with ctx.output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
-            axes.set_title(f"{plot_type} of {column_name} over {time_base_column}")
-            axes.set_xlabel(time_base_column)
+            axes.set_title(f"{plot_type} of {column_name} over {time_base_column_name}")
+            axes.set_xlabel(time_base_column_name)
             axes.set_ylabel(f"{plot_type} of {column_name}")
             if axes.figure:
                 axes.set_xlim(xlim)
@@ -753,8 +733,8 @@ async def _get_seasonality_graphs(
         axes.plot(xlim, (0, 0), zorder=-3)
 
     return _PerTimeBaseSeasonalityGraphs(
-        original=TimeBasedGraph(timeBaseColumn=time_base_column, file=original_reference),
-        trend=TimeBasedGraph(timeBaseColumn=time_base_column, file=trend_reference),
-        seasonality=TimeBasedGraph(timeBaseColumn=time_base_column, file=seasonal_reference),
-        residual=TimeBasedGraph(timeBaseColumn=time_base_column, file=residual_reference),
+        original=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=original_reference),
+        trend=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=trend_reference),
+        seasonality=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=seasonal_reference),
+        residual=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=residual_reference),
     )

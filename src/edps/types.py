@@ -190,9 +190,6 @@ class StructuredDataSet(_BaseDataSet):
     stringColumns: List[StringColumn] = Field(
         description="Columns that could only be interpreted as string by the analysis"
     )
-    primaryDatetimeColumn: Optional[str] = Field(
-        default=None, description="Name of the datetime column that was determined to be the primary one."
-    )
 
     @property
     def all_columns(self) -> Iterator[_BaseColumn]:
