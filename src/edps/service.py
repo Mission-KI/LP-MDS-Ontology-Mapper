@@ -16,6 +16,7 @@ from edps.types import (
     Compression,
     ComputedEdpData,
     Config,
+    DataSet,
     DataSetType,
     ExtendedDatasetProfile,
     FileReference,
@@ -62,13 +63,12 @@ class Service:
     async def _compute_asset(self, ctx: TaskContext, config: Config, path: Path) -> ComputedEdpData:
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
-        compressions: Set[str] = set()
+        compression_algorithms: Set[str] = set()
         extracted_size = 0
-        datasets: List[StructuredDataSet] = []
-        data_structures: Set[DataSetType] = set()
+        datasets: List[DataSet] = []
         base_path = path if path.is_dir() else path.parent
 
-        async for child_file in self._walk_all_files(ctx, base_path, path, compressions):
+        async for child_file in self._walk_all_files(ctx, base_path, path, compression_algorithms):
             file_type = child_file.type
             extracted_size += child_file.size
             if file_type not in IMPORTERS:
@@ -77,31 +77,43 @@ class Service:
                 warn(text, RuntimeWarning)
                 continue
             analyzer = await ctx.exec(IMPORTERS[file_type], child_file)
-            data_structures.add(analyzer.data_set_type)
-            dataset_result = await ctx.exec(analyzer.analyze)
-            if not isinstance(dataset_result, StructuredDataSet):
-                raise NotImplementedError(f'Did not expect dataset type "{type(dataset_result)}"')
-            datasets.append(dataset_result)
+            async for dataset in ctx.exec(analyzer.analyze):
+                datasets.append(dataset)
 
         compression: Optional[Compression]
-        if len(compressions) == 0:
+        if len(compression_algorithms) == 0:
             compression = None
         else:
-            compression = Compression(algorithms=compressions, extractedSize=extracted_size)
+            compression = Compression(algorithms=compression_algorithms, extractedSize=extracted_size)
 
         if len(datasets) == 0:
             raise RuntimeError("Was not able to analyze any datasets in this asset")
-        computed_edp_data = ComputedEdpData(
-            volume=calculate_size(path),
-            compression=compression,
-            dataTypes=data_structures,
-            structuredDatasets=datasets,
-        )
+        computed_edp_data = self._create_computed_edp_data(path, compression, datasets)
         computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
+
+    def _create_computed_edp_data(
+        self, path: Path, compression: Optional[Compression], datasets: List[DataSet]
+    ) -> ComputedEdpData:
+        structured_datasets: List[StructuredDataSet] = []
+        data_types: Set[DataSetType] = set()
+
+        for dataset in datasets:
+            if isinstance(dataset, StructuredDataSet):
+                structured_datasets.append(dataset)
+                data_types.add(DataSetType.structured)
+            else:
+                raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
+
+        return ComputedEdpData(
+            volume=calculate_size(path),
+            compression=compression,
+            dataTypes=data_types,
+            structuredDatasets=structured_datasets,
+        )
 
     async def _walk_all_files(
         self, ctx: TaskContext, base_path: Path, path: Path, compressions: Set[str]

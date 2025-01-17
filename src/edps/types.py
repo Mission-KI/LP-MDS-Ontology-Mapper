@@ -4,6 +4,7 @@ from enum import Enum
 from importlib.metadata import version as get_version
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Dict, Iterator, List, Optional, Set, Union
+from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, Field, TypeAdapter
 
@@ -72,6 +73,11 @@ class TemporalConsistency(BaseModel):
 Numeric = Union[int, float, timedelta, complex]
 
 FileReference = PurePosixPath
+
+
+class _BaseDataSet(BaseModel):
+    uuid: UUID = Field(description="Identifier for the dataset")
+    parentUuid: Optional[UUID] = Field(description="Reference to the identifier of the parent dataset, if any")
 
 
 class Augmentation(BaseModel):
@@ -164,7 +170,7 @@ class StringColumn(_BaseColumn):
     pass
 
 
-class StructuredDataSet(BaseModel):
+class StructuredDataSet(_BaseDataSet):
     name: PurePosixPath = Field(description="Name of the structured dataset")
     rowCount: int = Field(
         description="Number of row",
@@ -196,6 +202,9 @@ class StructuredDataSet(BaseModel):
 
     def get_columns_dict(self) -> Dict[str, _BaseColumn]:
         return {column.name: column for column in self.all_columns}
+
+
+DataSet = Union[StructuredDataSet]
 
 
 class Publisher(BaseModel):

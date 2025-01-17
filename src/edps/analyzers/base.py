@@ -1,13 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import AsyncIterator
 
 from edps.task import TaskContext
-from edps.types import DataSetType, StructuredDataSet
+from edps.types import DataSet
 
 
 class Analyzer(ABC):
-    @property
     @abstractmethod
-    def data_set_type(self) -> DataSetType: ...
-    @abstractmethod
-    async def analyze(self, ctx: TaskContext) -> Union[StructuredDataSet]: ...
+    def analyze(self, ctx: TaskContext) -> AsyncIterator[DataSet]: ...

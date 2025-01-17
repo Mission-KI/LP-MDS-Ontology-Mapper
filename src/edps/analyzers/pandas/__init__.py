@@ -5,7 +5,8 @@ from datetime import timedelta
 from enum import Enum
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple
+from uuid import uuid4
 from warnings import warn
 
 from fitter import Fitter, get_common_distributions
@@ -33,7 +34,6 @@ from edps.analyzers.pandas.type_parser import (
 from edps.file import File
 from edps.task import TaskContext
 from edps.types import (
-    DataSetType,
     DateTimeColumn,
     FileReference,
     NumericColumn,
@@ -148,11 +148,7 @@ class Pandas(Analyzer):
             timedelta(weeks=1),
         ]
 
-    @property
-    def data_set_type(self):
-        return DataSetType.structured
-
-    async def analyze(self, ctx: TaskContext):
+    async def analyze(self, ctx: TaskContext) -> AsyncIterator[StructuredDataSet]:
         row_count = len(self._data.index)
         ctx.logger.info(
             "Started structured data analysis with dataset containing %d rows",
@@ -230,7 +226,9 @@ class Pandas(Analyzer):
             transformed_numeric_column_count + transformed_date_time_column_count + transformed_string_column_count
         )
 
-        return StructuredDataSet(
+        yield StructuredDataSet(
+            uuid=uuid4(),
+            parentUuid=None,
             name=PurePosixPath(self._file.relative),
             rowCount=row_count,
             columnCount=column_count,
