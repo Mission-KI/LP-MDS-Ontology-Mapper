@@ -4,6 +4,7 @@ from logging import getLogger
 from pathlib import PurePosixPath
 from types import NoneType
 from typing import Union, get_args, get_origin
+from uuid import UUID
 
 from pydantic import AnyUrl, BaseModel
 
@@ -36,7 +37,7 @@ def _validate_model(model_type: type[BaseModel]):
 
 # Check if the given type is valid for the EDPS model and return additional types that need checking.
 def _validate_model_type(current_type: type):
-    if current_type in [NoneType, str, int, float, complex, bool, datetime, timedelta, PurePosixPath, AnyUrl]:
+    if current_type in [NoneType, str, int, float, complex, bool, datetime, timedelta, PurePosixPath, AnyUrl, UUID]:
         pass
     elif isinstance(current_type, type) and issubclass(current_type, Enum):
         pass

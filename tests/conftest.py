@@ -52,6 +52,11 @@ def path_data_test_zip():
 
 
 @fixture
+def path_data_test_multiassets_zip():
+    return TESTS_ROOT_PATH / "data/test_multiassets.zip"
+
+
+@fixture
 def path_data_pontusx_algocustomdata():
     return TESTS_ROOT_PATH / "data/pontusx/algoCustomData.json"
 

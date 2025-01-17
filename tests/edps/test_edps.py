@@ -190,6 +190,19 @@ async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
 
 
 @mark.asyncio
+async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_multiassets_zip)
+    assert "zip" in edp.compression.algorithms
+    assert len(edp.structuredDatasets) == 4
+    assert edp.structuredDatasets[0].columnCount == 5
+    assert edp.structuredDatasets[0].rowCount == 50
+    assert str(edp.structuredDatasets[0].name) == "test_multiassets_zip/csv/test.csv"
+    assert str(edp.structuredDatasets[1].name) == "test_multiassets_zip/xls/test.xls"
+    assert str(edp.structuredDatasets[2].name) == "test_multiassets_zip/xlsx/test.xlsx"
+    assert str(edp.structuredDatasets[3].name) == "test_multiassets_zip/zip/test_zip/test.csv"
+
+
+@mark.asyncio
 async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
     file_path = tmp_path / "unsupported.txt"
     with open(file_path, "wt", encoding="utf-8") as file:
