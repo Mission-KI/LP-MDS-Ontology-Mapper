@@ -1,8 +1,12 @@
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
 from pydantic import AnyUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# ENV file should be in the same directory (only relevant for development; for production we use ENV variables).
+ENV_FILE = Path(__file__).parent / ".env"
 
 
 # App config is read from .env file and validate on app startup.
@@ -18,9 +22,12 @@ class AppConfig(BaseSettings):
         default=None,
     )
 
-    model_config = SettingsConfigDict(env_file="edp/.env")
+    model_config = SettingsConfigDict(env_file=ENV_FILE)
 
 
 def get_app_config():
     # Prevent MyPy check to allow required settings without default.
-    return AppConfig()  # type: ignore
+    config = AppConfig()  # type: ignore
+    # We can't log the DB credentials, so use model_dump() to respect the exclude attribute.
+    getLogger(__name__).info("App config: %s", config.model_dump())
+    return config
