@@ -54,7 +54,6 @@ test = [
     "pytest",
     "pytest-asyncio",
     "pytest-benchmark",
-    "bandit",
     "mypy",
     "pandas-stubs",
     "scipy-stubs",
@@ -79,7 +78,17 @@ version = { file = "dist/VERSION.txt" }
 line-length = 120
 
 [tool.ruff.lint]
-extend-select = ["I"] # isort replacement
+extend-select = [
+    "I", # isort replacement
+    "S", # bandit
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101",
+    "S106",
+]
+
 
 [tool.pytest.ini_options]
 log_cli = true
@@ -92,18 +101,10 @@ filterwarnings = [
 ]
 markers = ["slow: Tests that may take more than a few seconds."]
 
-[tool.bandit]
-exclude_dirs = [
-    "tests",
-    ".venv",
-    ".conda",
-]
-skips = ["B403"]
-
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
-exclude = ["build"]
+exclude = ["build", ".venv"]
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]

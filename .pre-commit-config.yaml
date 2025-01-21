@@ -30,14 +30,6 @@ repos:
         language: system
   - repo: local
     hooks:
-      - id: bandit
-        name: bandit
-        entry: bandit
-        args: ["-c", "pyproject.toml"]
-        types: [python]
-        language: system
-  - repo: local
-    hooks:
       - id: mypy
         name: mypy
         entry: mypy .
