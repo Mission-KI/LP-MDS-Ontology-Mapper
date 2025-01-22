@@ -1,3 +1,4 @@
+import shutil
 from datetime import UTC, datetime
 from logging import getLogger
 from pathlib import Path
@@ -83,8 +84,9 @@ class AnalysisJobManager:
                 with TemporaryDirectory() as temp_working_dir:
                     output_context = OutputLocalFilesContext(job.result_dir)
                     ctx = SimpleTaskContext(getLogger("process_job"), Path(temp_working_dir), output_context)
+                    shutil.copytree(job.input_data_dir, ctx.input_path)
                     config = Config(userProvidedEdpData=job.user_data)
-                    await self._service.analyse_asset(ctx, config, job.input_data_dir)
+                    await self._service.analyse_asset(ctx, config)
                     await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
                     job.update_state(JobState.COMPLETED)
                     job.finished = datetime.now(tz=UTC)

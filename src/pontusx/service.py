@@ -74,23 +74,21 @@ async def run_service(logger: Logger, args: Args):
     file_extension = sanitize_file_part(file_extension)
     input_filename = f"data.{file_extension}"
     with (
-        TemporaryDirectory() as temp_input_dir_path,
         TemporaryDirectory() as temp_working_dir_path,
         TemporaryDirectory() as temp_output_dir_path,
     ):
-        temp_raw_data_file = Path(temp_input_dir_path) / input_filename
-        logger.debug("Copying raw data file to %s", temp_raw_data_file)
-        shutil.copy(args.raw_data_file, temp_raw_data_file)
-
-        edps_config = Config(userProvidedEdpData=user_edp_data)
-
         output_dir = Path(temp_output_dir_path)
         logger.debug("Processing into output dir %s", output_dir)
         output_context = OutputLocalFilesContext(output_dir)
 
-        logger.info("Processing asset..")
         ctx = SimpleTaskContext(logger, Path(temp_working_dir_path), output_context)
-        await Service().analyse_asset(ctx, edps_config, temp_raw_data_file)
+
+        ctx.input_path.mkdir(parents=True, exist_ok=True)
+        shutil.copy(args.raw_data_file, ctx.input_path / input_filename)
+
+        logger.info("Processing asset..")
+        edps_config = Config(userProvidedEdpData=user_edp_data)
+        await Service().analyse_asset(ctx, edps_config)
 
         logger.info("Zipping EDP..")
         target_archive = args.output_dir / f"{sanitize_file_part(user_edp_data.assetId)}.zip"

@@ -1,3 +1,4 @@
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable, List
@@ -5,6 +6,7 @@ from typing import Awaitable, Callable, List
 from pytest import fixture, mark, raises
 
 from edps import Service
+from edps.task import TaskContext
 from edps.types import (
     Augmentation,
     AugmentedColumn,
@@ -54,12 +56,12 @@ def config_data(user_provided_data):
 
 @fixture
 def analyse_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[FileReference]]:
-    return lambda path: Service().analyse_asset(ctx, config_data, path)
+    return lambda path: analyse_asset(ctx, config_data, path)
 
 
 @fixture
 def compute_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[ComputedEdpData]]:
-    return lambda path: Service()._compute_asset(ctx, config_data, path)
+    return lambda path: compute_asset(ctx, config_data, path)
 
 
 @mark.asyncio
@@ -131,7 +133,7 @@ async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, outpu
 async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data, output_context):
     # We can't use the default config.
     config_data = Config(userProvidedEdpData=user_provided_data)
-    edp = await Service()._compute_asset(ctx, config_data, path_data_test_headerless_csv)
+    edp = await compute_asset(ctx, config_data, path_data_test_headerless_csv)
 
     assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
@@ -210,12 +212,28 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
     with open(file_path, "wt", encoding="utf-8") as file:
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):
-        await analyse_asset_fn(tmp_path)
+        await analyse_asset_fn(file_path)
 
 
 @mark.asyncio
 async def test_analyse_csv_daseen_context(path_data_test_csv, ctx, daseen_output_context, config_data):
-    await Service().analyse_asset(ctx, config_data, path_data_test_csv)
+    await analyse_asset(ctx, config_data, path_data_test_csv)
+
+
+async def analyse_asset(ctx: TaskContext, config_data: Config, asset_path: Path):
+    _copy_asset_to_working_dir(asset_path, ctx)
+    return await Service().analyse_asset(ctx, config_data)
+
+
+async def compute_asset(ctx: TaskContext, config_data: Config, asset_path: Path):
+    _copy_asset_to_working_dir(asset_path, ctx)
+    return await Service()._compute_asset(ctx, config_data)
+
+
+def _copy_asset_to_working_dir(asset_path: Path, ctx: TaskContext):
+    shutil.rmtree(ctx.input_path, ignore_errors=True)
+    ctx.input_path.mkdir()
+    shutil.copy(asset_path, ctx.input_path / asset_path.name)
 
 
 def _assert_pickle_temporal_consistencies(

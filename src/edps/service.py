@@ -37,15 +37,13 @@ class Service:
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, ctx: TaskContext, config: Config, path: Path) -> FileReference:
-        """Let the service analyse the given asset
+    async def analyse_asset(self, ctx: TaskContext, config: Config) -> FileReference:
+        """Let the service analyse the assets in ctx.input_path
 
         Parameters
         ----------
         ctx : TaskContext
             Gives access to the appriopriate logger and output_context and allows executing sub-tasks.
-        path : Path
-             Can be a single file or directory. If it is a directory, all files inside that directory will get analyzed.
         config_data : Config
             The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
             by the user.
@@ -55,22 +53,22 @@ class Service:
         FileReference
             File path or URL to the generated edp.service.
         """
-        computed_data = await self._compute_asset(ctx, config, path)
+        computed_data = await self._compute_asset(ctx, config)
         user_data = config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
         return await ctx.output_context.write_edp(json_name, edp)
 
-    async def _compute_asset(self, ctx: TaskContext, config: Config, path: Path) -> ComputedEdpData:
+    async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
+        path = ctx.input_path
         if not path.exists():
             raise FileNotFoundError(f'File "{path}" can not be found!')
         compression_algorithms: Set[str] = set()
         extracted_size = 0
         datasets: List[DataSet] = []
-        base_path = path if path.is_dir() else path.parent
 
-        async for child_file in self._walk_all_files(ctx, base_path, path, compression_algorithms):
+        async for child_file in self._walk_all_files(ctx, path, compression_algorithms):
             file_type = child_file.type
             extracted_size += child_file.size
             if file_type not in IMPORTERS:
@@ -117,23 +115,21 @@ class Service:
             structuredDatasets=structured_datasets,
         )
 
-    async def _walk_all_files(
-        self, ctx: TaskContext, base_path: Path, path: Path, compressions: Set[str]
-    ) -> AsyncIterator[File]:
+    async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""
 
         if path.is_file():
-            file = File(base_path, path)
+            file = File(ctx.input_path, path)
             if file.type not in DECOMPRESSION_ALGORITHMS:
                 yield file
             else:
                 compressions.add(file.type)
                 async with self._extract(file) as extracted_path:
-                    async for child_file in self._walk_all_files(ctx, base_path, extracted_path, compressions):
+                    async for child_file in self._walk_all_files(ctx, extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
             for file_path in path.iterdir():
-                async for child_file in self._walk_all_files(ctx, base_path, file_path, compressions):
+                async for child_file in self._walk_all_files(ctx, file_path, compressions):
                     yield child_file
         else:
             ctx.logger.warning('Can not extract or analyse "%s"', path)

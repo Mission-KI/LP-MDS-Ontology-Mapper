@@ -23,17 +23,17 @@ class TaskContext(ABC):
 
     @property
     def working_path(self) -> Path:
-        """Return working path (not guaranteed that it exists yet)."""
+        """Return working path (not guaranteed that it exists, normally temp directory with write access)."""
         return self._working_path
 
     @property
-    def working_input_path(self) -> Path:
-        """Return working path for task input (not guaranteed that it exists yet)."""
+    def input_path(self) -> Path:
+        """Return path for input files (not guaranteed that it exists)."""
         return self._working_path / "input"
 
     @property
-    def working_output_path(self) -> Path:
-        """Return working path for task output (not guaranteed that it exists yet)."""
+    def output_path(self) -> Path:
+        """Return path for output files (not guaranteed that it exists)."""
         return self._working_path / "output"
 
     @property
