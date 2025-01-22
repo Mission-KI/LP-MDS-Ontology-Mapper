@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from logging import getLogger
 from pathlib import Path
 from shutil import copyfileobj
+from tempfile import TemporaryDirectory
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -79,14 +80,15 @@ class AnalysisJobManager:
             job = await session.get_job(job_id)
             self._logger.info("Starting job %s...", job_id)
             try:
-                output_context = OutputLocalFilesContext(job.result_dir)
-                ctx = SimpleTaskContext(getLogger("process_job"), output_context)
-                config = Config(userProvidedEdpData=job.user_data)
-                await self._service.analyse_asset(ctx, config, job.input_data_dir)
-                await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
-                job.update_state(JobState.COMPLETED)
-                job.finished = datetime.now(tz=UTC)
-                self._logger.info("Job %s completed.", job.job_id)
+                with TemporaryDirectory() as temp_working_dir:
+                    output_context = OutputLocalFilesContext(job.result_dir)
+                    ctx = SimpleTaskContext(getLogger("process_job"), Path(temp_working_dir), output_context)
+                    config = Config(userProvidedEdpData=job.user_data)
+                    await self._service.analyse_asset(ctx, config, job.input_data_dir)
+                    await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
+                    job.update_state(JobState.COMPLETED)
+                    job.finished = datetime.now(tz=UTC)
+                    self._logger.info("Job %s completed.", job.job_id)
 
             except Exception as exception:
                 job.update_state(JobState.FAILED, f"Processing failed: {exception}")

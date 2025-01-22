@@ -1,24 +1,20 @@
-from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
-from typing import AsyncIterator, Tuple
 
-from matplotlib.axes import Axes
 from pytest import fixture
 
-from edps.context import OutputContext, OutputDaseenContext, OutputLocalFilesContext
+from edps.context import OutputDaseenContext, OutputLocalFilesContext
 from edps.task import SimpleTaskContext
-from edps.types import ExtendedDatasetProfile, FileReference
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
 
 @fixture
-def path_output(tmp_path):
-    """This is the path to output files generated in the tests. Change this to the following code, to review the results in a test directory:
+def path_work(tmp_path):
+    """This is the path to the working directory. Change this to the following code, to review the results in a directory:
 
     Example:
-        path = TESTS_ROOT_PATH.parent / "output"
+        path = TESTS_ROOT_PATH / "work"
         if not path.exists():
             path.mkdir()
         yield path
@@ -87,8 +83,8 @@ def output_context(path_output):
 
 
 @fixture
-def ctx(output_context):
-    return SimpleTaskContext(getLogger("TEST"), output_context)
+def ctx(path_work, output_context):
+    return SimpleTaskContext(getLogger("TEST"), path_work, output_context)
 
 
 @fixture
@@ -104,12 +100,3 @@ def daseen_output_context(monkeypatch, path_output):
             elastic_url="http://elastic",
             elastic_apikey="APIKEY",
         )
-
-
-class DummyOutputContext(OutputContext):
-    async def write_edp(self, name: str, edp: ExtendedDatasetProfile) -> FileReference:
-        raise NotImplementedError()
-
-    @asynccontextmanager
-    def get_plot(self, name: str) -> AsyncIterator[Tuple[Axes, FileReference]]:
-        raise NotImplementedError()

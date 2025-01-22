@@ -75,6 +75,7 @@ async def run_service(logger: Logger, args: Args):
     input_filename = f"data.{file_extension}"
     with (
         TemporaryDirectory() as temp_input_dir_path,
+        TemporaryDirectory() as temp_working_dir_path,
         TemporaryDirectory() as temp_output_dir_path,
     ):
         temp_raw_data_file = Path(temp_input_dir_path) / input_filename
@@ -88,7 +89,7 @@ async def run_service(logger: Logger, args: Args):
         output_context = OutputLocalFilesContext(output_dir)
 
         logger.info("Processing asset..")
-        ctx = SimpleTaskContext(logger, output_context)
+        ctx = SimpleTaskContext(logger, Path(temp_working_dir_path), output_context)
         await Service().analyse_asset(ctx, edps_config, temp_raw_data_file)
 
         logger.info("Zipping EDP..")
