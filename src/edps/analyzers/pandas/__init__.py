@@ -86,7 +86,6 @@ _NUMERIC_IQR = "inter-quartile-range"
 _NUMERIC_IQR_OUTLIERS = "iqr-outlier-count"
 _NUMERIC_DISTRIBUTION = "distribution"
 _NUMERIC_DISTRIBUTION_PARAMETERS = "distribution-parameters"
-_NUMERIC_SEASONALITY = "seasonality"
 
 _DATETIME_EARLIEST = "earliest"
 _DATETIME_LATEST = "latest"
@@ -709,7 +708,9 @@ async def _get_seasonality_graphs(
 
     @asynccontextmanager
     async def get_plot(plot_type: str):
-        async with ctx.output_context.get_plot(column_plot_base + "_" + plot_type.lower()) as (axes, reference):
+        async with ctx.output_context.get_plot(
+            column_plot_base + "_over_" + time_base_column_name + "_" + plot_type.lower()
+        ) as (axes, reference):
             axes.set_title(f"{plot_type} of {column_name} over {time_base_column_name}")
             axes.set_xlabel(time_base_column_name)
             axes.set_ylabel(f"{plot_type} of {column_name}")
