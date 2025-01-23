@@ -5,6 +5,7 @@ from logging import getLogger
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Tuple
 from uuid import UUID, uuid4
+from warnings import warn
 
 from boto3 import resource as aws_resource
 from matplotlib import colormaps, use
@@ -95,7 +96,11 @@ class OutputLocalFilesContext(OutputContext):
     def _prepare_save_path(self, name: str, suffix: str):
         save_path = self.path / (name.replace(":", "").replace(" ", "") + suffix)
         if save_path.exists():
-            self._logger.warning('The path "%s" already exists, will overwrite!', save_path)
+            message = (
+                f'The path "{save_path}" already exists, will overwrite! This is most likely an implementation error.'
+            )
+            warn(message, RuntimeWarning)
+            self._logger.warning(message)
             save_path.unlink()
         else:
             save_path.parent.mkdir(parents=True, exist_ok=True)
