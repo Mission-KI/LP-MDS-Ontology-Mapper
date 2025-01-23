@@ -655,16 +655,16 @@ async def _compute_seasonality(
 
     periodicity: _DatetimeColumnTemporalConsistency
     for datetime_column_name, periodicity in datetime_column_periodicities.items():
-        datetime_type = datetime_columns.get_info(str(datetime_column_name))
+        datetime_kind = datetime_columns.get_info(str(datetime_column_name)).get_kind()
 
-        if datetime_type == DatetimeKind.DATE:
+        if datetime_kind == DatetimeKind.DATE:
             message = (
                 f'Column "{datetime_column_name}" has date only format. This might impede the seasonality analysis. '
                 "To fix this, supply it as datetime, preferably in the ISO8601 format."
             )
             warn(message)
             ctx.logger.warning(message)
-        elif datetime_type == DatetimeKind.TIME:
+        elif datetime_kind == DatetimeKind.TIME:
             message = (
                 f'Column "{datetime_column_name}" has time only format. It will be skipped for seasonality analysis'
             )
