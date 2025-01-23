@@ -14,11 +14,16 @@ TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
 
 @fixture
-def path_output():
-    path = TESTS_ROOT_PATH.parent / "output"
-    if not path.exists():
-        path.mkdir()
-    yield path
+def path_output(tmp_path):
+    """This is the path to output files generated in the tests. Change this to the following code, to review the results in a test directory:
+
+    Example:
+        path = TESTS_ROOT_PATH.parent / "output"
+        if not path.exists():
+            path.mkdir()
+        yield path
+    """
+    return tmp_path
 
 
 @fixture
