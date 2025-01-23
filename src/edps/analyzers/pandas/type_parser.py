@@ -205,7 +205,7 @@ class ColumnsWrapper[TColumnInfo: ColumnInfo]:
 
     def __iter__(self) -> Iterator[Tuple[str, TColumnInfo, Series]]:
         for column_name, info in self._infos.items():
-            yield column_name, info, self._all_data[column_name]
+            yield column_name, info, self._all_data.loc[:, column_name]
 
 
 class Result:
