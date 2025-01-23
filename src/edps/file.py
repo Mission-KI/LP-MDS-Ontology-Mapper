@@ -44,8 +44,8 @@ class File:
 
 
 def sanitize_file_part(file_part: str) -> str:
-    """Keep only alphanumeric characters and -_"""
-    return re.sub(r"[^a-zA-Z0-9-_]", "", file_part)
+    """Keep only alphanumeric characters and dash/underscore. Replace dot with underscore."""
+    return re.sub(r"[^a-zA-Z0-9-_]", "", file_part.replace(".", "_"))
 
 
 def calculate_size(path: Path) -> int:

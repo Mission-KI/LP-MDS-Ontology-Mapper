@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
-from edps.file import File, calculate_size
+from edps.file import File, calculate_size, sanitize_file_part
 from edps.filewriter import write_edp
 from edps.importers import IMPORTERS
 from edps.task import TaskContext
@@ -58,7 +58,6 @@ class Service:
         user_data = config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
-        json_name = json_name.replace(".", "_")
         return await write_edp(ctx, json_name, edp)
 
     async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
@@ -144,7 +143,7 @@ class Service:
         if decompressor is None:
             raise NotImplementedError(f'Extracting "{archive_type}" is not implemented')
         archive_name = file.path.name
-        directory = file.path.parent / archive_name.replace(".", "_")
+        directory = file.path.parent / sanitize_file_part(archive_name)
         while directory.exists():
             directory /= "extracted"
 
