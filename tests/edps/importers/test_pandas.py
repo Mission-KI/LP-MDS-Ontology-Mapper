@@ -96,5 +96,53 @@ async def test_import_xls(path_data_test_xls, ctx):
     assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "parkhaus"]
 
 
+async def test_detect_german_decimal_comma(path_data_german_decimal_comma_csv, ctx):
+    file = get_file(path_data_german_decimal_comma_csv)
+    analyzer = await ctx.exec(csv_importer, file)
+    data = analyzer._data
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 15
+    assert row_count == 6
+    assert headers == [
+        "Zeit",
+        "0-17 Jahre",
+        "Unnamed: 2",
+        "18-24 Jahre",
+        "Unnamed: 4",
+        "25-29 Jahre",
+        "Unnamed: 6",
+        "30-49 Jahre",
+        "Unnamed: 8",
+        "50-64 Jahre",
+        "Unnamed: 10",
+        "65 Jahre und aelter",
+        "Unnamed: 12",
+        "Insgesamt",
+        "Unnamed: 14",
+    ]
+
+
+async def test_hamburg(path_data_hamburg_csv, ctx):
+    file = get_file(path_data_hamburg_csv)
+    analyzer = await ctx.exec(csv_importer, file)
+    data = analyzer._data
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 7
+    assert row_count == 55
+    assert headers == [
+        "Unnamed: 0",
+        "Unnamed: 1",
+        "Unnamed: 2",
+        "Unnamed: 3",
+        "Unnamed: 4",
+        "Unnamed: 5",
+        "in Tsd. Euro",
+    ]
+
+
 def get_file(path: Path):
     return File(path.parent, path)

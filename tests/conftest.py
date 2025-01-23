@@ -42,6 +42,16 @@ def path_data_test_xls():
 
 
 @fixture
+def path_data_german_decimal_comma_csv():
+    return TESTS_ROOT_PATH / "data/german_decimal_comma.csv"
+
+
+@fixture
+def path_data_hamburg_csv():
+    return TESTS_ROOT_PATH / "data/hamburg.csv"
+
+
+@fixture
 def path_data_test_xlsx():
     return TESTS_ROOT_PATH / "data/test.xlsx"
 
