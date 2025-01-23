@@ -3,10 +3,15 @@ from pathlib import Path
 
 from pytest import fixture
 
-from edps.context import OutputDaseenContext, OutputLocalFilesContext
+from edps.filewriter import setup_matplotlib
 from edps.task import SimpleTaskContext
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
+
+
+@fixture(autouse=True, scope="session")
+def setup():
+    setup_matplotlib()
 
 
 @fixture
@@ -78,25 +83,5 @@ def path_data_pontusx_ddo():
 
 
 @fixture
-def output_context(path_output):
-    return OutputLocalFilesContext(path_output)
-
-
-@fixture
-def ctx(path_work, output_context):
-    return SimpleTaskContext(getLogger("TEST"), path_work, output_context)
-
-
-@fixture
-def daseen_output_context(monkeypatch, path_output):
-    with monkeypatch.context() as monkey:
-        monkey.setattr(OutputDaseenContext, "_upload_to_elastic", lambda *args: None)
-        monkey.setattr(OutputDaseenContext, "_upload_to_s3", lambda *args: None)
-        yield OutputDaseenContext(
-            local_path=path_output,
-            s3_access_key_id="ABC",
-            s3_secret_access_key="PW",
-            s3_bucket_name="dummybucket",
-            elastic_url="http://elastic",
-            elastic_apikey="APIKEY",
-        )
+def ctx(path_work):
+    return SimpleTaskContext(getLogger("TEST"), path_work)

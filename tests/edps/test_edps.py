@@ -55,12 +55,12 @@ def config_data(user_provided_data):
 
 
 @fixture
-def analyse_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[FileReference]]:
+def analyse_asset_fn(ctx, config_data) -> Callable[[Path], Awaitable[FileReference]]:
     return lambda path: analyse_asset(ctx, config_data, path)
 
 
 @fixture
-def compute_asset_fn(ctx, config_data, output_context) -> Callable[[Path], Awaitable[ComputedEdpData]]:
+def compute_asset_fn(ctx, config_data) -> Callable[[Path], Awaitable[ComputedEdpData]]:
     return lambda path: compute_asset(ctx, config_data, path)
 
 
@@ -120,17 +120,16 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
 
 
 @mark.asyncio
-async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, output_context, config_data):
+async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, ctx, config_data):
     edp_file = await analyse_asset_fn(path_data_test_csv)
-    edp_file_path = output_context.build_full_path(edp_file)
-    edp = read_edp_file(edp_file_path)
+    edp = read_edp_file(ctx.output_path / edp_file)
     assert edp.assetId == config_data.userProvidedEdpData.assetId
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
 
 
 @mark.asyncio
-async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data, output_context):
+async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data):
     # We can't use the default config.
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_headerless_csv)
@@ -213,11 +212,6 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):
         await analyse_asset_fn(file_path)
-
-
-@mark.asyncio
-async def test_analyse_csv_daseen_context(path_data_test_csv, ctx, daseen_output_context, config_data):
-    await analyse_asset(ctx, config_data, path_data_test_csv)
 
 
 async def analyse_asset(ctx: TaskContext, config_data: Config, asset_path: Path):

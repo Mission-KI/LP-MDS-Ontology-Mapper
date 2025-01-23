@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
-from edps.context import OutputLocalFilesContext
 from edps.task import SimpleTaskContext
 from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
@@ -82,12 +81,11 @@ class AnalysisJobManager:
             self._logger.info("Starting job %s...", job_id)
             try:
                 with TemporaryDirectory() as temp_working_dir:
-                    output_context = OutputLocalFilesContext(job.result_dir)
-                    ctx = SimpleTaskContext(getLogger("process_job"), Path(temp_working_dir), output_context)
+                    ctx = SimpleTaskContext(getLogger("process_job"), Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path)
                     config = Config(userProvidedEdpData=job.user_data)
                     await self._service.analyse_asset(ctx, config)
-                    await ZipAlgorithm().compress(job.result_dir, job.zip_archive)
+                    await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
                     job.update_state(JobState.COMPLETED)
                     job.finished = datetime.now(tz=UTC)
                     self._logger.info("Job %s completed.", job.job_id)

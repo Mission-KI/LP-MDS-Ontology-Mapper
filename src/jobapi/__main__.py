@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from uvicorn import run as server_run
 
+from edps.filewriter import setup_matplotlib
 from jobapi import get_job_api_router
 from jobapi.config import AppConfig, get_app_config
 
@@ -21,6 +22,7 @@ def main():
 
     config_logging()
     app_config = get_app_config()
+    setup_matplotlib()
     app = init_fastapi(app_config)
 
     logger = getLogger(__name__)

@@ -6,8 +6,8 @@ from edps.compression.zip import ZipAlgorithm
 
 
 @mark.asyncio
-async def test_zip_unzip(path_output):
-    compression_test_dir = path_output / "compression"
+async def test_zip_unzip(path_work):
+    compression_test_dir = path_work / "compression"
     src_dir = compression_test_dir / "src"
     dest_unzipped = compression_test_dir / "unzipped"
     zip_file = compression_test_dir / "test.zip"

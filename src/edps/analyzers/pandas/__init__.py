@@ -29,6 +29,7 @@ from edps.analyzers.pandas.type_parser import (
     parse_types,
 )
 from edps.file import File
+from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
 from edps.types import (
     DateTimeColumn,
@@ -369,7 +370,7 @@ class Pandas(Analyzer):
 
 
 async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -> FileReference:
-    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
+    async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         if isinstance(axes.figure, Figure):
             axes.figure.set_figwidth(3.0)
         axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
@@ -462,7 +463,7 @@ async def _plot_distribution(
     x_min = column_fields[_NUMERIC_LOWER_DIST]
     x_max = column_fields[_NUMERIC_UPPER_DIST]
     x_limits = (x_min, x_max)
-    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
+    async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         axes.set_title(f"Distribution of {column.name}")
         axes.set_xlabel(f"Value of {column.name}")
         axes.set_ylabel("Relative Density")
@@ -500,7 +501,7 @@ async def _get_correlation_graph(
     ctx.logger.debug("Computing correlation between columns %s", filtered_columns.columns)
     correlation = filtered_columns.corr()
     mask = triu(ones_like(correlation, dtype=bool))
-    async with ctx.output_context.get_plot(plot_name) as (axes, reference):
+    async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         figure = axes.figure
         if isinstance(figure, Figure):
             width_offset = 3

@@ -1,0 +1,86 @@
+from asyncio import get_running_loop
+from contextlib import asynccontextmanager
+from pathlib import Path, PurePosixPath
+from typing import AsyncIterator, Tuple
+from warnings import warn
+
+import matplotlib
+import matplotlib.axes
+import matplotlib.colors
+import matplotlib.pyplot
+import matplotlib.style
+import seaborn
+
+from edps.file import sanitize_file_part
+from edps.task import TaskContext
+from edps.types import ExtendedDatasetProfile
+
+TEXT_ENCODING = "utf-8"
+
+MATPLOTLIB_BACKEND: str = "AGG"
+MATPLOTLIB_PLOT_FORMAT = "png"
+MATPLOTLIB_STYLE_PATH = Path(__file__).parent / "styles/plot.mplstyle"
+
+
+async def write_edp(ctx: TaskContext, name: str, edp: ExtendedDatasetProfile) -> PurePosixPath:
+    """Write EDP to a JSON file.
+
+    Create a file with the given name (and ".json" extension) in ctx.output_path.
+    Return the path of the new file relative to ctx.output_path."""
+
+    save_path = _prepare_save_path(ctx, name, "json")
+    with open(save_path, "wt", encoding=TEXT_ENCODING) as io_wrapper:
+        json: str = edp.model_dump_json()
+        loop = get_running_loop()
+        await loop.run_in_executor(None, io_wrapper.write, json)
+    ctx.logger.debug('Generated text file "%s"', save_path)
+    return PurePosixPath(save_path.relative_to(ctx.output_path))
+
+
+def setup_matplotlib():
+    """Customize matplotlib for our plots. Must be called exactly once before using `get_pyplot_writer()`."""
+
+    matplotlib.use(MATPLOTLIB_BACKEND)
+    seaborn.reset_orig()
+    matplotlib.style.use(str(MATPLOTLIB_STYLE_PATH))
+    colormap = _get_default_colormap()
+    matplotlib.colormaps.register(colormap)
+    matplotlib.pyplot.set_cmap(colormap)
+
+
+def _get_default_colormap() -> matplotlib.colors.Colormap:
+    BLUE = "#43ACFF"
+    GRAY = "#D9D9D9"
+    PINK = "#FF3FFF"
+    return matplotlib.colors.LinearSegmentedColormap.from_list("daseen", [BLUE, GRAY, PINK])
+
+
+@asynccontextmanager
+async def get_pyplot_writer(ctx: TaskContext, name: str) -> AsyncIterator[Tuple[matplotlib.axes.Axes, PurePosixPath]]:
+    """Context manager for a matplotlib `Axes` object.
+
+    The caller should use the yielded `Axes` object to plot her graph.
+    This is saved to an image when the context is exited.
+    Before using this function `setup_matplotlib()` must be called exactly once."""
+
+    save_path = _prepare_save_path(ctx, name, MATPLOTLIB_PLOT_FORMAT)
+    figure, axes = matplotlib.pyplot.subplots()
+    axes.autoscale(True)
+    yield axes, PurePosixPath(save_path.relative_to(ctx.output_path))
+    figure.tight_layout()
+    figure.savefig(save_path)
+    matplotlib.pyplot.close(figure)
+    ctx.logger.debug('Generated plot "%s"', save_path)
+
+
+def _prepare_save_path(ctx: TaskContext, name: str, suffix: str):
+    full_name = sanitize_file_part(name) + "." + sanitize_file_part(suffix)
+    save_path = ctx.output_path / full_name
+    if save_path.exists():
+        message = f'The path "{save_path}" already exists, will overwrite! This is most likely an implementation error.'
+        warn(message, RuntimeWarning)
+        ctx.logger.warning(message)
+        save_path.unlink()
+    else:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+    return save_path

@@ -8,6 +8,7 @@ from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency
 from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
+from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
 from edps.types import TimeBasedGraph
 
@@ -93,9 +94,8 @@ async def get_seasonality_graphs(
 
     @asynccontextmanager
     async def get_plot(plot_type: str):
-        async with ctx.output_context.get_plot(
-            column_plot_base + "_over_" + time_base_column_name + "_" + plot_type.lower()
-        ) as (axes, reference):
+        plot_name = column_plot_base + "_over_" + time_base_column_name + "_" + plot_type.lower()
+        async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
             axes.set_title(f"{plot_type} of {column_name} over {time_base_column_name}")
             axes.set_xlabel(time_base_column_name)
             axes.set_ylabel(f"{plot_type} of {column_name}")

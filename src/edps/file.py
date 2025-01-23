@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from filetype import guess
@@ -40,6 +41,11 @@ class File:
 
     def __repr__(self) -> str:
         return str(self.relative.as_posix())
+
+
+def sanitize_file_part(file_part: str) -> str:
+    """Keep only alphanumeric characters and -_"""
+    return re.sub(r"[^a-zA-Z0-9-_]", "", file_part)
 
 
 def calculate_size(path: Path) -> int:

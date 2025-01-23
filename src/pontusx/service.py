@@ -1,4 +1,3 @@
-import re
 import shutil
 from datetime import datetime
 from logging import Logger
@@ -9,7 +8,7 @@ from pydantic import HttpUrl, ValidationError
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
-from edps.context import OutputLocalFilesContext
+from edps.file import sanitize_file_part
 from edps.task import SimpleTaskContext
 from edps.types import Config, DataSpace, License, Publisher, UserProvidedEdpData
 from pontusx.args import Args
@@ -59,11 +58,6 @@ def identify_file_extension(logger: Logger, args: Args):
     return file_extension
 
 
-def sanitize_file_part(file_part: str) -> str:
-    # Keep only alphanumeric characters and -_
-    return re.sub(r"[^a-zA-Z0-9-_]", "", file_part)
-
-
 async def run_service(logger: Logger, args: Args):
     ddo = read_ddo_file(args.ddo_file)
     logger.debug("DDO: %s", ddo)
@@ -73,15 +67,9 @@ async def run_service(logger: Logger, args: Args):
 
     file_extension = sanitize_file_part(file_extension)
     input_filename = f"data.{file_extension}"
-    with (
-        TemporaryDirectory() as temp_working_dir_path,
-        TemporaryDirectory() as temp_output_dir_path,
-    ):
-        output_dir = Path(temp_output_dir_path)
-        logger.debug("Processing into output dir %s", output_dir)
-        output_context = OutputLocalFilesContext(output_dir)
 
-        ctx = SimpleTaskContext(logger, Path(temp_working_dir_path), output_context)
+    with TemporaryDirectory() as temp_working_dir_path:
+        ctx = SimpleTaskContext(logger, Path(temp_working_dir_path))
 
         ctx.input_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(args.raw_data_file, ctx.input_path / input_filename)
@@ -92,4 +80,4 @@ async def run_service(logger: Logger, args: Args):
 
         logger.info("Zipping EDP..")
         target_archive = args.output_dir / f"{sanitize_file_part(user_edp_data.assetId)}.zip"
-        await ZipAlgorithm().compress(output_dir, target_archive)
+        await ZipAlgorithm().compress(ctx.output_path, target_archive)

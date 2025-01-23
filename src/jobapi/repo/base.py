@@ -67,10 +67,6 @@ class Job(ABC):
         return self.job_base_dir / "input"
 
     @property
-    def result_dir(self) -> Path:
-        return self.job_base_dir / "result"
-
-    @property
     def zip_archive(self) -> Path:
         return self.job_base_dir / "result.zip"
 

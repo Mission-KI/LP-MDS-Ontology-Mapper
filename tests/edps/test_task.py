@@ -3,8 +3,8 @@ from logging import getLogger
 from edps.task import SimpleTaskContext, TaskContext
 
 
-async def test_task(path_work, output_context):
-    ctx = SimpleTaskContext(getLogger("task"), path_work, output_context)
+async def test_task(path_work):
+    ctx = SimpleTaskContext(getLogger("task"), path_work)
     r1 = ctx.exec(my_task_with_args, 42, b=10)
     assert r1 == 52
     r2 = await ctx.exec(my_async_task, "there")

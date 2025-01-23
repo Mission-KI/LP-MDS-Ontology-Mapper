@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import File, calculate_size
+from edps.filewriter import write_edp
 from edps.importers import IMPORTERS
 from edps.task import TaskContext
 from edps.types import (
@@ -58,7 +59,7 @@ class Service:
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         json_name = json_name.replace(".", "_")
-        return await ctx.output_context.write_edp(json_name, edp)
+        return await write_edp(ctx, json_name, edp)
 
     async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
         path = ctx.input_path
