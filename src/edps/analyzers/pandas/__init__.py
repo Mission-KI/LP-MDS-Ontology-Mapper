@@ -12,12 +12,10 @@ from warnings import warn
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
-from numpy import count_nonzero, linspace, ones_like, triu
+from numpy import linspace, ones_like, triu
 from pandas import (
     DataFrame,
     Series,
-    Timedelta,
-    UInt64Dtype,
     concat,
 )
 from pydantic import BaseModel, Field
@@ -26,6 +24,8 @@ from seaborn import heatmap
 from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
 from edps.analyzers.base import Analyzer
+from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
+from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
 from edps.analyzers.pandas.type_parser import (
     ColumnsWrapper,
     DatetimeColumnInfo,
@@ -40,7 +40,6 @@ from edps.types import (
     NumericColumn,
     StringColumn,
     StructuredDataSet,
-    TemporalConsistency,
     TemporalCover,
     TimeBasedGraph,
 )
@@ -112,27 +111,6 @@ class _PerTimeBaseSeasonalityGraphs:
         self.trend = trend
         self.seasonality = seasonality
         self.residual = residual
-
-
-class _DatetimeColumnTemporalConsistency:
-    def __init__(
-        self,
-        period: str,
-        temporal_consistencies: List[TemporalConsistency],
-        cleaned_series: Series,
-    ) -> None:
-        self.period = period
-        self.temporal_consistencies = temporal_consistencies
-        self.cleaned_series = cleaned_series
-
-    def get_main_temporal_consistency(self) -> TemporalConsistency:
-        return self.__getitem__(self.period)
-
-    def __getitem__(self, period: str) -> TemporalConsistency:
-        try:
-            return next((consistency for consistency in self.temporal_consistencies if consistency.timeScale == period))
-        except StopIteration as error:
-            raise KeyError(f"{period} not in the temporal consistencies") from error
 
 
 class Pandas(Analyzer):
@@ -308,7 +286,7 @@ class Pandas(Analyzer):
         computed[_DATETIME_MONOTONIC_DECREASING] = Series(
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
-        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await _compute_temporal_consistency(ctx, columns)
+        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await compute_temporal_consistency(ctx, columns)
         return computed
 
     async def _transform_numeric_results(
@@ -376,7 +354,7 @@ class Pandas(Analyzer):
         self, ctx: TaskContext, column: Series, computed_fields: Series, info: DatetimeColumnInfo
     ) -> DateTimeColumn:
         ctx.logger.debug('Transforming datetime column "%s" results to EDP', column.name)
-        temporal_consistency: Optional[_DatetimeColumnTemporalConsistency] = computed_fields[
+        temporal_consistency: Optional[DatetimeColumnTemporalConsistency] = computed_fields[
             _DATETIME_TEMPORAL_CONSISTENCY
         ]
 
@@ -415,78 +393,6 @@ async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -
             axes.figure.set_figwidth(3.0)
         axes.boxplot(column, notch=False, tick_labels=[str(column.name)])
     return reference
-
-
-async def _compute_temporal_consistency(ctx: TaskContext, columns: DataFrame) -> Series:
-    return Series({name: _compute_temporal_consistency_for_column(ctx, column) for name, column in columns.items()})
-
-
-def determine_periodicity(gaps: Series, distincts: Series) -> str:
-    diff = distincts - gaps
-    return str(diff.idxmax())
-
-
-def _compute_temporal_consistency_for_column(
-    ctx: TaskContext, column: Series
-) -> Optional[_DatetimeColumnTemporalConsistency]:
-    column = column.sort_values(ascending=True)
-    row_count = len(column)
-
-    TIME_BASE_THRESHOLD = 15
-    unique_timestamps = column.nunique()
-    if unique_timestamps < TIME_BASE_THRESHOLD:
-        message = (
-            "Can not analyze temporal consistency, time base contains too few unique timestamps. "
-            f"Have {unique_timestamps}, need at least {TIME_BASE_THRESHOLD}."
-        )
-        ctx.logger.warning(message)
-        warn(message)
-        return None
-
-    # Remove null entries
-    column = column[column.notnull()]  # type: ignore
-    new_count = len(column)
-    if new_count < row_count:
-        empty_index_count = row_count - new_count
-        message = f"Filtered out {empty_index_count} rows, because their index was empty"
-        ctx.logger.warning(message)
-        warn(message)
-        row_count = new_count
-
-    granularities = {
-        "microseconds": Timedelta(microseconds=1),
-        "milliseconds": Timedelta(milliseconds=1),
-        "seconds": Timedelta(seconds=1),
-        "minutes": Timedelta(minutes=1),
-        "hours": Timedelta(hours=1),
-        "days": Timedelta(days=1),
-        "weeks": Timedelta(weeks=1),
-        "months": Timedelta(days=30),
-        "years": Timedelta(days=365),
-    }
-
-    deltas = column.diff()[1:]
-    gaps = Series(
-        {label: count_nonzero(deltas > time_base) for label, time_base in granularities.items()},
-        dtype=UInt64Dtype(),
-    )
-    distincts = Series(
-        {label: column.dt.round(time_base).nunique() for label, time_base in granularities.items()},  # type: ignore
-        dtype=UInt64Dtype(),
-    )
-    stable = distincts == 1
-    periodicity = determine_periodicity(gaps, distincts)
-    temporal_consistencies = [
-        TemporalConsistency(
-            timeScale=time_base,
-            differentAbundancies=distincts[time_base],
-            stable=stable[time_base],
-            numberOfGaps=gaps[time_base],
-        )
-        for time_base in granularities
-    ]
-
-    return _DatetimeColumnTemporalConsistency(periodicity, temporal_consistencies, column)
 
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
@@ -653,7 +559,7 @@ async def _compute_seasonality(
 
     dataframe = DataFrame(index=numeric_columns.columns, columns=datetime_columns.ids, dtype=object)
 
-    periodicity: _DatetimeColumnTemporalConsistency
+    periodicity: DatetimeColumnTemporalConsistency
     for datetime_column_name, periodicity in datetime_column_periodicities.items():
         datetime_kind = datetime_columns.get_info(str(datetime_column_name)).get_kind()
 
