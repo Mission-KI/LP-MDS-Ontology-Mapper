@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from warnings import warn
 
+from extended_dataset_profile.models.v0.edp import TimeBasedGraph
 from matplotlib.figure import Figure
 from pandas import DataFrame, Series
 from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
@@ -10,7 +11,6 @@ from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalCon
 from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
-from edps.types import TimeBasedGraph
 
 
 class PerTimeBaseSeasonalityGraphs:

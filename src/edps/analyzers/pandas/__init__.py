@@ -7,6 +7,14 @@ from pathlib import PurePosixPath
 from typing import AsyncIterator, Dict, List, Optional, Tuple
 from uuid import uuid4
 
+from extended_dataset_profile.models.v0.edp import (
+    DateTimeColumn,
+    FileReference,
+    NumericColumn,
+    StringColumn,
+    StructuredDataSet,
+    TemporalCover,
+)
 from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
@@ -31,14 +39,6 @@ from edps.analyzers.pandas.type_parser import (
 from edps.file import File
 from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
-from edps.types import (
-    DateTimeColumn,
-    FileReference,
-    NumericColumn,
-    StringColumn,
-    StructuredDataSet,
-    TemporalCover,
-)
 
 
 class FittingConfig(BaseModel):

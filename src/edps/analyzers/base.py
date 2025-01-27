@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
 
+from extended_dataset_profile.models.v0.edp import DataSet
+
 from edps.task import TaskContext
-from edps.types import DataSet
 
 
 class Analyzer(ABC):

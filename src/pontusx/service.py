@@ -4,13 +4,13 @@ from logging import Logger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from extended_dataset_profile.models.v0.edp import Config, DataSpace, License, Publisher, UserProvidedEdpData
 from pydantic import HttpUrl, ValidationError
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
 from edps.file import sanitize_file_part
 from edps.task import SimpleTaskContext
-from edps.types import Config, DataSpace, License, Publisher, UserProvidedEdpData
 from pontusx.args import Args
 from pontusx.metadata import DDO, read_custom_data_file, read_ddo_file
 

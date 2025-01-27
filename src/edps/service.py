@@ -4,16 +4,7 @@ from pathlib import Path
 from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
-from pandas import DataFrame
-from pydantic import BaseModel
-
-from edps.analyzers.pandas import determine_periodicity
-from edps.compression import DECOMPRESSION_ALGORITHMS
-from edps.file import File, calculate_size, sanitize_file_part
-from edps.filewriter import write_edp
-from edps.importers import IMPORTERS
-from edps.task import TaskContext
-from edps.types import (
+from extended_dataset_profile.models.v0.edp import (
     AugmentedColumn,
     Compression,
     ComputedEdpData,
@@ -26,6 +17,15 @@ from edps.types import (
     TemporalCover,
     _BaseColumn,
 )
+from pandas import DataFrame
+from pydantic import BaseModel
+
+from edps.analyzers.pandas import determine_periodicity
+from edps.compression import DECOMPRESSION_ALGORITHMS
+from edps.file import File, calculate_size, sanitize_file_part
+from edps.filewriter import write_edp
+from edps.importers import IMPORTERS
+from edps.task import TaskContext
 
 
 class Service:
@@ -43,7 +43,7 @@ class Service:
         Parameters
         ----------
         ctx : TaskContext
-            Gives access to the appriopriate logger and output_context and allows executing sub-tasks.
+            Gives access to the appropriate logger and output_context and allows executing sub-tasks.
         config_data : Config
             The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
             by the user.

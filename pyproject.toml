@@ -22,6 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "argparse",
+    "extended_dataset_profile @ git+https://github.com/Beebucket/extended_dataset_profile@v0.1.0",
     "boto3",
     "filetype",
     "fitter",
@@ -121,6 +122,7 @@ ignore-packages = [
     "edps",
     "chardet",
     "fitter",
+    "extended-dataset-profile",
 ]
 partial-match = true
 allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0"

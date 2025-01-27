@@ -2,6 +2,7 @@ from enum import Enum
 from tempfile import TemporaryFile
 from uuid import UUID
 
+from extended_dataset_profile.models.v0.edp import UserProvidedEdpData
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -13,7 +14,6 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlmodel import create_engine
 
-from edps.types import UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.manager import AnalysisJobManager
 from jobapi.repo.base import JobRepository

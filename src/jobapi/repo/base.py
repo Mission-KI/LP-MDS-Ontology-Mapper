@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
-from edps.types import UserProvidedEdpData
+from extended_dataset_profile.models.v0.edp import UserProvidedEdpData
+
 from jobapi.types import JobState, JobView
 
 

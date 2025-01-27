@@ -3,11 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable, List
 
-from pytest import fixture, mark, raises
-
-from edps import Service
-from edps.task import TaskContext
-from edps.types import (
+from extended_dataset_profile.models.v0.edp import (
     Augmentation,
     AugmentedColumn,
     ComputedEdpData,
@@ -21,6 +17,10 @@ from edps.types import (
     TemporalConsistency,
     UserProvidedEdpData,
 )
+from pytest import fixture, mark, raises
+
+from edps import Service
+from edps.task import TaskContext
 
 ENCODING = "utf-8"
 
