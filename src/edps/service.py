@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path
-from shutil import rmtree
 from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
@@ -124,7 +123,7 @@ class Service:
                 yield file
             else:
                 compressions.add(file.type)
-                async with self._extract(file) as extracted_path:
+                async with self._extract(ctx, file) as extracted_path:
                     async for child_file in self._walk_all_files(ctx, extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
@@ -135,7 +134,7 @@ class Service:
             ctx.logger.warning('Can not extract or analyse "%s"', path)
 
     @asynccontextmanager
-    async def _extract(self, file: File) -> AsyncIterator[Path]:
+    async def _extract(self, ctx: TaskContext, file: File) -> AsyncIterator[Path]:
         archive_type = file.type
         if archive_type not in DECOMPRESSION_ALGORITHMS:
             raise RuntimeError(f'"{archive_type}" is not a know archive type')
@@ -148,11 +147,11 @@ class Service:
             directory /= "extracted"
 
         directory.mkdir()
+        ctx.logger.debug('Extracting archive "%s" into "%s"...', file, directory)
         await decompressor.extract(file.path, directory)
-        try:
-            yield directory
-        finally:
-            rmtree(directory.absolute())
+        ctx.logger.debug('Extracted archive "%s" is removed now', file)
+        file.path.unlink()
+        yield directory
 
     async def _add_augmentation(self, ctx: TaskContext, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
         structured_datasets = {dataset.name: dataset.get_columns_dict() for dataset in edp.structuredDatasets}
