@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "argparse",
-    "extended_dataset_profile @ git+https://github.com/Beebucket/extended_dataset_profile@v0.1.0",
+    "extended_dataset_profile @ git+https://github.com/Beebucket/extended_dataset_profile@v0.2.0",
     "boto3",
     "filetype",
     "fitter",
@@ -41,6 +41,11 @@ dependencies = [
     "xlrd",
     "sqlmodel",
     "pg8000",
+    "pillow",
+    "opencv-python",
+    "scikit-image",
+    "brisque",
+    "PyWavelets",
 ]
 
 [project.scripts]
@@ -99,6 +104,7 @@ asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
     "error",
     "ignore::matplotlib._api.deprecation.MatplotlibDeprecationWarning",
+    "ignore::DeprecationWarning:libsvm.svm"
 ]
 markers = ["slow: Tests that may take more than a few seconds."]
 
@@ -112,7 +118,8 @@ check_untyped_defs = true
 module = [
     "filetype",
     "fitter",
-    "statsmodels.*"
+    "statsmodels.*",
+    "brisque.*"
 ]
 ignore_missing_imports = true
 
@@ -123,6 +130,7 @@ ignore-packages = [
     "chardet",
     "fitter",
     "extended-dataset-profile",
+    "libsvm-official",
 ]
 partial-match = true
 allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0"
