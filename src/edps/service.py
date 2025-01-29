@@ -13,6 +13,7 @@ from extended_dataset_profile.models.v0.edp import (
     DataSetType,
     ExtendedDatasetProfile,
     FileReference,
+    ImageDataSet,
     StructuredDataSet,
     TemporalCover,
     _BaseColumn,
@@ -98,12 +99,16 @@ class Service:
         self, path: Path, compression: Optional[Compression], datasets: List[DataSet]
     ) -> ComputedEdpData:
         structured_datasets: List[StructuredDataSet] = []
+        image_datasets: List[ImageDataSet] = []
         data_types: Set[DataSetType] = set()
 
         for dataset in datasets:
             if isinstance(dataset, StructuredDataSet):
                 structured_datasets.append(dataset)
                 data_types.add(DataSetType.structured)
+            elif isinstance(dataset, ImageDataSet):
+                image_datasets.append(dataset)
+                data_types.add(DataSetType.image)
             else:
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
 
@@ -112,6 +117,7 @@ class Service:
             compression=compression,
             dataTypes=data_types,
             structuredDatasets=structured_datasets,
+            imageDatasets=image_datasets,
         )
 
     async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
