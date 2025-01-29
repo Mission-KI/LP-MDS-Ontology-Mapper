@@ -12,6 +12,9 @@ from extended_dataset_profile.models.v0.edp import (
     DataSpace,
     ExtendedDatasetProfile,
     FileReference,
+    ImageColorMode,
+    ImageDimensions,
+    ImageDPI,
     License,
     Publisher,
     TemporalConsistency,
@@ -203,6 +206,122 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
         "test_multiassets_zip/xlsx/test.xlsx",
         "test_multiassets_zip/zip/test_zip/test.csv",
     }
+
+
+@mark.asyncio
+async def test_analyse_png(ctx, path_data_test_png, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_png)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "PNG"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_jpg(ctx, path_data_test_jpg, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_jpg)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "JPEG"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_jpeg(ctx, path_data_test_jpeg, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_jpeg)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "JPEG"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_gif(ctx, path_data_test_gif, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_gif)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "GIF"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_bmp(ctx, path_data_test_bmp, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_bmp)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "BMP"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_tiff(ctx, path_data_test_tiff, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_tiff)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "TIFF"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_tif(ctx, path_data_test_tif, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_tif)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "TIFF"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert 90 <= edp.imageDatasets[0].dpi.x <= 100
+    assert 90 <= edp.imageDatasets[0].dpi.y <= 100
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+@mark.asyncio
+async def test_analyse_webp(ctx, path_data_test_webp, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_webp)
+    assert edp.compression is None
+    assert edp.imageDatasets[0].codec == "WEBP"
+    assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
+    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
+    _assert_pixel_metrics(edp.imageDatasets[0])
+
+
+def _assert_pixel_metrics(image_dataset):
+    expected_brightness = 2.8
+    expected_blurriness = 660
+    expected_sharpness = 3.3
+    expected_brisque = 100
+
+    assert abs(image_dataset.brightness - expected_brightness) < 0.1
+    assert expected_blurriness * 0.9 <= image_dataset.blurriness <= expected_blurriness * 1.1
+    assert expected_sharpness * 0.9 <= image_dataset.sharpness <= expected_sharpness * 1.1
+    assert expected_brisque * 0.9 <= image_dataset.brisque <= expected_brisque * 1.1
+    assert 0.8 <= image_dataset.noise <= 12
+    assert not image_dataset.lowContrast
 
 
 @mark.asyncio

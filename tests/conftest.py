@@ -73,6 +73,46 @@ def path_data_test_multiassets_zip():
 
 
 @fixture
+def path_data_test_png():
+    return TESTS_ROOT_PATH / "data/test.png"
+
+
+@fixture
+def path_data_test_jpg():
+    return TESTS_ROOT_PATH / "data/test.jpg"
+
+
+@fixture
+def path_data_test_jpeg():
+    return TESTS_ROOT_PATH / "data/test.jpeg"
+
+
+@fixture
+def path_data_test_gif():
+    return TESTS_ROOT_PATH / "data/test.gif"
+
+
+@fixture
+def path_data_test_bmp():
+    return TESTS_ROOT_PATH / "data/test.bmp"
+
+
+@fixture
+def path_data_test_tiff():
+    return TESTS_ROOT_PATH / "data/test.tiff"
+
+
+@fixture
+def path_data_test_tif():
+    return TESTS_ROOT_PATH / "data/test.tif"
+
+
+@fixture
+def path_data_test_webp():
+    return TESTS_ROOT_PATH / "data/test.webp"
+
+
+@fixture
 def path_data_pontusx_algocustomdata():
     return TESTS_ROOT_PATH / "data/pontusx/algoCustomData.json"
 
