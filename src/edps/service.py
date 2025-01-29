@@ -75,9 +75,9 @@ class Service:
                 ctx.logger.warning(text)
                 warn(text, RuntimeWarning)
                 continue
-            analyzer = await ctx.exec(IMPORTERS[file_type], child_file)
-            async for dataset in ctx.exec(analyzer.analyze):
-                datasets.append(dataset)
+            async for analyzer in ctx.exec(IMPORTERS[file_type], child_file):
+                async for dataset in ctx.exec(analyzer.analyze):
+                    datasets.append(dataset)
 
         compression: Optional[Compression]
         if len(compression_algorithms) == 0:

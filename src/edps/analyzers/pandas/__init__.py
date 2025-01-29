@@ -95,7 +95,7 @@ class _Distributions(str, Enum):
     TooSmallDataset = "dataset too small to determine distribution"
 
 
-class Pandas(Analyzer):
+class PandasAnalyzer(Analyzer):
     def __init__(self, data: DataFrame, file: File):
         self._data = data
         self._file = file

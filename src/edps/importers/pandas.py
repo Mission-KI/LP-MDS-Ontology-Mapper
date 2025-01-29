@@ -1,18 +1,18 @@
 from asyncio import get_running_loop
 from csv import Dialect
-from typing import Literal
+from typing import AsyncIterator, Literal
 
 from clevercsv import Detector
 from clevercsv.detect import DetectionMethod
 from clevercsv.encoding import get_encoding
 from pandas import read_csv, read_excel
 
-from edps.analyzers.pandas import Pandas
+from edps.analyzers import PandasAnalyzer
 from edps.file import File
 from edps.task import TaskContext
 
 
-async def csv_importer(ctx: TaskContext, file: File):
+async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
     ctx.logger.info("Importing '%s' as CSV", file)
 
     dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, file, num_lines=100)
@@ -48,10 +48,12 @@ async def csv_importer(ctx: TaskContext, file: File):
         col_count = len(data_frame.columns)
         data_frame.columns = [f"col{i:03d}" for i in range(col_count)]
 
-    return Pandas(data_frame, file)
+    yield PandasAnalyzer(data_frame, file)
 
 
-async def excel_importer(ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]):
+async def excel_importer(
+    ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]
+) -> AsyncIterator[PandasAnalyzer]:
     """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
 
     ctx.logger.info("Importing '%s' as Excel", file)
@@ -78,15 +80,15 @@ async def excel_importer(ctx: TaskContext, file: File, engine: Literal["xlrd", "
     if len(sheets) > 1:
         ctx.logger.warning("Excel contains multiple sheets %s, only first one is used!", sheets)
 
-    return Pandas(dataframes[0], file)
+    yield PandasAnalyzer(dataframes[0], file)
 
 
-async def xlsx_importer(ctx: TaskContext, file: File):
-    return await excel_importer(ctx, file, "openpyxl")
+def xlsx_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
+    return excel_importer(ctx, file, "openpyxl")
 
 
-async def xls_importer(ctx: TaskContext, file: File):
-    return await excel_importer(ctx, file, "xlrd")
+def xls_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
+    return excel_importer(ctx, file, "xlrd")
 
 
 def _detect_dialect_encoding_and_has_header(ctx: TaskContext, file: File, num_lines: int | None):
