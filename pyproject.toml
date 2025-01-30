@@ -46,6 +46,7 @@ dependencies = [
     "scikit-image",
     "brisque",
     "PyWavelets",
+    "pypdf",
 ]
 
 [project.scripts]
