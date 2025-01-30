@@ -11,6 +11,7 @@ from extended_dataset_profile.models.v0.edp import (
     Config,
     DataSet,
     DataSetType,
+    DocumentDataSet,
     ExtendedDatasetProfile,
     FileReference,
     ImageDataSet,
@@ -98,27 +99,27 @@ class Service:
     def _create_computed_edp_data(
         self, path: Path, compression: Optional[Compression], datasets: List[DataSet]
     ) -> ComputedEdpData:
-        structured_datasets: List[StructuredDataSet] = []
-        image_datasets: List[ImageDataSet] = []
-        data_types: Set[DataSetType] = set()
-
-        for dataset in datasets:
-            if isinstance(dataset, StructuredDataSet):
-                structured_datasets.append(dataset)
-                data_types.add(DataSetType.structured)
-            elif isinstance(dataset, ImageDataSet):
-                image_datasets.append(dataset)
-                data_types.add(DataSetType.image)
-            else:
-                raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
-
-        return ComputedEdpData(
+        edp = ComputedEdpData(
             volume=calculate_size(path),
             compression=compression,
-            dataTypes=data_types,
-            structuredDatasets=structured_datasets,
-            imageDatasets=image_datasets,
+            dataTypes=set(),
+            structuredDatasets=[],
+            imageDatasets=[],
+            documentDatasets=[],
         )
+        for dataset in datasets:
+            if isinstance(dataset, StructuredDataSet):
+                edp.structuredDatasets.append(dataset)
+                edp.dataTypes.add(DataSetType.structured)
+            elif isinstance(dataset, ImageDataSet):
+                edp.imageDatasets.append(dataset)
+                edp.dataTypes.add(DataSetType.image)
+            elif isinstance(dataset, DocumentDataSet):
+                edp.documentDatasets.append(dataset)
+                edp.dataTypes.add(DataSetType.documents)
+            else:
+                raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
+        return edp
 
     async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
         """Will yield all files, recursively through directories and archives."""

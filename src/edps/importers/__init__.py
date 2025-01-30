@@ -4,6 +4,7 @@ from edps.analyzers import Analyzer
 from edps.file import File
 from edps.importers.images import raster_image_importer
 from edps.importers.pandas import csv_importer, xls_importer, xlsx_importer
+from edps.importers.pdf import pdf_importer
 from edps.importers.python import pickle_importer
 from edps.task import TaskContext
 
@@ -14,6 +15,7 @@ IMPORTERS: dict[str, Importer] = {
     "csv": csv_importer,
     "xls": xls_importer,
     "xlsx": xlsx_importer,
+    "pdf": pdf_importer,
     "pickle": pickle_importer,
     "png": raster_image_importer,
     "jpg": raster_image_importer,
