@@ -2,6 +2,9 @@ name: Build container
 
 on: [pull_request]
 
+env:
+    PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+
 jobs:
     linter:
         runs-on: ubuntu-24.04

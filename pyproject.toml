@@ -47,6 +47,9 @@ dependencies = [
     "brisque",
     "PyWavelets",
     "pypdf",
+    "torch==2.6.0+cpu",
+    "torchvision==0.21.0+cpu",
+    "easyocr",
 ]
 
 [project.scripts]
@@ -120,7 +123,8 @@ module = [
     "filetype",
     "fitter",
     "statsmodels.*",
-    "brisque.*"
+    "brisque.*",
+    "easyocr"
 ]
 ignore_missing_imports = true
 
@@ -132,6 +136,8 @@ ignore-packages = [
     "fitter",
     "extended-dataset-profile",
     "libsvm-official",
+    "torchvision",
+    "easyocr"
 ]
 partial-match = true
-allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0"
+allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0;GNU Library or Lesser General Public License (LGPL)"

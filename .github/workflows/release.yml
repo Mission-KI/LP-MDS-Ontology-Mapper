@@ -10,6 +10,7 @@ env:
     IMAGE_PATH: beebucket/edps
     WHEEL_NAME: edps.whl
     LICENSES_ARTIFACT_NAME: licenses.csv
+    PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
 
 jobs:
     build_wheel:

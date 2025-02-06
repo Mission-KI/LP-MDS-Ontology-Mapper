@@ -6,6 +6,26 @@ modal datasets.
 
 # Developer Info
 
+The project's dependencies are managed via pip. Typically, you can install them by running:
+
+```bash
+pip install .
+```
+
+However, if you require CPU-based PyTorch wheels, you must direct pip to the PyTorch CPU package index. 
+You can achieve this by setting the PIP_EXTRA_INDEX_URL environment variable:
+
+```bash
+export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+pip install .
+```
+
+Alternatively, you can specify the extra index URL directly with pip:
+
+```bash
+pip install . --extra-index-url https://download.pytorch.org/whl/cpu
+```
+
 ## Release Process
 
 To create a release, just push a tag to the repository. The pipeline will then run checks
