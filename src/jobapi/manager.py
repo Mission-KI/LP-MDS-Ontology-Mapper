@@ -1,10 +1,12 @@
+import logging
 import shutil
+from contextlib import closing, contextmanager
 from datetime import UTC, datetime
-from logging import getLogger
+from logging import Logger, getLogger
 from pathlib import Path
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Iterator, Optional
 from uuid import UUID, uuid4
 
 from extended_dataset_profile.models.v0.edp import Config, UserProvidedEdpData
@@ -62,6 +64,13 @@ class AnalysisJobManager:
                 raise RuntimeError(f"There is no result for job {job.job_id}")
             return job.zip_archive
 
+    async def get_log_file(self, job_id: UUID) -> Path:
+        """This call returns the path to the job log file, no matter if and how far the job has been processed."""
+
+        async with self._job_repo.new_session() as session:
+            job: Job = await session.get_job(job_id)
+            return job.log_file
+
     async def process_job(self, job_id: UUID):
         """If the job is in state 'QUEUED' process the job.
         During processing it changes to state 'PROCESSING'. When finished it changes to 'COMPLETED' or 'FAILED'.
@@ -81,8 +90,11 @@ class AnalysisJobManager:
             job = await session.get_job(job_id)
             self._logger.info("Starting job %s...", job_id)
             try:
-                with TemporaryDirectory() as temp_working_dir:
-                    ctx = SimpleTaskContext(getLogger("process_job"), Path(temp_working_dir))
+                with (
+                    TemporaryDirectory() as temp_working_dir,
+                    init_file_logger("process_job", job.log_file) as job_logger,
+                ):
+                    ctx = SimpleTaskContext(job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path)
                     config = Config(userProvidedEdpData=job.user_data)
                     await self._service.analyse_asset(ctx, config)
@@ -132,3 +144,15 @@ class AnalysisJobManager:
                 data_file_path,
                 data_file_path.stat().st_size,
             )
+
+
+@contextmanager
+def init_file_logger(name: str, log_path: Path) -> Iterator[Logger]:
+    """Create a new logger that logs to the given file. File is closed on contextmanager exit."""
+    logger = getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    with closing(logging.FileHandler(log_path)) as file_handler:
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s - %(message)s"))
+        logger.addHandler(file_handler)
+        yield logger

@@ -71,6 +71,10 @@ class Job(ABC):
     def zip_archive(self) -> Path:
         return self.job_base_dir / "result.zip"
 
+    @property
+    def log_file(self) -> Path:
+        return self.job_base_dir / "job.log"
+
 
 class JobSession(ABC):
     """Abstract JobSession for creating and finding jobs. It is instantiated by the JobRepository."""
