@@ -29,12 +29,13 @@ async def write_edp(ctx: TaskContext, name: str, edp: ExtendedDatasetProfile) ->
     Return the path of the new file relative to ctx.output_path."""
 
     save_path = _prepare_save_path(ctx, name, "json")
+    relative_save_path = save_path.relative_to(ctx.output_path)
     with open(save_path, "wt", encoding=TEXT_ENCODING) as io_wrapper:
         json: str = edp.model_dump_json()
         loop = get_running_loop()
         await loop.run_in_executor(None, io_wrapper.write, json)
-    ctx.logger.debug('Generated text file "%s"', save_path)
-    return PurePosixPath(save_path.relative_to(ctx.output_path))
+    ctx.logger.debug('Generated EDP file "%s"', relative_save_path)
+    return PurePosixPath(relative_save_path)
 
 
 def setup_matplotlib():
@@ -64,13 +65,14 @@ async def get_pyplot_writer(ctx: TaskContext, name: str) -> AsyncIterator[Tuple[
     Before using this function `setup_matplotlib()` must be called exactly once."""
 
     save_path = _prepare_save_path(ctx, name, MATPLOTLIB_PLOT_FORMAT)
+    relative_save_path = save_path.relative_to(ctx.output_path)
     figure, axes = matplotlib.pyplot.subplots()
     axes.autoscale(True)
-    yield axes, PurePosixPath(save_path.relative_to(ctx.output_path))
+    yield axes, PurePosixPath(relative_save_path)
     figure.tight_layout()
     figure.savefig(save_path)
     matplotlib.pyplot.close(figure)
-    ctx.logger.debug('Generated plot "%s"', save_path)
+    ctx.logger.debug('Generated plot "%s"', relative_save_path)
 
 
 def _prepare_save_path(ctx: TaskContext, name: str, suffix: str):

@@ -153,7 +153,7 @@ class Service:
             directory /= "extracted"
 
         directory.mkdir()
-        ctx.logger.debug('Extracting archive "%s" into "%s"...', file, directory)
+        ctx.logger.debug('Extracting archive "%s"...', file)
         await decompressor.extract(file.path, directory)
         ctx.logger.debug('Extracted archive "%s" is removed now', file)
         file.path.unlink()

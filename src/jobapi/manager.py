@@ -89,16 +89,21 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job = await session.get_job(job_id)
             self._logger.info("Starting job %s...", job_id)
+            self._logger.debug("Job data directory: %s", job.job_base_dir)
             try:
                 with (
                     TemporaryDirectory() as temp_working_dir,
                     init_file_logger("process_job", job.log_file) as job_logger,
                 ):
+                    self._logger.debug("Temporary working directory: %s", temp_working_dir)
                     ctx = SimpleTaskContext(job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path)
-                    config = Config(userProvidedEdpData=job.user_data)
+                    user_data = job.user_data
+                    config = Config(userProvidedEdpData=user_data)
+                    job_logger.info("Analysing asset '%s' version '%s'...", user_data.assetId, user_data.version)
                     await self._service.analyse_asset(ctx, config)
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
+                    job_logger.info("EDP created successfully")
                     job.update_state(JobState.COMPLETED)
                     job.finished = datetime.now(tz=UTC)
                     self._logger.info("Job %s completed.", job.job_id)
