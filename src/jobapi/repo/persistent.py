@@ -23,7 +23,6 @@ class DbJob(SQLModel, Job, table=True):
     f_asset_version: Optional[str] = Field(sa_column_kwargs={"name": "asset_version"})
     f_started: Optional[datetime] = Field(sa_column_kwargs={"name": "started"})
     f_finished: Optional[datetime] = Field(sa_column_kwargs={"name": "finished"})
-    f_user_data: str = Field(sa_column_kwargs={"name": "user_data"})
     # tasks: list["DbTask"] = Relationship(back_populates="job")
 
     def __init__(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
@@ -33,8 +32,8 @@ class DbJob(SQLModel, Job, table=True):
         self.f_state_detail: Optional[str] = None
         self.f_asset_id = user_data.assetId
         self.f_asset_version = user_data.version
-        # TODO store the user data in the directory
-        self.f_user_data = user_data.model_dump_json()
+        with self.user_data_file.open("w") as file:
+            file.write(user_data.model_dump_json())
 
     @property
     def job_id(self) -> UUID:
@@ -78,11 +77,16 @@ class DbJob(SQLModel, Job, table=True):
 
     @property
     def user_data(self) -> UserProvidedEdpData:
-        return UserProvidedEdpData.model_validate_json(self.f_user_data)
+        with self.user_data_file.open("r") as file:
+            return UserProvidedEdpData.model_validate_json(file.read())
 
     @property
     def job_base_dir(self) -> Path:
         return Path(self.f_job_base_dir)
+
+    @property
+    def user_data_file(self) -> Path:
+        return self.job_base_dir / "userdata.json"
 
 
 # class DbTask(SQLModel, table=True):
