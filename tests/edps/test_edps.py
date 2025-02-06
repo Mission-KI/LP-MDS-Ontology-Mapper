@@ -216,7 +216,7 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
 
 
 @mark.asyncio
-async def test_analyse_png(ctx, path_data_test_png, user_provided_data):
+async def test_analyse_png(ctx, path_data_test_png, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_png)
     assert edp.compression is None
@@ -229,7 +229,7 @@ async def test_analyse_png(ctx, path_data_test_png, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_jpg(ctx, path_data_test_jpg, user_provided_data):
+async def test_analyse_jpg(ctx, path_data_test_jpg, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_jpg)
     assert edp.compression is None
@@ -242,7 +242,7 @@ async def test_analyse_jpg(ctx, path_data_test_jpg, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_jpeg(ctx, path_data_test_jpeg, user_provided_data):
+async def test_analyse_jpeg(ctx, path_data_test_jpeg, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_jpeg)
     assert edp.compression is None
@@ -255,7 +255,7 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_gif(ctx, path_data_test_gif, user_provided_data):
+async def test_analyse_gif(ctx, path_data_test_gif, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_gif)
     assert edp.compression is None
@@ -267,7 +267,7 @@ async def test_analyse_gif(ctx, path_data_test_gif, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_bmp(ctx, path_data_test_bmp, user_provided_data):
+async def test_analyse_bmp(ctx, path_data_test_bmp, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_bmp)
     assert edp.compression is None
@@ -280,7 +280,7 @@ async def test_analyse_bmp(ctx, path_data_test_bmp, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_tiff(ctx, path_data_test_tiff, user_provided_data):
+async def test_analyse_tiff(ctx, path_data_test_tiff, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_tiff)
     assert edp.compression is None
@@ -293,7 +293,7 @@ async def test_analyse_tiff(ctx, path_data_test_tiff, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_tif(ctx, path_data_test_tif, user_provided_data):
+async def test_analyse_tif(ctx, path_data_test_tif, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_tif)
     assert edp.compression is None
@@ -306,7 +306,7 @@ async def test_analyse_tif(ctx, path_data_test_tif, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_webp(ctx, path_data_test_webp, user_provided_data):
+async def test_analyse_webp(ctx, path_data_test_webp, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_webp)
     assert edp.compression is None

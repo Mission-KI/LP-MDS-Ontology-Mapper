@@ -1,6 +1,7 @@
 from logging import getLogger
 from pathlib import Path
 
+from easyocr import easyocr
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
@@ -118,6 +119,11 @@ def path_data_test_webp():
 
 
 @fixture
+def path_data_test_with_text():
+    return TESTS_ROOT_PATH / "data/test_with_text.png"
+
+
+@fixture
 def path_data_pontusx_algocustomdata():
     return TESTS_ROOT_PATH / "data/pontusx/algoCustomData.json"
 
@@ -130,3 +136,9 @@ def path_data_pontusx_ddo():
 @fixture
 def ctx(path_work):
     return SimpleTaskContext(getLogger("TEST"), path_work)
+
+
+@fixture
+def download_ocr_models(ctx):
+    ctx.logger.info("Downloading OCR models.")
+    easyocr.Reader(lang_list=["en", "de"], gpu=False, download_enabled=True)
