@@ -11,7 +11,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlmodel import create_engine
 
 from jobapi.config import AppConfig
@@ -109,8 +109,8 @@ def get_job_api_router(app_config: AppConfig):
         responses={
             200: {
                 "description": "Successful Response",
-                "content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}},
-            }
+                "content": {"application/zip": {}},
+            },
         },
     )
     async def get_result(job_id: UUID):
@@ -120,6 +120,25 @@ def get_job_api_router(app_config: AppConfig):
         return FileResponse(zip_archive, media_type="application/zip", filename=zip_archive.name)
 
     @router.get(
+        "/analysisjob/{job_id}/log",
+        tags=[Tags.AnalysisJob],
+        summary="Return job log",
+        response_class=PlainTextResponse,
+        responses={
+            204: {
+                "description": "No log data",
+            },
+        },
+    )
+    async def get_log(job_id: UUID):
+        """This call returns the job log up to now."""
+
+        log_file = await job_manager.get_log_file(job_id)
+        if not log_file.exists():
+            return PlainTextResponse(status_code=204)
+        return FileResponse(log_file, media_type="text/plain")
+
+    @router.get(
         "/analysisjob/{job_id}/report",
         tags=[Tags.AnalysisJob],
         summary="Return PDF report after completed analysis",
@@ -127,8 +146,8 @@ def get_job_api_router(app_config: AppConfig):
         responses={
             200: {
                 "description": "Successful Response",
-                "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
-            }
+                "content": {"application/pdf": {}},
+            },
         },
     )
     async def get_report(job_id: UUID):
