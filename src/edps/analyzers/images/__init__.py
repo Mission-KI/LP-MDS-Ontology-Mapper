@@ -6,14 +6,14 @@ import brisque
 import cv2
 import numpy as np
 from extended_dataset_profile.models.v0.edp import ImageColorMode, ImageDataSet, ImageDimensions, ImageDPI
+from pandas import DataFrame
 from skimage.exposure import is_low_contrast
 from skimage.restoration import estimate_sigma
 
 from edps.analyzers.base import Analyzer
+from edps.analyzers.images.ocr import OCR
 from edps.file import File
 from edps.task import TaskContext
-
-brisque_model = brisque.BRISQUE(url=False)
 
 
 class ImageMetadata:
@@ -29,6 +29,7 @@ class ImageAnalyzer(Analyzer):
         self._data = data
         self._file = file
         self._metadata = metadata
+        self._detected_texts = DataFrame()
 
     async def analyze(self, ctx: TaskContext) -> AsyncIterator[ImageDataSet]:
         height, width, _ = self._data.shape
@@ -43,6 +44,9 @@ class ImageAnalyzer(Analyzer):
         brisque = await self._compute_brisque(self._data)
         noise = await self._compute_noise(self._data)
         low_contrast = await self._is_low_contrast(self._data)
+
+        # TODO: Process in further analysis steps
+        self._detected_texts = await self._detect_texts(self._data)
 
         yield ImageDataSet(
             uuid=uuid4(),
@@ -60,27 +64,32 @@ class ImageAnalyzer(Analyzer):
             lowContrast=low_contrast,
         )
 
-    async def _compute_brightness(self, img) -> float:
+    async def _compute_brightness(self, img: np.ndarray) -> float:
         img_converted = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
         brightness_channel = img_converted[:, :, 1]
         brightness_indication = cv2.mean(brightness_channel)[0]
         return brightness_indication
 
-    async def _compute_blurriness(self, img) -> float:
+    async def _compute_blurriness(self, img: np.ndarray) -> float:
         return float(cv2.Laplacian(img, cv2.CV_64F).var())
 
-    async def _compute_sharpness(self, img) -> float:
+    async def _compute_sharpness(self, img: np.ndarray) -> float:
         laplacian = cv2.Laplacian(img, cv2.CV_64F)
         gnorm = np.sqrt(laplacian**2)
         sharpness = np.average(gnorm)
         return float(sharpness)
 
-    async def _compute_brisque(self, img) -> float:
+    async def _compute_brisque(self, img: np.ndarray) -> float:
+        brisque_model = brisque.BRISQUE(url=False)
         return float(brisque_model.score(img))
 
-    async def _compute_noise(self, img) -> float:
+    async def _compute_noise(self, img: np.ndarray) -> float:
         return float(estimate_sigma(img, channel_axis=-1, average_sigmas=True))
 
-    async def _is_low_contrast(self, img) -> bool:
+    async def _is_low_contrast(self, img: np.ndarray) -> bool:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return bool(is_low_contrast(gray))
+
+    async def _detect_texts(self, img: np.ndarray) -> DataFrame:
+        ocr_detector = OCR(languages=["en", "de"])
+        return ocr_detector.read(img)
