@@ -12,7 +12,6 @@ from skimage.restoration import estimate_sigma
 
 from edps.analyzers.base import Analyzer
 from edps.analyzers.images.ocr import OCR
-from edps.file import File
 from edps.task import TaskContext
 
 
@@ -25,9 +24,9 @@ class ImageMetadata:
 
 
 class ImageAnalyzer(Analyzer):
-    def __init__(self, metadata: ImageMetadata, data: np.ndarray, file: File):
+    def __init__(self, metadata: ImageMetadata, data: np.ndarray, name: PurePosixPath):
         self._data = data
-        self._file = file
+        self._name = name
         self._metadata = metadata
         self._detected_texts = DataFrame()
 
@@ -51,7 +50,7 @@ class ImageAnalyzer(Analyzer):
         yield ImageDataSet(
             uuid=uuid4(),
             parentUuid=None,
-            name=PurePosixPath(self._file.relative),
+            name=self._name,
             codec=self._metadata.codec,
             colorMode=self._metadata.color_mode,
             resolution=self._metadata.resolution,

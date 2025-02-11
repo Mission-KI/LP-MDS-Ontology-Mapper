@@ -2,13 +2,14 @@ from pathlib import PurePosixPath
 from typing import AsyncIterator, Iterator, Optional
 from uuid import uuid4
 
-from extended_dataset_profile.models.v0.edp import DataSet, DocumentDataSet, ModificationState
+from extended_dataset_profile.models.v0.edp import DataSet, DocumentDataSet, ImageDataSet, ModificationState
 from PIL.Image import Image
 from pypdf import DocumentInformation, PdfReader
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.base import Analyzer
 from edps.file import File
+from edps.importers.images import build_raster_image_analyzer
 from edps.task import TaskContext
 
 
@@ -39,10 +40,9 @@ class PdfAnalyzer(Analyzer):
         num_images = 0
         for image in self._extract_images(ctx):
             num_images += 1
-            # TODO yield ImageDataSet from ImageImporter/Analyzer
-            # async for dataset in self._analyze_image(ctx, image):
-            #     dataset.parentUuid = doc_uuid
-            #     yield dataset
+            async for dataset in self._analyze_image(ctx, image, num_images):
+                dataset.parentUuid = doc_uuid
+                yield dataset
 
         yield DocumentDataSet(
             uuid=doc_uuid,
@@ -81,8 +81,12 @@ class PdfAnalyzer(Analyzer):
     # async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
     #     yield ...
 
-    # async def _analyze_image(self, ctx: TaskContext, image: Image) -> AsyncIterator[DataSet]:
-    #     yield ...
+    async def _analyze_image(self, ctx: TaskContext, image: Image, count: int) -> AsyncIterator[ImageDataSet]:
+        name = self.file.relative / f"image{count:03}"
+        ctx.logger.info("Invoking ImageAnalyzer for image #%d", count)
+        img_analyzer = build_raster_image_analyzer(image, PurePosixPath(name))
+        async for dataset in ctx.exec(img_analyzer.analyze):
+            yield dataset
 
 
 def _calc_modified(ids: Optional[ArrayObject], metadata: Optional[DocumentInformation]) -> ModificationState:
