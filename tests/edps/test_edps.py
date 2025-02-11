@@ -1,6 +1,6 @@
 import shutil
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, List
 
 from extended_dataset_profile.models.v0.edp import (
@@ -333,18 +333,24 @@ def _assert_pixel_metrics(image_dataset):
 
 async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_pdf)
+
     assert len(edp.documentDatasets) == 1
-    assert edp.documentDatasets[0].docType == "PDF-1.4"
-    assert edp.documentDatasets[0].author == "Sta Nord"
+    doc_dataset = edp.documentDatasets[0]
+    assert doc_dataset.docType == "PDF-1.4"
+    assert doc_dataset.author == "Sta Nord"
     assert (
-        edp.documentDatasets[0].subject
-        == "Investitionen für den Umweltschutz im Produzierenden Gewerbe in Schleswig-Holstein 2017"
+        doc_dataset.subject == "Investitionen für den Umweltschutz im Produzierenden Gewerbe in Schleswig-Holstein 2017"
     )
-    assert edp.documentDatasets[0].toolchain == "Microsoft® Excel® 2010"
-    assert edp.documentDatasets[0].keywords == []
-    assert edp.documentDatasets[0].numPages == 5
-    assert edp.documentDatasets[0].numImages == 1
-    assert edp.documentDatasets[0].modified == ModificationState.modified
+    assert doc_dataset.toolchain == "Microsoft® Excel® 2010"
+    assert doc_dataset.keywords == []
+    assert doc_dataset.numPages == 5
+    assert doc_dataset.numImages == 1
+    assert doc_dataset.modified == ModificationState.modified
+
+    assert len(edp.imageDatasets) == 1
+    img_dataset = edp.imageDatasets[0]
+    assert img_dataset.parentUuid == doc_dataset.uuid
+    assert img_dataset.name == PurePosixPath("test.pdf/image001")
 
 
 @mark.asyncio
