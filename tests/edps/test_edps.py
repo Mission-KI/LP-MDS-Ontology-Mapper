@@ -16,6 +16,7 @@ from extended_dataset_profile.models.v0.edp import (
     ImageDimensions,
     ImageDPI,
     License,
+    ModificationState,
     Publisher,
     TemporalConsistency,
     UserProvidedEdpData,
@@ -48,6 +49,11 @@ def user_provided_data():
 
 @fixture
 def config_data(user_provided_data):
+    return Config(userProvidedEdpData=user_provided_data, augmentedColumns=[])
+
+
+@fixture
+def config_data_with_augmentations(user_provided_data):
     augmented_columns = [
         AugmentedColumn(
             name="aufenthalt",
@@ -73,8 +79,9 @@ async def test_load_unknown_dir(analyse_asset_fn):
         await analyse_asset_fn(Path("/does/not/exist/"))
 
 
-async def test_analyse_pickle(path_data_test_pickle, compute_asset_fn, config_data):
-    computed_data = await compute_asset_fn(path_data_test_pickle)
+async def test_analyse_pickle(path_data_test_pickle, ctx, config_data_with_augmentations):
+    # Use config with augmentations in this test
+    computed_data = await compute_asset(ctx, config_data_with_augmentations, path_data_test_pickle)
 
     assert len(computed_data.structuredDatasets) == 1
     assert computed_data.periodicity == "hours"
@@ -86,7 +93,7 @@ async def test_analyse_pickle(path_data_test_pickle, compute_asset_fn, config_da
 
     aufenthalt = next(item for item in dataset.numericColumns if item.name == "aufenthalt")
     assert aufenthalt.dataType == "UInt32"
-    assert aufenthalt.augmentation == config_data.augmentedColumns[0].augmentation
+    assert aufenthalt.augmentation == config_data_with_augmentations.augmentedColumns[0].augmentation
 
     parkhaus = next(item for item in dataset.numericColumns if item.name == "parkhaus")
     assert parkhaus.dataType == "UInt8"
@@ -322,6 +329,22 @@ def _assert_pixel_metrics(image_dataset):
     assert expected_brisque * 0.9 <= image_dataset.brisque <= expected_brisque * 1.1
     assert 0.8 <= image_dataset.noise <= 12
     assert not image_dataset.lowContrast
+
+
+async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_pdf)
+    assert len(edp.documentDatasets) == 1
+    assert edp.documentDatasets[0].docType == "PDF-1.4"
+    assert edp.documentDatasets[0].author == "Sta Nord"
+    assert (
+        edp.documentDatasets[0].subject
+        == "Investitionen für den Umweltschutz im Produzierenden Gewerbe in Schleswig-Holstein 2017"
+    )
+    assert edp.documentDatasets[0].toolchain == "Microsoft® Excel® 2010"
+    assert edp.documentDatasets[0].keywords == []
+    assert edp.documentDatasets[0].numPages == 5
+    assert edp.documentDatasets[0].numImages == 1
+    assert edp.documentDatasets[0].modified == ModificationState.modified
 
 
 @mark.asyncio

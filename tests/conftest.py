@@ -68,6 +68,11 @@ def path_data_test_zip():
 
 
 @fixture
+def path_data_test_pdf():
+    return TESTS_ROOT_PATH / "data/test.pdf"
+
+
+@fixture
 def path_data_test_multiassets_zip():
     return TESTS_ROOT_PATH / "data/test_multiassets.zip"
 
