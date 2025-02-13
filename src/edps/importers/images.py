@@ -3,7 +3,7 @@ from pathlib import PurePosixPath
 from typing import AsyncIterator
 
 import numpy as np
-from extended_dataset_profile.models.v0.edp import ImageColorMode, ImageDimensions, ImageDPI
+from extended_dataset_profile.models.v0.edp import ImageColorMode, ImageDPI, Resolution
 from PIL.Image import Image
 from PIL.Image import open as open_image
 
@@ -35,7 +35,7 @@ def build_raster_image_analyzer(img: Image, name: PurePosixPath) -> ImageAnalyze
     img_metadata = ImageMetadata(
         codec=codec or "UNKNOWN",
         color_mode=ImageColorMode(color_mode),
-        resolution=ImageDimensions(width=resolution[0], height=resolution[1]),
+        resolution=Resolution(width=resolution[0], height=resolution[1]),
         dpi=ImageDPI(x=dpi[0], y=dpi[1]),
     )
     return ImageAnalyzer(img_metadata, img_array, name)
