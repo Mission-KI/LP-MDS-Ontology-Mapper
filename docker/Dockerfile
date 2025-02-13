@@ -1,5 +1,11 @@
 # First Stage: Build environment
 FROM python:3.12-slim AS build
+
+# Install git and g++ for building libsvm
+RUN apt-get update && \
+    apt-get install -y git build-essential
+
+ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
     
 # Set up a virtual environment and install dependencies from pyproject.toml
 ARG WHEELS_DIR="/wheels"
@@ -17,6 +23,10 @@ ARG VERSION
 LABEL ai.beebucket.maintainer="beebucket GmbH <hello@beebucket.ai>"
 LABEL ai.beebucket.version=${VERSION}
 
+# Install necessary packages for Open-CV
+RUN apt-get update && \
+    apt-get install -y ffmpeg libsm6 libxext6
+
 # Copy virtual environment from build stage
 COPY --from=build /venv /venv
 
@@ -30,6 +40,11 @@ RUN useradd -m appuser
 VOLUME ["/work"]
 RUN mkdir -p /work && chown -R appuser:appuser /work
 ENV WORKING_DIR=/work
+
+# Pre-download the EasyOCR model files
+RUN mkdir -p /work/models/ocr
+ENV EASYOCR_MODULE_PATH=/work/models/ocr
+RUN python -c "import easyocr; easyocr.Reader(['en', 'de'], gpu=False, download_enabled=True)"
 
 # Set user
 USER appuser
