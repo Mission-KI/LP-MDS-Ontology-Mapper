@@ -13,11 +13,11 @@ from extended_dataset_profile.models.v0.edp import (
     ExtendedDatasetProfile,
     FileReference,
     ImageColorMode,
-    ImageDimensions,
     ImageDPI,
     License,
     ModificationState,
     Publisher,
+    Resolution,
     TemporalConsistency,
     UserProvidedEdpData,
 )
@@ -222,7 +222,7 @@ async def test_analyse_png(ctx, path_data_test_png, download_ocr_models, user_pr
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "PNG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -235,7 +235,7 @@ async def test_analyse_jpg(ctx, path_data_test_jpg, download_ocr_models, user_pr
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -248,7 +248,7 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg, download_ocr_models, user_
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -261,7 +261,7 @@ async def test_analyse_gif(ctx, path_data_test_gif, download_ocr_models, user_pr
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "GIF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
     _assert_pixel_metrics(edp.imageDatasets[0])
 
@@ -273,7 +273,7 @@ async def test_analyse_bmp(ctx, path_data_test_bmp, download_ocr_models, user_pr
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "BMP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -286,7 +286,7 @@ async def test_analyse_tiff(ctx, path_data_test_tiff, download_ocr_models, user_
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -299,7 +299,7 @@ async def test_analyse_tif(ctx, path_data_test_tif, download_ocr_models, user_pr
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
     _assert_pixel_metrics(edp.imageDatasets[0])
@@ -312,7 +312,7 @@ async def test_analyse_webp(ctx, path_data_test_webp, download_ocr_models, user_
     assert edp.compression is None
     assert edp.imageDatasets[0].codec == "WEBP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
-    assert edp.imageDatasets[0].resolution == ImageDimensions(width=600, height=400)
+    assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
     _assert_pixel_metrics(edp.imageDatasets[0])
 
@@ -322,6 +322,7 @@ def _assert_pixel_metrics(image_dataset):
     expected_blurriness = 660
     expected_sharpness = 3.3
     expected_brisque = 100
+    expected_ela_score = 13.6
 
     assert abs(image_dataset.brightness - expected_brightness) < 0.1
     assert expected_blurriness * 0.9 <= image_dataset.blurriness <= expected_blurriness * 1.1
@@ -329,6 +330,11 @@ def _assert_pixel_metrics(image_dataset):
     assert expected_brisque * 0.9 <= image_dataset.brisque <= expected_brisque * 1.1
     assert 0.8 <= image_dataset.noise <= 12
     assert not image_dataset.lowContrast
+
+    if image_dataset.codec in ("JPG", "JPEG"):
+        assert abs(image_dataset.elaScore - expected_ela_score) < 0.1
+    else:
+        assert image_dataset.elaScore is None
 
 
 async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
