@@ -1,5 +1,6 @@
+import threading
 from pathlib import PurePosixPath
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 from uuid import uuid4
 
 import brisque
@@ -79,8 +80,7 @@ class ImageAnalyzer(Analyzer):
         return float(sharpness)
 
     async def _compute_brisque(self, img: np.ndarray) -> float:
-        brisque_model = brisque.BRISQUE(url=False)
-        return float(brisque_model.score(img))
+        return float(get_brisque_model().score(img))
 
     async def _compute_noise(self, img: np.ndarray) -> float:
         return float(estimate_sigma(img, channel_axis=-1, average_sigmas=True))
@@ -90,5 +90,30 @@ class ImageAnalyzer(Analyzer):
         return bool(is_low_contrast(gray))
 
     async def _detect_texts(self, img: np.ndarray) -> DataFrame:
-        ocr_detector = OCR(languages=["en", "de"])
-        return ocr_detector.read(img)
+        return get_ocr_model().read(img)
+
+
+class ThreadLocal[T](threading.local):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.model: Optional[T] = None
+
+
+# Thread-local storage for OCR model
+local_ocr: ThreadLocal[OCR] = ThreadLocal()
+
+
+def get_ocr_model() -> OCR:
+    if local_ocr.model is None:
+        local_ocr.model = OCR(languages=["en", "de"])
+    return local_ocr.model
+
+
+# Thread-local storage for BRISQUE model
+local_brisque: ThreadLocal[brisque.BRISQUE] = ThreadLocal()
+
+
+def get_brisque_model() -> brisque.BRISQUE:
+    if local_brisque.model is None:
+        local_brisque.model = brisque.BRISQUE(url=False)
+    return local_brisque.model
