@@ -50,6 +50,8 @@ dependencies = [
     "torch",
     "torchvision",
     "easyocr",
+    "python-ffmpeg",
+    "static-ffmpeg",
 ]
 
 [project.scripts]
@@ -117,7 +119,7 @@ sqlite_cache = true
 cache_fine_grained = true
 
 [[tool.mypy.overrides]]
-module = ["filetype", "fitter", "statsmodels.*", "brisque.*", "easyocr"]
+module = ["filetype", "fitter", "statsmodels.*", "brisque.*", "easyocr", "ffmpeg", "static_ffmpeg",]
 ignore_missing_imports = true
 
 [tool.pip-licenses]

@@ -18,6 +18,7 @@ from extended_dataset_profile.models.v0.edp import (
     StructuredDataSet,
     TemporalCover,
     UnstructuredTextDataSet,
+    VideoDataSet,
     _BaseColumn,
 )
 from pandas import DataFrame
@@ -118,6 +119,9 @@ class Service:
             elif isinstance(dataset, ImageDataSet):
                 edp.imageDatasets.append(dataset)
                 edp.dataTypes.add(DataSetType.image)
+            elif isinstance(dataset, VideoDataSet):
+                edp.videoDatasets.append(dataset)
+                edp.dataTypes.add(DataSetType.video)
             elif isinstance(dataset, DocumentDataSet):
                 edp.documentDatasets.append(dataset)
                 edp.dataTypes.add(DataSetType.documents)
