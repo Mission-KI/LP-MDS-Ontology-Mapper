@@ -119,6 +119,36 @@ def path_data_test_webp():
 
 
 @fixture
+def path_data_test_mp4():
+    return TESTS_ROOT_PATH / "data/test.mp4"
+
+
+@fixture
+def path_data_test_avi():
+    return TESTS_ROOT_PATH / "data/test.avi"
+
+
+@fixture
+def path_data_test_mkv():
+    return TESTS_ROOT_PATH / "data/test.mkv"
+
+
+@fixture
+def path_data_test_mov():
+    return TESTS_ROOT_PATH / "data/test.mov"
+
+
+@fixture
+def path_data_test_flv():
+    return TESTS_ROOT_PATH / "data/test.flv"
+
+
+@fixture
+def path_data_test_wmv():
+    return TESTS_ROOT_PATH / "data/test.wmv"
+
+
+@fixture
 def path_data_test_with_text():
     return TESTS_ROOT_PATH / "data/test_with_text.png"
 

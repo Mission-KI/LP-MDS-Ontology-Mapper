@@ -20,6 +20,8 @@ from extended_dataset_profile.models.v0.edp import (
     Resolution,
     TemporalConsistency,
     UserProvidedEdpData,
+    VideoCodec,
+    VideoPixelFormat,
 )
 from pytest import fixture, mark, raises
 
@@ -225,7 +227,7 @@ async def test_analyse_png(ctx, path_data_test_png, download_ocr_models, user_pr
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -238,7 +240,7 @@ async def test_analyse_jpg(ctx, path_data_test_jpg, download_ocr_models, user_pr
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -251,7 +253,7 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg, download_ocr_models, user_
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -263,7 +265,7 @@ async def test_analyse_gif(ctx, path_data_test_gif, download_ocr_models, user_pr
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -276,7 +278,7 @@ async def test_analyse_bmp(ctx, path_data_test_bmp, download_ocr_models, user_pr
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -289,7 +291,7 @@ async def test_analyse_tiff(ctx, path_data_test_tiff, download_ocr_models, user_
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -302,7 +304,7 @@ async def test_analyse_tif(ctx, path_data_test_tif, download_ocr_models, user_pr
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert 90 <= edp.imageDatasets[0].dpi.x <= 100
     assert 90 <= edp.imageDatasets[0].dpi.y <= 100
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
 @mark.asyncio
@@ -314,10 +316,10 @@ async def test_analyse_webp(ctx, path_data_test_webp, download_ocr_models, user_
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
     assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
-    _assert_pixel_metrics(edp.imageDatasets[0])
+    _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
-def _assert_pixel_metrics(image_dataset):
+def _assert_image_pixel_metrics(image_dataset):
     expected_brightness = 2.8
     expected_blurriness = 660
     expected_sharpness = 3.3
@@ -335,6 +337,84 @@ def _assert_pixel_metrics(image_dataset):
         assert abs(image_dataset.elaScore - expected_ela_score) < 0.1
     else:
         assert image_dataset.elaScore is None
+
+
+@mark.asyncio
+async def test_analyse_mp4(ctx, path_data_test_mp4, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_mp4)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+
+
+@mark.asyncio
+async def test_analyse_avi(ctx, path_data_test_avi, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_avi)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.MPEG4
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+
+
+@mark.asyncio
+async def test_analyse_mkv(ctx, path_data_test_mkv, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_mkv)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+
+
+@mark.asyncio
+async def test_analyse_mov(ctx, path_data_test_mov, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_mov)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+
+
+@mark.asyncio
+async def test_analyse_flv(ctx, path_data_test_flv, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_flv)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.FLV1
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+
+
+@mark.asyncio
+async def test_analyse_wmv(ctx, path_data_test_wmv, user_provided_data):
+    config_data = Config(userProvidedEdpData=user_provided_data)
+    edp = await compute_asset(ctx, config_data, path_data_test_wmv)
+    video_dataset = edp.videoDatasets[0]
+    assert edp.compression is None
+    assert video_dataset.codec == VideoCodec.WMV2
+    assert video_dataset.resolution == Resolution(width=1280, height=720)
+    assert abs(video_dataset.fps - 30) < 0.1
+    assert abs(video_dataset.duration - 30.5) < 0.1
+    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
 
 
 async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
