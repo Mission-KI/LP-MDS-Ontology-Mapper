@@ -461,6 +461,25 @@ async def test_unstructured_text(path_unstructured_text_with_table, compute_asse
     assert unstructured_dataset.lineCount == 4
 
 
+async def test_analyse_docx(path_data_test_docx, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_docx)
+    assert len(edp.documentDatasets) == 1
+    doc_ds = edp.documentDatasets[0]
+    assert doc_ds.title == "Vornamen von Neugeborenen in der Stadt Aachen 2021"
+    assert doc_ds.keywords == ["Vornamen", "Neugeborene", "Aachen", "2021"]
+    assert len(edp.imageDatasets) == 2
+    image1_ds = edp.imageDatasets[0]
+    assert image1_ds.codec == "JPEG"
+    image2_ds = edp.imageDatasets[1]
+    assert image2_ds.codec == "PNG"
+    assert len(edp.structuredDatasets) == 1
+    table_ds = edp.structuredDatasets[0]
+    headers = [col.name for col in table_ds.all_columns]
+    assert set(headers) == {"anzahl", "vorname", "geschlecht", "position"}
+    assert table_ds.rowCount == 388
+    assert table_ds.columnCount == 4
+
+
 @mark.asyncio
 async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
     file_path = tmp_path / "unsupported.unsupported"
