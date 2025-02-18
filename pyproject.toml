@@ -47,6 +47,7 @@ dependencies = [
     "brisque",
     "PyWavelets",
     "pypdf",
+    "python-docx",
     "torch",
     "torchvision",
     "easyocr",
