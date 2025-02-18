@@ -2,6 +2,7 @@ from typing import AsyncIterator, Callable
 
 from edps.analyzers import Analyzer
 from edps.file import File
+from edps.importers.docx import docx_importer
 from edps.importers.images import raster_image_importer
 from edps.importers.pdf import pdf_importer
 from edps.importers.python import pickle_importer
@@ -18,6 +19,7 @@ IMPORTERS: dict[str, Importer] = {
     "xls": xls_importer,
     "xlsx": xlsx_importer,
     "pdf": pdf_importer,
+    "docx": docx_importer,
     "pickle": pickle_importer,
     "png": raster_image_importer,
     "jpg": raster_image_importer,

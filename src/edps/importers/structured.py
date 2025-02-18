@@ -8,7 +8,7 @@ from clevercsv.detect import DetectionMethod
 from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
 from clevercsv.potential_dialects import get_dialects as _get_dialects
-from pandas import read_csv, read_excel
+from pandas import Index, read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
 from edps.file import File
@@ -37,7 +37,7 @@ async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnal
     # Otherwise the headers are just numbers, not strings.
     if not has_header:
         col_count = len(data_frame.columns)
-        data_frame.columns = [f"col{i:03d}" for i in range(col_count)]
+        data_frame.columns = Index([f"col{i:03d}" for i in range(col_count)])
 
     yield PandasAnalyzer(data_frame, file)
 

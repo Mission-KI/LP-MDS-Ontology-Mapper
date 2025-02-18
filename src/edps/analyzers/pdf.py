@@ -11,6 +11,7 @@ from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.base import Analyzer
+from edps.analyzers.common import split_keywords
 from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
 from edps.importers.images import build_raster_image_analyzer
@@ -31,7 +32,7 @@ class PdfAnalyzer(Analyzer):
         file_version = self.pdf_reader.pdf_header.replace("%", "")
         pages = self.pdf_reader.pages
         toolchain = _calc_toolchain(metadata)
-        keywords = _calc_keywords(metadata.keywords if metadata else None)
+        keywords = split_keywords(metadata.keywords if metadata else None)
         modified = _calc_modified(self.pdf_reader._ID, metadata)
 
         extracted_text = self._extract_text(ctx)
@@ -124,31 +125,6 @@ def _calc_toolchain(metadata: Optional[DocumentInformation]) -> Optional[str]:
     # Remove duplicates
     parts = list(dict.fromkeys(parts))
     return "; ".join(parts) if parts else None
-
-
-def _calc_keywords(keywords_raw: Optional[str]) -> list[str]:
-    keywords_raw = keywords_raw.strip() if keywords_raw else None
-    # Ignore one-character keyword strings, like "|"
-    if not keywords_raw or len(keywords_raw) <= 1:
-        return []
-
-    # Try splitting on ";", then on ",", then on any whitespace character.
-    # Splitting must produce at least two parts, otherwise fallback to full keywords_raw.
-    return (
-        _try_splitting(keywords_raw, ";")
-        or _try_splitting(keywords_raw, ",")
-        or _try_splitting(keywords_raw, None)
-        or [keywords_raw]
-    )
-
-
-def _try_splitting(text: str, sep: str | None) -> list[str] | None:
-    # Split on separator, strip each part, remove empty parts.
-    # Return only if splitting produced at least two parts.
-    parts = text.split(sep)
-    parts = [p.strip() for p in parts]
-    parts = [p for p in parts if p]
-    return parts if len(parts) > 1 else None
 
 
 def _extract_page_text(ctx: TaskContext, page: PageObject) -> str:

@@ -1,3 +1,5 @@
+from typing import AsyncIterator
+
 from pypdf import PdfReader
 
 from edps.analyzers.pdf import PdfAnalyzer
@@ -5,7 +7,7 @@ from edps.file import File
 from edps.task import TaskContext
 
 
-async def pdf_importer(ctx: TaskContext, file: File):
+async def pdf_importer(ctx: TaskContext, file: File) -> AsyncIterator[PdfAnalyzer]:
     ctx.logger.info("Importing '%s' as PDF", file)
 
     with PdfReader(file.path) as pdf_reader:

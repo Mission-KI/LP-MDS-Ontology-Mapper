@@ -4,7 +4,7 @@ from extended_dataset_profile.models.v0.edp import ModificationState
 from pypdf import DocumentInformation
 from pypdf.generic import ArrayObject, TextStringObject
 
-from edps.analyzers.pdf import _calc_keywords, _calc_modified, _calc_toolchain
+from edps.analyzers.pdf import _calc_modified, _calc_toolchain
 
 
 def test_calc_toolchain():
@@ -18,26 +18,6 @@ def test_calc_toolchain():
         == "Microsoft Word; Adobe Acrobat"
     )
     assert _calc_toolchain(_metadata({"/Creator": "Adobe Acrobat", "/Producer": "  Adobe Acrobat "})) == "Adobe Acrobat"
-
-
-def test_calc_keywords():
-    assert _calc_keywords(None) == []
-    assert _calc_keywords("") == []
-    # Ignore one-character keyword strings
-    assert _calc_keywords("x") == []
-    assert _calc_keywords(" x  ") == []
-    assert _calc_keywords("TV") == ["TV"]
-    # Strip whitespace characters
-    assert _calc_keywords(" Test  ") == ["Test"]
-    # Splitting by ";" has precendence
-    assert _calc_keywords("  Abc;   beta  ;x; gamma ") == ["Abc", "beta", "x", "gamma"]
-    # Then splitting by ","
-    assert _calc_keywords("  Abc,   beta  ,x, gamma ") == ["Abc", "beta", "x", "gamma"]
-    # Strict priority between separators
-    assert _calc_keywords("  Abc,   beta  ;x, gamma ") == ["Abc,   beta", "x, gamma"]
-    # Finally split on whitespace character
-    assert _calc_keywords("  Abc   beta  x gamma ") == ["Abc", "beta", "x", "gamma"]
-    assert _calc_keywords("  Abc\tbeta  x\ngamma ") == ["Abc", "beta", "x", "gamma"]
 
 
 D1 = "D:20250101103000+02'00'"
