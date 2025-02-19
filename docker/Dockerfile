@@ -29,7 +29,7 @@ LABEL ai.beebucket.version=${VERSION}
 
 # Install necessary packages for Open-CV
 RUN apt-get update && \
-    apt-get install -y ffmpeg libsm6 libxext6
+    apt-get install -y python3-opencv
 
 # Copy virtual environment from build stage
 COPY --from=build /venv /venv
@@ -49,6 +49,9 @@ ENV WORKING_DIR=/work
 RUN mkdir -p /work/models/ocr
 ENV EASYOCR_MODULE_PATH=/work/models/ocr
 RUN python -c "import easyocr; easyocr.Reader(['en', 'de'], gpu=False, download_enabled=True)"
+
+# Pre-download the FFmpeg binaries
+RUN python -c "import static_ffmpeg; static_ffmpeg.add_paths()"
 
 # Set user
 USER appuser
