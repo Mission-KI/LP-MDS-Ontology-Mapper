@@ -28,7 +28,7 @@ from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import File, calculate_size, sanitize_file_part
 from edps.filewriter import write_edp
-from edps.importers import IMPORTERS
+from edps.importers import IMPORTERS, UNSUPPORTED_TYPE_MESSAGES
 from edps.task import TaskContext
 
 
@@ -76,6 +76,8 @@ class Service:
             extracted_size += child_file.size
             if file_type not in IMPORTERS:
                 text = f'Import for "{file_type}" not yet supported'
+                if file_type in UNSUPPORTED_TYPE_MESSAGES:
+                    text = UNSUPPORTED_TYPE_MESSAGES[file_type]
                 ctx.logger.warning(text)
                 warn(text, RuntimeWarning)
                 continue

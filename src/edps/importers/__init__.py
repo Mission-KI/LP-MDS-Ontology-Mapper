@@ -13,6 +13,7 @@ from edps.task import TaskContext
 
 Importer = Callable[[TaskContext, File], AsyncIterator[Analyzer]]
 
+
 # Dictionary mapping a file extension to Importer
 IMPORTERS: dict[str, Importer] = {
     "csv": csv_importer,
@@ -36,4 +37,9 @@ IMPORTERS: dict[str, Importer] = {
     "mov": video_importer,
     "flv": video_importer,
     "wmv": video_importer,
+}
+
+# Dictionary of unsupported types with specific message
+UNSUPPORTED_TYPE_MESSAGES: dict[str, str] = {
+    "doc": "DOC format is not supported directly. Please convert it to DOCX or PDF manually.",
 }
