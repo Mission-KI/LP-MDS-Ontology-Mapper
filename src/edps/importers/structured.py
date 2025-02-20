@@ -1,10 +1,13 @@
 from asyncio import get_running_loop
 from csv import Dialect
+from io import TextIOBase
 from typing import AsyncIterator, Literal
 
 from clevercsv import Detector
 from clevercsv.detect import DetectionMethod
+from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
+from clevercsv.potential_dialects import get_dialects as _get_dialects
 from pandas import read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
@@ -16,19 +19,7 @@ async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnal
     ctx.logger.info("Importing '%s' as CSV", file)
 
     dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, file, num_lines=100)
-
-    csv_dialect: Dialect | None = None
-    if dialect:
-        csv_dialect = dialect.to_csv_dialect()
-        ctx.logger.info(
-            "Detected dialect. Delimiter=%s, EscapeChar=%s, QuoteChar=%s",
-            dialect.delimiter,
-            dialect.escapechar,
-            dialect.quotechar,
-        )
-    else:
-        ctx.logger.info("No dialect detected")
-
+    csv_dialect = _translate_dialect(ctx, dialect)
     ctx.logger.info("%s", "Detected Header" if has_header else "No Header detected")
 
     def runner():
@@ -49,6 +40,16 @@ async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnal
         data_frame.columns = [f"col{i:03d}" for i in range(col_count)]
 
     yield PandasAnalyzer(data_frame, file)
+
+
+def _translate_dialect(ctx, dialect: None | SimpleDialect) -> None | Dialect:
+    if dialect:
+        converted_dialect = dialect.to_csv_dialect()
+        ctx.logger.info("Detected dialect: %s", dialect_to_str(converted_dialect))
+        return converted_dialect
+    else:
+        ctx.logger.info("No dialect detected")
+        return None
 
 
 async def excel_importer(
@@ -89,6 +90,20 @@ def xlsx_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]
 
 def xls_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
     return excel_importer(ctx, file, "xlrd")
+
+
+def get_possible_csv_dialects(opened_file: TextIOBase):
+    data = opened_file.read()
+    encoding = opened_file.encoding
+    return _get_dialects(data, encoding=encoding)
+
+
+def dialect_to_str(dialect: Dialect) -> str:
+    text = ""
+    text += f'delimiter "{dialect.delimiter}", ' if dialect.delimiter else "no delimiter, "
+    text += f'escapechar "{dialect.escapechar}", ' if dialect.escapechar else "no escapechar, "
+    text += f'quotechar "{dialect.quotechar}"' if dialect.quotechar else "no quotechar"
+    return text
 
 
 def _detect_dialect_encoding_and_has_header(ctx: TaskContext, file: File, num_lines: int | None):

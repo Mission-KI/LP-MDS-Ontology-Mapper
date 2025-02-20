@@ -1,0 +1,7 @@
+This text snippet contains a bunch of text plus a CSV table.
+
+id;name;width
+1;mochi cookies;10.2
+2;strawberry mochi;5.13
+
+And some more non-csv text in the end.

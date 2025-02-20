@@ -4,6 +4,7 @@ from pathlib import Path
 from easyocr import easyocr
 from pytest import fixture
 
+from edps.file import File
 from edps.filewriter import setup_matplotlib
 from edps.task import SimpleTaskContext
 
@@ -131,6 +132,16 @@ def path_data_pontusx_algocustomdata():
 @fixture
 def path_data_pontusx_ddo():
     return TESTS_ROOT_PATH / "data/pontusx/ddo.json"
+
+
+@fixture
+def file_unstructured_text_only_txt():
+    return File(TESTS_ROOT_PATH, TESTS_ROOT_PATH / "data/unstructured_text_only.txt")
+
+
+@fixture
+def file_unstructured_text_with_table():
+    return File(TESTS_ROOT_PATH, TESTS_ROOT_PATH / "data/unstructured_text_with_table.txt")
 
 
 @fixture

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from edps.file import File
-from edps.importers.pandas import csv_importer, xls_importer, xlsx_importer
+from edps.importers.structured import csv_importer, xls_importer, xlsx_importer
 
 
 async def test_import_csv(path_data_test_csv, ctx):
