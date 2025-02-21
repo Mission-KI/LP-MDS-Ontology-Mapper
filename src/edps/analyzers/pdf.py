@@ -1,10 +1,12 @@
+import warnings
 from pathlib import PurePosixPath
 from typing import AsyncIterator, Iterator, Optional
 from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import DataSet, DocumentDataSet, ImageDataSet, ModificationState
 from PIL.Image import Image
-from pypdf import DocumentInformation, PdfReader
+from pypdf import DocumentInformation, PageObject, PdfReader
+from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.base import Analyzer
@@ -66,8 +68,8 @@ class PdfAnalyzer(Analyzer):
     def _extract_text(self, ctx: TaskContext) -> str:
         ctx.logger.info("Extracting text...")
         pages = self.pdf_reader.pages
-        page_text = [p.extract_text() for p in pages]
-        return "\n".join(page_text)
+        page_text = [_extract_page_text(ctx, p) for p in pages]
+        return "\n\n".join(page_text)
 
     def _extract_images(self, ctx: TaskContext) -> Iterator[Image]:
         ctx.logger.info("Extracting images...")
@@ -137,3 +139,18 @@ def _try_splitting(text: str, sep: str | None) -> list[str] | None:
     parts = [p.strip() for p in parts]
     parts = [p for p in parts if p]
     return parts if len(parts) > 1 else None
+
+
+def _extract_page_text(ctx: TaskContext, page: PageObject) -> str:
+    # PyPDF doesn't handle empty pages properly!
+    if PageAttributes.CONTENTS not in page:
+        return ""
+    try:
+        # Try layout extraction mode which aims to reproduce the text layout from the coordinates.
+        # This is still experimental, so fall back to plain mode on error.
+        return page.extract_text(extraction_mode="layout")
+    except Exception as exception:
+        message = "Error with PDF extraction in layout mode, falling back to plain mode..."
+        ctx.logger.warning(message, exc_info=exception)
+        warnings.warn(message)
+        return page.extract_text(extraction_mode="plain")
