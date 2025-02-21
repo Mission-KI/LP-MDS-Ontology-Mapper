@@ -1,5 +1,6 @@
 import warnings
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from typing import AsyncIterator, Iterator, Optional
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.base import Analyzer
+from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
 from edps.importers.images import build_raster_image_analyzer
 from edps.task import TaskContext
@@ -32,12 +34,10 @@ class PdfAnalyzer(Analyzer):
         keywords = _calc_keywords(metadata.keywords if metadata else None)
         modified = _calc_modified(self.pdf_reader._ID, metadata)
 
-        self._extract_text(ctx)
-        # TODO yield TextDataSet from TextImporter/Analyzer
-        # extracted_text = self._extract_text(ctx)
-        # async for dataset in self._analyze_text(ctx, extracted_text):
-        #     dataset.parentUuid = doc_uuid
-        #     yield dataset
+        extracted_text = self._extract_text(ctx)
+        async for dataset in self._analyze_text(ctx, extracted_text):
+            dataset.parentUuid = doc_uuid
+            yield dataset
 
         num_images = 0
         for image in self._extract_images(ctx):
@@ -80,12 +80,22 @@ class PdfAnalyzer(Analyzer):
                 if image:
                     yield image
 
-    # async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
-    #     yield ...
+    async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
+        ctx.logger.info("Invoking unstructured text analyzer")
+        # TODO(mka): Rework this after Datasets are added to TaskContext
+        with TemporaryDirectory() as tmp_dir:
+            tmp_file = Path(tmp_dir) / "content.txt"
+            # UTF-8 is needed for umlauts etc.
+            with tmp_file.open("wt", encoding="utf-8") as file_io:
+                file_io.write(text)
+            file = File(tmp_file.parent, tmp_file)
+            text_analyzer = UnstructuredTextAnalyzer(file)
+            async for dataset in ctx.exec(text_analyzer.analyze):
+                yield dataset
 
     async def _analyze_image(self, ctx: TaskContext, image: Image, count: int) -> AsyncIterator[ImageDataSet]:
         name = self.file.relative / f"image{count:03}"
-        ctx.logger.info("Invoking ImageAnalyzer for image #%d", count)
+        ctx.logger.info("Invoking image analyzer for image #%d", count)
         img_analyzer = build_raster_image_analyzer(image, PurePosixPath(name))
         async for dataset in ctx.exec(img_analyzer.analyze):
             yield dataset

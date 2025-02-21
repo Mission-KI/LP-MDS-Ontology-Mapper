@@ -438,6 +438,9 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert img_dataset.parentUuid == doc_dataset.uuid
     assert img_dataset.name == PurePosixPath("test.pdf/image001")
 
+    assert len(edp.unstructuredTextDatasets) == 1
+    assert len(edp.structuredDatasets) == 0
+
 
 async def test_unstructured_text(path_unstructured_text_with_table, compute_asset_fn):
     edp = await compute_asset_fn(path_unstructured_text_with_table)
