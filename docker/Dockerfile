@@ -6,14 +6,18 @@ RUN apt-get update && \
     apt-get install -y git build-essential
 
 ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
-    
+
 # Set up a virtual environment and install dependencies from pyproject.toml
 ARG WHEELS_DIR="/wheels"
-RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
+RUN --mount=type=secret,id=REPO_TOKEN,required=true \
+    --mount=type=cache,mode=0755,target=/root/.cache/pip \
     --mount=type=bind,src=dist,target=${WHEELS_DIR},readonly \
+    git config --global url."https://$(cat /run/secrets/REPO_TOKEN)@github.com/".insteadOf "git@github.com:" && \
+    git config --global url."https://$(cat /run/secrets/REPO_TOKEN)@github.com".insteadOf "https://github.com" && \
     python3 -m venv /venv && \
     /venv/bin/pip install --upgrade pip && \
-    /venv/bin/pip install ${WHEELS_DIR}/edps*.whl
+    /venv/bin/pip install ${WHEELS_DIR}/edps*.whl && \
+    rm -f /root/.gitconfig
 
 # Second Stage: Production environment
 FROM python:3.12-slim AS runner
