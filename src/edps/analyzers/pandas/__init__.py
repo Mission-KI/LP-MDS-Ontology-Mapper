@@ -15,7 +15,6 @@ from extended_dataset_profile.models.v0.edp import (
     StructuredDataSet,
     TemporalCover,
 )
-from fitter import Fitter, get_common_distributions
 from matplotlib.figure import Figure
 from matplotlib.pyplot import get_cmap
 from numpy import linspace, ones_like, triu
@@ -29,6 +28,7 @@ from scipy.stats import distributions
 from seaborn import heatmap
 
 from edps.analyzers.base import Analyzer
+from edps.analyzers.pandas.fitter import Fitter, get_common_distributions
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
@@ -395,6 +395,7 @@ async def _get_distributions(
         name, column = values
         distributions.append(
             await _get_distribution(
+                ctx,
                 column,
                 _get_single_row(name, fields),
                 config,
@@ -413,6 +414,7 @@ async def _get_distributions(
 
 
 async def _get_distribution(
+    ctx: TaskContext,
     column: Series,
     fields: Series,
     config: FittingConfig,
@@ -425,24 +427,24 @@ async def _get_distribution(
     if fields[_COMMON_NON_NULL] < distribution_threshold:
         return _Distributions.TooSmallDataset.value, dict()
 
-    return await _find_best_distribution(column, config, fields, workers)
+    return await _find_best_distribution(ctx, column, config, fields, workers)
 
 
 async def _find_best_distribution(
-    column: Series, config: FittingConfig, column_fields: Series, workers: int
+    ctx: TaskContext, column: Series, config: FittingConfig, column_fields: Series, workers: int
 ) -> Tuple[str, dict]:
     loop = get_running_loop()
     fitter = Fitter(
         column,
-        xmin=column_fields[_NUMERIC_LOWER_DIST],
-        xmax=column_fields[_NUMERIC_UPPER_DIST],
+        x_min=column_fields[_NUMERIC_LOWER_DIST],
+        x_max=column_fields[_NUMERIC_UPPER_DIST],
         timeout=config.timeout.total_seconds(),
         bins=config.bins,
         distributions=config.distributions,
     )
 
     def runner():
-        return fitter.fit(max_workers=workers)
+        return fitter.fit(ctx)
 
     await loop.run_in_executor(None, runner)
     # According to documentation, this ony ever contains one entry.
