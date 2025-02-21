@@ -47,8 +47,8 @@ dependencies = [
     "brisque",
     "PyWavelets",
     "pypdf",
-    "torch==2.6.0+cpu",
-    "torchvision==0.21.0+cpu",
+    "torch",
+    "torchvision",
     "easyocr",
 ]
 
@@ -94,10 +94,7 @@ extend-select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [
-    "S101",
-    "S106",
-]
+"tests/*" = ["S101", "S106"]
 
 
 [tool.pytest.ini_options]
@@ -108,7 +105,7 @@ asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
     "error",
     "ignore::matplotlib._api.deprecation.MatplotlibDeprecationWarning",
-    "ignore::DeprecationWarning:libsvm.svm"
+    "ignore::DeprecationWarning:libsvm.svm",
 ]
 markers = ["slow: Tests that may take more than a few seconds."]
 
@@ -121,13 +118,7 @@ sqlite_cache = true
 cache_fine_grained = true
 
 [[tool.mypy.overrides]]
-module = [
-    "filetype",
-    "fitter",
-    "statsmodels.*",
-    "brisque.*",
-    "easyocr"
-]
+module = ["filetype", "fitter", "statsmodels.*", "brisque.*", "easyocr"]
 ignore_missing_imports = true
 
 [tool.pip-licenses]
@@ -139,7 +130,27 @@ ignore-packages = [
     "extended-dataset-profile",
     "libsvm-official",
     "torchvision",
-    "easyocr"
+    "easyocr",
 ]
 partial-match = true
-allow-only="MIT License;CMU License;ISCL;BSD License;Apache Software License;Python Software Foundation License;Unlicense;MPL 2.0;MIT-0;GNU Library or Lesser General Public License (LGPL)"
+
+[tool.uv.sources]
+torch = [
+    { index = "pypi", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-unix", marker = "sys_platform != 'win32'" },
+]
+torchvision = [
+    { index = "pypi", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-unix", marker = "sys_platform != 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-unix"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.python.org/simple"
+default = true
