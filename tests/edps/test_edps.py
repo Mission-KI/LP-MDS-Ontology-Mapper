@@ -359,9 +359,30 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert img_dataset.name == PurePosixPath("test.pdf/image001")
 
 
+async def test_unstructured_text(path_unstructured_text_with_table, compute_asset_fn):
+    edp = await compute_asset_fn(path_unstructured_text_with_table)
+    assert len(edp.structuredDatasets) == 1
+    assert len(edp.unstructuredTextDatasets) == 1
+    structured_dataset = edp.structuredDatasets[0]
+    assert structured_dataset.columnCount == 3
+    assert structured_dataset.rowCount == 2
+    headers = [column.name for column in structured_dataset.all_columns]
+    assert "id" in headers
+    assert "name" in headers
+    assert "width" in headers
+    assert structured_dataset.all_columns
+    assert structured_dataset.numericColumnCount == 2
+    assert structured_dataset.stringColumnCount == 1
+    assert structured_dataset.datetimeColumnCount == 0
+    unstructured_dataset = edp.unstructuredTextDatasets[0]
+    assert len(unstructured_dataset.embeddedTables) == 1
+    assert unstructured_dataset.wordCount == 20
+    assert unstructured_dataset.lineCount == 4
+
+
 @mark.asyncio
 async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
-    file_path = tmp_path / "unsupported.txt"
+    file_path = tmp_path / "unsupported.unsupported"
     with open(file_path, "wt", encoding="utf-8") as file:
         file.write("This type is not supported")
     with raises((RuntimeWarning, RuntimeError)):

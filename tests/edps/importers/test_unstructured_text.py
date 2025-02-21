@@ -5,13 +5,16 @@ from pytest import mark
 
 from edps.analyzers.base import Analyzer
 from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
+from edps.file import File
 from edps.importers.unstructured_text import unstructured_text_importer
 
 
 @mark.asyncio
-async def test_unstructured_text_only(ctx, file_unstructured_text_only_txt):
+async def test_unstructured_text_only(ctx, path_unstructured_text_only_txt):
     analyzers: List[Analyzer] = []
-    async for analyzer in unstructured_text_importer(ctx, file_unstructured_text_only_txt):
+    async for analyzer in unstructured_text_importer(
+        ctx, File(path_unstructured_text_only_txt.parent, path_unstructured_text_only_txt)
+    ):
         analyzers.append(analyzer)
     assert len(analyzers) == 1
     analyzer = analyzers[0]
@@ -19,10 +22,12 @@ async def test_unstructured_text_only(ctx, file_unstructured_text_only_txt):
 
 
 @mark.asyncio
-async def test_unstructured_text_with_table(ctx, file_unstructured_text_with_table):
+async def test_unstructured_text_with_table(ctx, path_unstructured_text_with_table):
     datasets = [
         dataset
-        async for analyzer in unstructured_text_importer(ctx, file_unstructured_text_with_table)
+        async for analyzer in unstructured_text_importer(
+            ctx, File(path_unstructured_text_with_table.parent, path_unstructured_text_with_table)
+        )
         async for dataset in ctx.exec(analyzer.analyze)
     ]
     assert len(datasets) == 2
