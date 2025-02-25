@@ -110,7 +110,7 @@ class ImageAnalyzer(Analyzer):
             ref_img_rgb = ref_img.convert(ImageColorMode.RGB)
             ref_img_array = np.array(ref_img_rgb)
 
-        ela_score = np.std(30 * cv2.absdiff(img, ref_img_array))
+        ela_score = np.std((30 * cv2.absdiff(img, ref_img_array)).astype(np.float32))
         return float(ela_score)
 
 
