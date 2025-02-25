@@ -422,18 +422,16 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
 
     assert len(edp.documentDatasets) == 1
     doc_dataset = edp.documentDatasets[0]
-    assert doc_dataset.docType == "PDF-1.4"
-    assert doc_dataset.author == "Sta Nord"
-    assert (
-        doc_dataset.subject == "Investitionen für den Umweltschutz im Produzierenden Gewerbe in Schleswig-Holstein 2017"
-    )
-    assert doc_dataset.toolchain == "Microsoft® Excel® 2010"
-    assert doc_dataset.keywords == []
-    assert doc_dataset.numPages == 5
-    assert doc_dataset.numImages == 1
-    assert doc_dataset.modified == ModificationState.modified
+    assert doc_dataset.docType == "PDF-1.7"
+    assert doc_dataset.title == "Vornamen von Neugeborenen in der Stadt Aachen 2021"
+    assert doc_dataset.subject == "Vornamen-Statistik"
+    assert doc_dataset.toolchain == "Microsoft® Word für Microsoft 365"
+    assert doc_dataset.keywords == ["Vornamen", "Neugeborene", "Aachen", "2021"]
+    assert doc_dataset.numPages == 18
+    assert doc_dataset.numImages == 2
+    assert doc_dataset.modified == ModificationState.unmodified
 
-    assert len(edp.imageDatasets) == 1
+    assert len(edp.imageDatasets) == 2
     img_dataset = edp.imageDatasets[0]
     assert img_dataset.parentUuid == doc_dataset.uuid
     assert img_dataset.name == PurePosixPath("test.pdf/image001")
