@@ -17,6 +17,7 @@ from pandas import DataFrame
 from edps.analyzers.base import Analyzer
 from edps.analyzers.common import split_keywords
 from edps.analyzers.pandas import PandasAnalyzer
+from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
 from edps.importers.images import raster_image_importer
 from edps.task import TaskContext
@@ -35,8 +36,10 @@ class DocxAnalyzer(Analyzer):
         keywords = split_keywords(props.keywords)
         modified = props.revision > 1
 
-        # TODO yield TextDataSet from TextImporter/Analyzer
-        self._extract_text(ctx)
+        extracted_text = self._extract_text(ctx)
+        async for dataset in self._analyze_text(ctx, extracted_text):
+            dataset.parentUuid = doc_uuid
+            yield dataset
 
         num_images = 0
         async for image_file in self._extract_images(ctx):
@@ -98,15 +101,6 @@ class DocxAnalyzer(Analyzer):
                         ctx.logger.debug("Extracted '%s' from DOCX to '%s'", media_file, media_file_path)
                     yield File(media_file_path.parent, media_file_path)
 
-    async def _analyze_image(self, ctx: TaskContext, image_file: File) -> AsyncIterator[ImageDataSet]:
-        ctx.logger.info("Invoking ImageAnalyzer for image '%s'", image_file)
-        try:
-            async for image_analyzer in raster_image_importer(ctx, image_file):
-                async for ds in ctx.exec(image_analyzer.analyze):
-                    yield ds
-        except Exception as exception:
-            ctx.logger.warning("Can't process DOCX media file '%s'", image_file, exc_info=exception)
-
     async def _extract_tables(self, ctx: TaskContext) -> AsyncIterator[DataFrame]:
         ctx.logger.info("Extracting tables...")
         for table in self.doc.tables:
@@ -116,6 +110,28 @@ class DocxAnalyzer(Analyzer):
                 cells.append(row_cells)
             # Assume first row is header
             yield DataFrame(cells[1:], columns=cells[0])
+
+    async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
+        ctx.logger.info("Invoking unstructured text analyzer")
+        # TODO(mka): Rework this after Datasets are added to TaskContext
+        with TemporaryDirectory() as tmp_dir:
+            tmp_file = Path(tmp_dir) / "content.txt"
+            # UTF-8 is needed for umlauts etc.
+            with tmp_file.open("wt", encoding="utf-8") as file_io:
+                file_io.write(text)
+            file = File(tmp_file.parent, tmp_file)
+            text_analyzer = UnstructuredTextAnalyzer(file)
+            async for dataset in ctx.exec(text_analyzer.analyze):
+                yield dataset
+
+    async def _analyze_image(self, ctx: TaskContext, image_file: File) -> AsyncIterator[ImageDataSet]:
+        ctx.logger.info("Invoking image analyzer for image '%s'", image_file)
+        try:
+            async for image_analyzer in raster_image_importer(ctx, image_file):
+                async for ds in ctx.exec(image_analyzer.analyze):
+                    yield ds
+        except Exception as exception:
+            ctx.logger.warning("Can't process DOCX media file '%s'", image_file, exc_info=exception)
 
     async def _analyze_table(self, ctx: TaskContext, table: DataFrame, count: int) -> AsyncIterator[StructuredDataSet]:
         ctx.logger.info("Invoking structured data analyzer for table %d", count)
