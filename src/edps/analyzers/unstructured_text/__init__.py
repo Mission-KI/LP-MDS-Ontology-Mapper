@@ -11,6 +11,7 @@ from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
 from clevercsv.exceptions import Error as CleverCsvError
 from extended_dataset_profile.models.v0.edp import EmbeddedTable, StructuredDataSet, UnstructuredTextDataSet
+from lingua import Language, LanguageDetectorBuilder
 from pandas import DataFrame
 
 from edps.analyzers.base import Analyzer as _BaseAnalyzer
@@ -43,22 +44,26 @@ class Analyzer(_BaseAnalyzer):
                 yield csv_dataset
 
             unstructured_only_file.seek(0)
-            yield self._analyze_unstructured_text(unstructured_only_file, embedded_tables)
+            yield self._analyze_unstructured_text(ctx, unstructured_only_file, embedded_tables)
 
     def _analyze_unstructured_text(
-        self, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
+        self, ctx: TaskContext, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
     ) -> UnstructuredTextDataSet:
-        line_count = 0
+        language_detector = LanguageDetectorBuilder.from_all_languages_without(*_EXCLUDED_LANGUAGES).build()
         word_count = 0
-        for line in opened_file:
-            line_count += 1
-            word_count += self._count_words(line)
+        text = opened_file.read()
+        language_detections = language_detector.detect_multiple_languages_of(text)
+        ctx.logger.info("Detected languages: %s", set(detection.language.name for detection in language_detections))
+        lines = text.splitlines(keepends=False)
+        line_count = sum(1 if line.strip() else 0 for line in lines)
+        word_count += self._count_words(text)
 
         return UnstructuredTextDataSet(
             uuid=self._uuid,
             parentUuid=self._parent_uuid,
             name=PurePosixPath(self._file.relative.as_posix()),
             embeddedTables=embedded_tables,
+            languages=set(detection.language.iso_code_639_3.name for detection in language_detections),
             lineCount=line_count,
             wordCount=word_count,
         )
@@ -376,3 +381,6 @@ class _CsvParser:
         if self._tracked_chunk and (self._tracked_chunk.column_count != len(row)):
             raise _LineParsingError("Number of columns does not match!")
         return row
+
+
+_EXCLUDED_LANGUAGES = [Language.WELSH, Language.IRISH]

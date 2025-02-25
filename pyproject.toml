@@ -26,6 +26,7 @@ dependencies = [
     "boto3",
     "filetype",
     "fitter",
+    "lingua-language-detector",
     "matplotlib",
     "numpy",
     "pandas",

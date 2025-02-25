@@ -440,7 +440,18 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert len(edp.structuredDatasets) == 0
 
 
-async def test_unstructured_text(path_unstructured_text_with_table, compute_asset_fn):
+async def test_unstructured_text_without_table(path_unstructured_text_only_txt, compute_asset_fn):
+    edp = await compute_asset_fn(path_unstructured_text_only_txt)
+    assert len(edp.unstructuredTextDatasets) == 1
+    unstructured_dataset = edp.unstructuredTextDatasets[0]
+    assert len(unstructured_dataset.languages) == 2
+    assert "deu" in unstructured_dataset.languages
+    assert "eng" in unstructured_dataset.languages
+    assert unstructured_dataset.wordCount == 12
+    assert unstructured_dataset.lineCount == 3
+
+
+async def test_unstructured_text_with_table(path_unstructured_text_with_table, compute_asset_fn):
     edp = await compute_asset_fn(path_unstructured_text_with_table)
     assert len(edp.structuredDatasets) == 1
     assert len(edp.unstructuredTextDatasets) == 1
@@ -457,8 +468,10 @@ async def test_unstructured_text(path_unstructured_text_with_table, compute_asse
     assert structured_dataset.datetimeColumnCount == 0
     unstructured_dataset = edp.unstructuredTextDatasets[0]
     assert len(unstructured_dataset.embeddedTables) == 1
+    assert len(unstructured_dataset.languages) == 1
+    assert "eng" in unstructured_dataset.languages
     assert unstructured_dataset.wordCount == 20
-    assert unstructured_dataset.lineCount == 4
+    assert unstructured_dataset.lineCount == 2
 
 
 async def test_analyse_docx(path_data_test_docx, compute_asset_fn):
