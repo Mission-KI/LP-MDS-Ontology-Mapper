@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from typing import AsyncIterator
@@ -42,11 +43,12 @@ class DocxAnalyzer(Analyzer):
             yield dataset
 
         num_images = 0
-        async for image_file in self._extract_images(ctx):
-            num_images += 1
-            async for image_ds in self._analyze_image(ctx, image_file):
-                image_ds.parentUuid = doc_uuid
-                yield image_ds
+        async for media_file in self._extract_media_files(ctx):
+            async for child_ds in self._analyze_media_file(ctx, media_file):
+                child_ds.parentUuid = doc_uuid
+                if isinstance(child_ds, ImageDataSet):
+                    num_images += 1
+                yield child_ds
 
         num_tables = 0
         async for dataframe in self._extract_tables(ctx):
@@ -80,8 +82,8 @@ class DocxAnalyzer(Analyzer):
         paragraph_texts = [p.text for p in paragraphs]
         return "\n".join(paragraph_texts)
 
-    async def _extract_images(self, ctx: TaskContext) -> AsyncIterator[File]:
-        ctx.logger.info("Extracting images...")
+    async def _extract_media_files(self, ctx: TaskContext) -> AsyncIterator[File]:
+        ctx.logger.info("Extracting media files...")
         # Open the .docx file as a zip archive
         with ZipFile(self.file.path, "r") as docx_zip:
             # Filter files in the 'word/media/' folder (which contains images)
@@ -124,14 +126,17 @@ class DocxAnalyzer(Analyzer):
             async for dataset in ctx.exec(text_analyzer.analyze):
                 yield dataset
 
-    async def _analyze_image(self, ctx: TaskContext, image_file: File) -> AsyncIterator[ImageDataSet]:
-        ctx.logger.info("Invoking image analyzer for image '%s'", image_file)
+    async def _analyze_media_file(self, ctx: TaskContext, media_file: File) -> AsyncIterator[DataSet]:
+        ctx.logger.info("Importing embedded media file '%s'...", media_file)
+        # TODO We can't use the import dictionary yet because we would get a circular dependency. To resolve this we'll move this into the TaskContext.
         try:
-            async for image_analyzer in raster_image_importer(ctx, image_file):
-                async for ds in ctx.exec(image_analyzer.analyze):
+            async for analyzer in raster_image_importer(ctx, media_file):
+                async for ds in ctx.exec(analyzer.analyze):
                     yield ds
         except Exception as exception:
-            ctx.logger.warning("Can't process DOCX media file '%s'", image_file, exc_info=exception)
+            message = f"Image importer can't process DOCX media file '{media_file}'"
+            ctx.logger.warning(message, exc_info=exception)
+            warnings.warn(message)
 
     async def _analyze_table(self, ctx: TaskContext, table: DataFrame, count: int) -> AsyncIterator[StructuredDataSet]:
         ctx.logger.info("Invoking structured data analyzer for table %d", count)

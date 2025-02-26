@@ -28,7 +28,7 @@ from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import File, calculate_size, sanitize_file_part
 from edps.filewriter import write_edp
-from edps.importers import IMPORTERS, UNSUPPORTED_TYPE_MESSAGES
+from edps.importers import get_importable_types, import_file
 from edps.task import TaskContext
 
 
@@ -37,7 +37,7 @@ class Service:
         _logger = getLogger(__name__)
         _logger.info("Initializing")
 
-        _logger.info("The following data types are supported: [%s]", ", ".join(IMPORTERS))
+        _logger.info("The following data types are supported: [%s]", get_importable_types())
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
@@ -72,18 +72,9 @@ class Service:
         datasets: List[DataSet] = []
 
         async for child_file in self._walk_all_files(ctx, path, compression_algorithms):
-            file_type = child_file.type
             extracted_size += child_file.size
-            if file_type not in IMPORTERS:
-                text = f'Import for "{file_type}" not yet supported'
-                if file_type in UNSUPPORTED_TYPE_MESSAGES:
-                    text = UNSUPPORTED_TYPE_MESSAGES[file_type]
-                ctx.logger.warning(text)
-                warn(text, RuntimeWarning)
-                continue
-            async for analyzer in ctx.exec(IMPORTERS[file_type], child_file):
-                async for dataset in ctx.exec(analyzer.analyze):
-                    datasets.append(dataset)
+            async for dataset in import_file(ctx, child_file):
+                datasets.append(dataset)
 
         compression: Optional[Compression]
         if len(compression_algorithms) == 0:
