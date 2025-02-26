@@ -8,9 +8,9 @@ from pydantic.dataclasses import dataclass
 
 @dataclass(frozen=True)
 class OCRBox:
-    x: int
-    y_top: int
-    y_bottom: int
+    x: float
+    y_top: float
+    y_bottom: float
     text: str
     confidence: float
 
