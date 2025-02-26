@@ -297,6 +297,7 @@ def _determine_type(ctx: TaskContext, column: Series) -> tuple[Series, ColumnInf
     column_sample = column.sample(SAMPLE_SIZE) if len(column.index) > SAMPLE_SIZE else column
     # determine best type match based on the sample
     preferred_col_info = _determine_best_type_match(ctx, column_sample)
+    _validate_selected_column_info(ctx, column, preferred_col_info)
     return _do_type_conversion(ctx, column, preferred_col_info)
 
 
@@ -360,3 +361,34 @@ def _do_type_conversion(
 
 def _check_conversion_ratio_passed(valid_count, count):
     return valid_count >= MIN_CONVERSION_RATIO * count
+
+
+DATETIME_MAGIC_WORDS = [
+    "jahr",
+    "monat",
+    "tag",
+    "stunde",
+    "minute",
+    "sekunde",
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+]
+
+
+def _validate_selected_column_info(ctx: TaskContext, col: Series, col_info: Optional[ColumnInfo]):
+    col_label = f"{col.name}".lower().strip()
+    if col_label in DATETIME_MAGIC_WORDS and not isinstance(col_info, DatetimeColumnInfo):
+        _warning(
+            ctx,
+            f"The column '{col.name}' is maybe intended as a date/time column but the content could not be parsed. Please use ISO datetime format!",
+        )
+
+
+# TODO Find a better integrated solution
+def _warning(ctx: TaskContext, message: str):
+    ctx.logger.warning(message)
+    warnings.warn(message)
