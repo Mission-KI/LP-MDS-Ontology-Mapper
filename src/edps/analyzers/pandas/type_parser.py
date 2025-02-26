@@ -46,12 +46,10 @@ class DatetimeColumnInfo(_BaseColumnInfo):
 
     def cast(self, ctx: TaskContext, col: Series) -> Series:
         if self.get_kind() == DatetimeKind.TIME:
-            ctx.logger.warning(
-                "Column '%s' contains pure times without dates. This is handled as a string column.", col.name
-            )
+            _warning(ctx, f"Column '{col.name}' contains pure times without dates. This is handled as a string column.")
             return col.astype(StringDtype())
         elif self.get_kind() == DatetimeKind.DATE:
-            ctx.logger.warning("Column '%s' contains pure dates without times.", col.name)
+            _warning(ctx, f"Column '{col.name}' contains pure dates without times.")
             return self._cast_internal(ctx, col)
         else:
             return self._cast_internal(ctx, col)
@@ -67,9 +65,9 @@ class DatetimeColumnInfo(_BaseColumnInfo):
             return to_datetime(col_converted, errors="coerce", utc=False)
         else:
             if count_without_timezone > 0:
-                ctx.logger.warning(
-                    "Found datetime column '%s' which contains entries partially with and without timezone. For entries without timezone UTC is assumed.",
-                    col.name,
+                _warning(
+                    ctx,
+                    f"Found datetime column '{col.name}' which contains entries partially with and without timezone. For entries without timezone UTC is assumed.",
                 )
             # If there is at least one entry with a timezone we convert them to dtype "datetime64[ns, UTC]" with TZ=UTC.
             return to_datetime(col_converted, errors="coerce", utc=True)
@@ -341,12 +339,9 @@ def _do_type_conversion(
         converted_col = column_info.cast(ctx, column)
         count_na = converted_col.isna().sum()
         if count_na > 0:
-            ctx.logger.warning(
-                "Couldn't convert some entries of column '%s' using %s (%d invalid of %d non-null entries).",
-                column.name,
-                column_info,
-                count_na,
-                count,
+            _warning(
+                ctx,
+                f"Couldn't convert some entries of column '{column.name}' using {column_info} ({count_na} invalid of {count} non-null entries).",
             )
         else:
             ctx.logger.debug(
