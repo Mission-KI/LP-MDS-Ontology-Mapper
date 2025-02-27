@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from edps.importers.structured import csv_import_dataframe, excel_import_dataframes
+import pytest
+
+from edps.importers.structured import HeaderMismatchWarning, csv_import_dataframe, excel_import_dataframes
 
 
 async def test_import_csv(path_data_test_csv, ctx):
@@ -21,6 +23,28 @@ async def test_import_csv_no_headers(path_data_test_headerless_csv, ctx):
     assert col_count == 5
     assert row_count == 50
     assert headers == ["col000", "col001", "col002", "col003", "col004"]
+
+
+async def test_import_csv_extra_headers(path_data_test_extra_headers_csv, ctx):
+    with pytest.warns(HeaderMismatchWarning, match="The header count 6 does not match number of columns 5"):
+        data = await csv_import_dataframe(ctx, path_data_test_extra_headers_csv)
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 5
+    assert row_count == 6
+    assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "a1"]
+
+
+async def test_import_csv_missing_headers(path_data_test_missing_headers_csv, ctx):
+    with pytest.warns(HeaderMismatchWarning, match="The header count 4 does not match number of columns 5"):
+        data = await csv_import_dataframe(ctx, path_data_test_missing_headers_csv)
+    row_count = len(data.index)
+    col_count = len(data.columns)
+    headers = data.columns.tolist()
+    assert col_count == 5
+    assert row_count == 6
+    assert headers == ["uuid", "einfahrt", "ausfahrt", "aufenthalt", "col004"]
 
 
 async def test_import_csv_with_clevercsv(ctx, tmp_path: Path):
@@ -44,7 +68,7 @@ async def test_import_csv_with_clevercsv(ctx, tmp_path: Path):
     assert col_count == 7
     assert row_count == 2
     first_row = data.iloc[0]
-    assert first_row.to_list() == [2022.0, 28.0, 16.8, 49.0, 5.7, 78.0, 4.5]
+    assert first_row.to_list() == ["2022", "28", "16.8", "49", "5.7", "78", "4.5"]
 
 
 async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
@@ -57,9 +81,9 @@ async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
     )
     data = await csv_import_dataframe(ctx, csv_file)
     assert data.to_dict() == {
-        "id": {0: 1, 1: 2},  # TODO(KB) index needs to be fixed
+        "id": {0: "1", 1: "2"},  # TODO(KB) index needs to be fixed
         "value": {0: "hello", 1: "world"},
-        "num": {0: 2023, 1: 2024},
+        "num": {0: "2023", 1: "2024"},
     }
 
 
@@ -112,11 +136,12 @@ async def test_detect_german_decimal_comma(path_data_german_decimal_comma_csv, c
 
 
 async def test_hamburg(path_data_hamburg_csv, ctx):
-    data = await csv_import_dataframe(ctx, path_data_hamburg_csv)
+    with pytest.warns(HeaderMismatchWarning, match="The header count 7 does not match number of columns 13"):
+        data = await csv_import_dataframe(ctx, path_data_hamburg_csv)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
-    assert col_count == 7
+    assert col_count == 13
     assert row_count == 55
     assert headers == [
         "Unnamed: 0",
@@ -126,4 +151,10 @@ async def test_hamburg(path_data_hamburg_csv, ctx):
         "Unnamed: 4",
         "Unnamed: 5",
         "in Tsd. Euro",
+        "col007",
+        "col008",
+        "col009",
+        "col010",
+        "col011",
+        "col012",
     ]

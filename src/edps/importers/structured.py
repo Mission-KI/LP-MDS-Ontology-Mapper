@@ -1,19 +1,30 @@
+import csv
+import io
 from asyncio import get_running_loop
 from csv import Dialect
 from io import TextIOBase
 from pathlib import Path
-from typing import Literal
+from typing import Any, Dict, Iterator, List, Literal, Optional
+from warnings import warn
 
-from clevercsv import Detector
+from clevercsv import Detector, field_size_limit
+from clevercsv.cparser import Parser
 from clevercsv.detect import DetectionMethod
 from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
 from clevercsv.potential_dialects import get_dialects as _get_dialects
 from extended_dataset_profile.models.v0.edp import StructuredDataSet
-from pandas import DataFrame, Index, read_csv, read_excel
+from pandas import DataFrame, read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
 from edps.taskcontext import TaskContext
+
+
+class HeaderMismatchWarning(UserWarning):
+    """
+    Custom warning indicating a mismatch between the number of headers
+    and the number of columns in the csv data.
+    """
 
 
 async def csv_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:
@@ -28,26 +39,23 @@ async def pandas_importer(ctx: TaskContext, data_frame: DataFrame) -> Structured
 
 
 async def csv_import_dataframe(ctx: TaskContext, path: Path) -> DataFrame:
-    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, path, num_lines=100)
+    encoding = _detect_encoding(ctx, path)
+    top_lines = _read_file_top_lines(path, encoding, num_lines=100)
+    dialect = _detect_dialect(top_lines)
+    has_header = _detect_header(top_lines)
     csv_dialect = _translate_dialect(ctx, dialect)
     ctx.logger.info("%s", "Detected Header" if has_header else "No Header detected")
 
-    def runner():
-        return read_csv(
-            path,
-            dialect=csv_dialect,  # type: ignore
-            header="infer" if has_header else None,
-            encoding=encoding,
-        )
+    header = _read_header(top_lines, csv_dialect) if has_header else []
+    data_frame: DataFrame = DataFrame.from_records(CSVParser(path, header, encoding, csv_dialect))
 
-    loop = get_running_loop()
-    data_frame: DataFrame = await loop.run_in_executor(None, runner)
+    column_count = len(data_frame.columns)
+    header_mismatch = has_header and column_count != len(header)
 
-    # Set column headers (col000, col001, ...) if the csv doesn't contain headers.
-    # Otherwise the headers are just numbers, not strings.
-    if not has_header:
-        col_count = len(data_frame.columns)
-        data_frame.columns = Index([f"col{i:03d}" for i in range(col_count)])
+    if header_mismatch:
+        message = f"The header count {len(header)} does not match number of columns {column_count}"
+        warn(message, HeaderMismatchWarning)
+        ctx.logger.warning(message)
 
     return data_frame
 
@@ -122,18 +130,72 @@ def dialect_to_str(dialect: Dialect) -> str:
     return text
 
 
-def _detect_dialect_encoding_and_has_header(ctx: TaskContext, path: Path, num_lines: int | None):
+class CSVParser:
+    def __init__(self, filename: Path, header: List[str], encoding: str, dialect: Optional[csv.Dialect] = None) -> None:
+        self._file = open(filename, "rt", newline="", encoding=encoding)
+        self._header = header
+        self._dialect = dialect or csv.Dialect()
+        self._parser: Iterator[List[str]] = Parser(
+            self._file,
+            delimiter=self._dialect.delimiter,
+            quotechar=self._dialect.quotechar,
+            escapechar=self._dialect.escapechar,
+            field_limit=field_size_limit(),
+            strict=False,
+            return_quoted=False,
+        )
+        # If header values are provided, skip the first row.
+        if any(header):
+            next(self._parser, None)
+
+    def __iter__(self) -> "CSVParser":
+        return self
+
+    def __next__(self) -> Dict[str, Any]:
+        try:
+            row = next(self._parser)
+        except StopIteration:
+            self._file.close()
+            raise
+
+        # Strip whitespace from each field in the row.
+        row = [value.strip() for value in row]
+
+        if len(row) > len(self._header):
+            self._header = self._header + [f"col{i:03d}" for i in range(len(self._header), len(row))]
+
+        return dict(zip(self._header, row))
+
+
+def _detect_encoding(ctx: TaskContext, path: Path) -> str:
     enc = get_encoding(path)
     if enc is None:
         raise RuntimeError(f'Could not detect encoding for "{ctx.relative_path(path)}"')
     ctx.logger.info('Detected encoding "%s"', enc)
+    return enc
 
-    data = _read_file_top_lines(path, enc, num_lines)
 
+def _detect_dialect(data: str) -> SimpleDialect | None:
     detector = Detector()
     dialect = detector.detect(data, verbose=False, method=DetectionMethod.AUTO)
+    return dialect
+
+
+def _detect_header(data: str) -> bool:
+    detector = Detector()
     has_header = detector.has_header(data)
-    return dialect, enc, has_header
+    return has_header
+
+
+def _read_header(data: str, dialect: Dialect | None) -> List[str]:
+    buffer = io.StringIO(data)
+    header_df = read_csv(
+        buffer,
+        header="infer",
+        dialect=dialect,  # type: ignore
+        nrows=1,
+    )
+    return header_df.columns.tolist()
 
 
 def _read_file_top_lines(path: Path, enc: str, num_lines: int | None) -> str:
