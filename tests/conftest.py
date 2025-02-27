@@ -179,6 +179,16 @@ def path_unstructured_text_with_table():
 
 
 @fixture
+def path_language_deu_wiki_llm_txt():
+    return TESTS_ROOT_PATH / "data/language/deu_wiki_llm.txt"
+
+
+@fixture
+def path_language_deu_eng_wiki_llm_txt():
+    return TESTS_ROOT_PATH / "data/language/deu_eng_wiki_llm.txt"
+
+
+@fixture
 def ctx(path_work):
     return SimpleTaskContext(getLogger("TEST"), path_work)
 

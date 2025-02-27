@@ -1,6 +1,7 @@
 from pytest import raises
 
 from edps.analyzers.unstructured_text.chunk import Chunk
+from edps.analyzers.unstructured_text.language import detect_languages
 
 
 def test_chunk_init():
@@ -76,3 +77,20 @@ def test_chunk_subtract_middle():
     assert result_chunks[0].end_line_exclusive == 4
     assert result_chunks[1].start_line_inclusive == 12
     assert result_chunks[1].end_line_exclusive == 16
+
+
+def test_deu_language_detection(ctx, path_language_deu_wiki_llm_txt):
+    with open(path_language_deu_wiki_llm_txt, "rt", encoding="utf-8") as file:
+        text = file.read()
+    languages = detect_languages(ctx, text)
+    assert len(languages) == 1
+    assert "deu" in languages
+
+
+def test_deu_and_eng_language_detection(ctx, path_language_deu_eng_wiki_llm_txt):
+    with open(path_language_deu_eng_wiki_llm_txt, "rt", encoding="utf-8") as file:
+        text = file.read()
+    languages = detect_languages(ctx, text)
+    assert len(languages) == 2
+    assert "deu" in languages
+    assert "eng" in languages

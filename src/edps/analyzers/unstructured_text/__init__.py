@@ -11,12 +11,12 @@ from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
 from clevercsv.exceptions import Error as CleverCsvError
 from extended_dataset_profile.models.v0.edp import EmbeddedTable, StructuredDataSet, UnstructuredTextDataSet
-from lingua import Language, LanguageDetectorBuilder
 from pandas import DataFrame
 
 from edps.analyzers.base import Analyzer as _BaseAnalyzer
 from edps.analyzers.pandas import PandasAnalyzer
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
+from edps.analyzers.unstructured_text.language import detect_languages
 from edps.file import File
 from edps.importers.structured import dialect_to_str, get_possible_csv_dialects
 from edps.task import TaskContext
@@ -49,11 +49,8 @@ class Analyzer(_BaseAnalyzer):
     def _analyze_unstructured_text(
         self, ctx: TaskContext, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
     ) -> UnstructuredTextDataSet:
-        language_detector = LanguageDetectorBuilder.from_all_languages_without(*_EXCLUDED_LANGUAGES).build()
         word_count = 0
         text = opened_file.read()
-        language_detections = language_detector.detect_multiple_languages_of(text)
-        ctx.logger.info("Detected languages: %s", set(detection.language.name for detection in language_detections))
         lines = text.splitlines(keepends=False)
         line_count = sum(1 if line.strip() else 0 for line in lines)
         word_count += self._count_words(text)
@@ -63,7 +60,7 @@ class Analyzer(_BaseAnalyzer):
             parentUuid=self._parent_uuid,
             name=PurePosixPath(self._file.relative.as_posix()),
             embeddedTables=embedded_tables,
-            languages=set(detection.language.iso_code_639_3.name for detection in language_detections),
+            languages=detect_languages(ctx, text),
             lineCount=line_count,
             wordCount=word_count,
         )
@@ -381,6 +378,3 @@ class _CsvParser:
         if self._tracked_chunk and (self._tracked_chunk.column_count != len(row)):
             raise _LineParsingError("Number of columns does not match!")
         return row
-
-
-_EXCLUDED_LANGUAGES = [Language.WELSH, Language.IRISH]
