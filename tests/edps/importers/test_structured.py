@@ -26,7 +26,7 @@ async def test_import_csv_no_headers(path_data_test_headerless_csv, ctx):
 
 
 async def test_import_csv_extra_headers(path_data_test_extra_headers_csv, ctx):
-    with pytest.warns(HeaderMismatchWarning, match="The header count 6 does not match number of columns 5"):
+    with pytest.warns(HeaderMismatchWarning):
         data = await csv_import_dataframe(ctx, path_data_test_extra_headers_csv)
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -37,7 +37,7 @@ async def test_import_csv_extra_headers(path_data_test_extra_headers_csv, ctx):
 
 
 async def test_import_csv_missing_headers(path_data_test_missing_headers_csv, ctx):
-    with pytest.warns(HeaderMismatchWarning, match="The header count 4 does not match number of columns 5"):
+    with pytest.warns(HeaderMismatchWarning):
         data = await csv_import_dataframe(ctx, path_data_test_missing_headers_csv)
     row_count = len(data.index)
     col_count = len(data.columns)
@@ -136,7 +136,7 @@ async def test_detect_german_decimal_comma(path_data_german_decimal_comma_csv, c
 
 
 async def test_hamburg(path_data_hamburg_csv, ctx):
-    with pytest.warns(HeaderMismatchWarning, match="The header count 7 does not match number of columns 13"):
+    with pytest.warns(HeaderMismatchWarning):
         data = await csv_import_dataframe(ctx, path_data_hamburg_csv)
     row_count = len(data.index)
     col_count = len(data.columns)

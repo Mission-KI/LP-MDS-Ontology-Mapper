@@ -60,7 +60,7 @@ async def test_detect_gamma(ctx):
 
 async def test_same_as_original_fitter(path_data_test_csv, ctx):
     data = await csv_import_dataframe(ctx, path_data_test_csv)
-    column = data["aufenthalt"]
+    column = data["aufenthalt"].astype(int)
 
     fitter = Fitter(column)
     name, params = await fitter.get_best(ctx)
