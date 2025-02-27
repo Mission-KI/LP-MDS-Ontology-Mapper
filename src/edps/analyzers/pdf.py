@@ -1,29 +1,32 @@
 import warnings
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import AsyncIterator, Iterator, Optional
+from typing import Iterator, Optional
 from uuid import uuid4
 
-from extended_dataset_profile.models.v0.edp import DataSet, DocumentDataSet, ImageDataSet, ModificationState
+from extended_dataset_profile.models.v0.edp import (
+    DocumentDataSet,
+    ModificationState,
+    UnstructuredTextDataSet,
+)
 from PIL.Image import Image
 from pypdf import DocumentInformation, PageObject, PdfReader
 from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
-from edps.analyzers.base import Analyzer
 from edps.analyzers.common import split_keywords
-from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
-from edps.importers.images import build_raster_image_analyzer
+from edps.importers.images import raster_image_importer_from_pilimage
+from edps.importers.unstructured_text import unstructured_text_importer
 from edps.task import TaskContext
 
 
-class PdfAnalyzer(Analyzer):
+class PdfAnalyzer:
     def __init__(self, pdf_reader: PdfReader, file: File):
         self.pdf_reader = pdf_reader
         self.file = file
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[DataSet]:
+    async def analyze(self, ctx: TaskContext) -> DocumentDataSet:
         ctx.logger.info("Analyzing PDF document '%s'...", self.file)
 
         doc_uuid = uuid4()
@@ -36,18 +39,15 @@ class PdfAnalyzer(Analyzer):
         modified = _calc_modified(self.pdf_reader._ID, metadata)
 
         extracted_text = self._extract_text(ctx)
-        async for dataset in self._analyze_text(ctx, extracted_text):
-            dataset.parentUuid = doc_uuid
-            yield dataset
+        await ctx.exec("text", self._analyze_text, extracted_text)
 
         num_images = 0
         for image in self._extract_images(ctx):
             num_images += 1
-            async for dataset in self._analyze_image(ctx, image, num_images):
-                dataset.parentUuid = doc_uuid
-                yield dataset
+            await ctx.exec(f"image_{num_images:03}", raster_image_importer_from_pilimage, image)
 
-        yield DocumentDataSet(
+        # TODO: Change DocumentDataSet: give defaults for "uuid", "parent"; maybe make "name" optional and of type str
+        return DocumentDataSet(
             uuid=doc_uuid,
             parentUuid=None,
             name=PurePosixPath(self.file.relative),
@@ -81,25 +81,16 @@ class PdfAnalyzer(Analyzer):
                 if image:
                     yield image
 
-    async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
-        ctx.logger.info("Invoking unstructured text analyzer")
+    async def _analyze_text(self, ctx: TaskContext, text: str) -> UnstructuredTextDataSet:
         # TODO(mka): Rework this after Datasets are added to TaskContext
         with TemporaryDirectory() as tmp_dir:
-            tmp_file = Path(tmp_dir) / "content.txt"
+            tmp_file = Path(tmp_dir) / ctx.qualified_path
+            tmp_file.parent.mkdir(parents=True, exist_ok=True)
             # UTF-8 is needed for umlauts etc.
             with tmp_file.open("wt", encoding="utf-8") as file_io:
                 file_io.write(text)
-            file = File(tmp_file.parent, tmp_file)
-            text_analyzer = UnstructuredTextAnalyzer(file)
-            async for dataset in ctx.exec(text_analyzer.analyze):
-                yield dataset
-
-    async def _analyze_image(self, ctx: TaskContext, image: Image, count: int) -> AsyncIterator[ImageDataSet]:
-        name = self.file.relative / f"image{count:03}"
-        ctx.logger.info("Invoking image analyzer for image #%d", count)
-        img_analyzer = build_raster_image_analyzer(image, PurePosixPath(name))
-        async for dataset in ctx.exec(img_analyzer.analyze):
-            yield dataset
+            file = File(Path(tmp_dir), tmp_file)
+            return await unstructured_text_importer(ctx, file)
 
 
 def _calc_modified(ids: Optional[ArrayObject], metadata: Optional[DocumentInformation]) -> ModificationState:

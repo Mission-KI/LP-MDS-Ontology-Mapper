@@ -4,6 +4,7 @@ from pathlib import Path
 from filetype import guess
 
 
+# TODO(mka): Remove!
 class File:
     def __init__(self, base_path: Path, path: Path) -> None:
         if not path.is_file():
@@ -44,8 +45,13 @@ class File:
 
 
 def sanitize_file_part(file_part: str) -> str:
-    """Keep only alphanumeric characters and dash/underscore. Replace dot with underscore."""
+    """Keep only alphanumeric characters and dash, underscore. Replace dot with underscore."""
     return re.sub(r"[^a-zA-Z0-9-_]", "", file_part.replace(".", "_"))
+
+
+def sanitize_file_path(file_path: str) -> str:
+    """Keep only alphanumeric characters and dash, underscore, slash, dot."""
+    return re.sub(r"[^a-zA-Z0-9-_/.]", "", file_path)
 
 
 def calculate_size(path: Path) -> int:

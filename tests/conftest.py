@@ -5,7 +5,7 @@ from easyocr import easyocr
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
-from edps.task import SimpleTaskContext
+from edps.task import TaskContext
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
@@ -190,7 +190,7 @@ def path_language_deu_eng_wiki_llm_txt():
 
 @fixture
 def ctx(path_work):
-    return SimpleTaskContext(getLogger("TEST"), path_work)
+    return TaskContext(getLogger("edps.test"), path_work)
 
 
 @fixture

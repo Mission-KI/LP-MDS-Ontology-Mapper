@@ -1,5 +1,4 @@
 from pathlib import PurePosixPath
-from typing import AsyncIterator
 from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import (
@@ -10,7 +9,6 @@ from extended_dataset_profile.models.v0.edp import (
 )
 from pydantic.dataclasses import dataclass
 
-from edps.analyzers.base import Analyzer
 from edps.task import TaskContext
 
 
@@ -23,15 +21,15 @@ class VideoMetadata:
     pixel_format: VideoPixelFormat
 
 
-class VideoAnalyzer(Analyzer):
+class VideoAnalyzer:
     def __init__(self, metadata: VideoMetadata, name: PurePosixPath):
         self._name = name
         self._metadata = metadata
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[VideoDataSet]:
+    async def analyze(self, ctx: TaskContext) -> VideoDataSet:
         ctx.logger.info("Started analysis for video dataset")
 
-        yield VideoDataSet(
+        return VideoDataSet(
             uuid=uuid4(),
             parentUuid=None,
             name=self._name,

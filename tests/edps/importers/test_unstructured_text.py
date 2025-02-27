@@ -1,35 +1,25 @@
-from typing import List
-
 from extended_dataset_profile.models.v0.edp import StructuredDataSet, UnstructuredTextDataSet
 from pytest import mark
 
-from edps.analyzers.base import Analyzer
-from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
 from edps.importers.unstructured_text import unstructured_text_importer
+from edps.task import TaskContext
 
 
 @mark.asyncio
 async def test_unstructured_text_only(ctx, path_unstructured_text_only_txt):
-    analyzers: List[Analyzer] = []
-    async for analyzer in unstructured_text_importer(
-        ctx, File(path_unstructured_text_only_txt.parent, path_unstructured_text_only_txt)
-    ):
-        analyzers.append(analyzer)
-    assert len(analyzers) == 1
-    analyzer = analyzers[0]
-    assert isinstance(analyzer, UnstructuredTextAnalyzer)
+    file = File(path_unstructured_text_only_txt.parent, path_unstructured_text_only_txt)
+    await ctx.exec("dataset", unstructured_text_importer, file)
+    datasets = list(ctx.collect_datasets())
+    assert len(datasets) == 1
+    assert any(isinstance(dataset, UnstructuredTextDataSet) for dataset in datasets)
 
 
 @mark.asyncio
-async def test_unstructured_text_with_table(ctx, path_unstructured_text_with_table):
-    datasets = [
-        dataset
-        async for analyzer in unstructured_text_importer(
-            ctx, File(path_unstructured_text_with_table.parent, path_unstructured_text_with_table)
-        )
-        async for dataset in ctx.exec(analyzer.analyze)
-    ]
+async def test_unstructured_text_with_table(ctx: TaskContext, path_unstructured_text_with_table):
+    file = File(path_unstructured_text_with_table.parent, path_unstructured_text_with_table)
+    await ctx.exec("dataset", unstructured_text_importer, file)
+    datasets = list(ctx.collect_datasets())
     assert len(datasets) == 2
     assert any(isinstance(dataset, UnstructuredTextDataSet) for dataset in datasets)
     assert any(isinstance(dataset, StructuredDataSet) for dataset in datasets)

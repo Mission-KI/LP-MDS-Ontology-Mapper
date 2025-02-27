@@ -1,13 +1,12 @@
 from pathlib import Path
 
 from edps.file import File
-from edps.importers.structured import csv_importer, xls_importer, xlsx_importer
+from edps.importers.structured import csv_import_dataframe, excel_import_dataframes
 
 
 async def test_import_csv(path_data_test_csv, ctx):
     file = get_file(path_data_test_csv)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -18,8 +17,7 @@ async def test_import_csv(path_data_test_csv, ctx):
 
 async def test_import_csv_no_headers(path_data_test_headerless_csv, ctx):
     file = get_file(path_data_test_headerless_csv)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -42,8 +40,7 @@ async def test_import_csv_with_clevercsv(ctx, tmp_path: Path):
 """
     )
     file = get_file(csv_file)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -63,8 +60,7 @@ async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
 """
     )
     file = get_file(csv_file)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     assert data.to_dict() == {
         "id": {0: 1, 1: 2},  # TODO(KB) index needs to be fixed
         "value": {0: "hello", 1: "world"},
@@ -74,8 +70,8 @@ async def test_import_csv_with_quoted_strings(ctx, tmp_path: Path):
 
 async def test_import_xlsx(path_data_test_xlsx, ctx):
     file = get_file(path_data_test_xlsx)
-    analyzer = await anext(ctx.exec(xlsx_importer, file))
-    data = analyzer._data
+    dataframes_map = await excel_import_dataframes(ctx, file, "openpyxl")
+    data = list(dataframes_map.values())[0]
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -86,8 +82,8 @@ async def test_import_xlsx(path_data_test_xlsx, ctx):
 
 async def test_import_xls(path_data_test_xls, ctx):
     file = get_file(path_data_test_xls)
-    analyzer = await anext(ctx.exec(xls_importer, file))
-    data = analyzer._data
+    dataframes_map = await excel_import_dataframes(ctx, file, "xlrd")
+    data = list(dataframes_map.values())[0]
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -98,8 +94,7 @@ async def test_import_xls(path_data_test_xls, ctx):
 
 async def test_detect_german_decimal_comma(path_data_german_decimal_comma_csv, ctx):
     file = get_file(path_data_german_decimal_comma_csv)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()
@@ -126,8 +121,7 @@ async def test_detect_german_decimal_comma(path_data_german_decimal_comma_csv, c
 
 async def test_hamburg(path_data_hamburg_csv, ctx):
     file = get_file(path_data_hamburg_csv)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, file)
     row_count = len(data.index)
     col_count = len(data.columns)
     headers = data.columns.tolist()

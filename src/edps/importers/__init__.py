@@ -1,9 +1,8 @@
 import warnings
-from typing import AsyncIterator, Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 from extended_dataset_profile.models.v0.edp import DataSet
 
-from edps.analyzers import Analyzer
 from edps.file import File
 from edps.importers.docx import docx_importer
 from edps.importers.images import raster_image_importer
@@ -14,7 +13,7 @@ from edps.importers.unstructured_text import unstructured_text_importer
 from edps.importers.videos import video_importer
 from edps.task import TaskContext
 
-Importer = Callable[[TaskContext, File], AsyncIterator[Analyzer]]
+Importer = Callable[[TaskContext, File], Awaitable[DataSet]]
 
 
 # Dictionary mapping a file type (extension) to an Importer.
@@ -65,15 +64,14 @@ def lookup_unsupported_type_message(file_type: str) -> str:
     return f'Import for "{file_type}" not yet supported'
 
 
-async def import_file(ctx: TaskContext, file: File) -> AsyncIterator[DataSet]:
+async def import_file(ctx: TaskContext, file: File) -> None:
     """Import and analyze the file if it's a supported type. Yield calculated datasets."""
     file_type = file.type
+    dataset_name = file.relative.as_posix()
     importer = lookup_importer(file_type)
     if importer is None:
         message = lookup_unsupported_type_message(file_type)
         ctx.logger.warning(message)
         warnings.warn(message, RuntimeWarning)
     else:
-        async for analyzer in ctx.exec(importer, file):
-            async for dataset in ctx.exec(analyzer.analyze):
-                yield dataset
+        await ctx.exec(dataset_name, importer, file)

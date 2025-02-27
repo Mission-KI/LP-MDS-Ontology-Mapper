@@ -1,11 +1,10 @@
 import json
 import shutil
 from pathlib import PurePosixPath
-from typing import AsyncIterator
 from warnings import warn
 
 import static_ffmpeg
-from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, VideoPixelFormat
+from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
 from ffmpeg import FFmpeg
 
 from edps.analyzers.videos import VideoAnalyzer, VideoMetadata
@@ -13,8 +12,8 @@ from edps.file import File
 from edps.task import TaskContext
 
 
-async def video_importer(ctx: TaskContext, file: File) -> AsyncIterator[VideoAnalyzer]:
-    ctx.logger.info("Importing '%s'", file)
+async def video_importer(ctx: TaskContext, file: File) -> VideoDataSet:
+    ctx.logger.info("Analyzing video '%s'", file)
 
     # Blocks until files are downloaded, but only if ffprobe not already on path
     if not shutil.which("ffprobe"):
@@ -49,7 +48,8 @@ async def video_importer(ctx: TaskContext, file: File) -> AsyncIterator[VideoAna
         duration=duration,
         pixel_format=VideoPixelFormat(pixel_format),
     )
-    yield VideoAnalyzer(metadata, PurePosixPath(file.relative))
+    analyzer = VideoAnalyzer(metadata, PurePosixPath(file.relative))
+    return await analyzer.analyze(ctx)
 
 
 def _compute_fps(ctx: TaskContext, avg_frame_rate: str) -> float:

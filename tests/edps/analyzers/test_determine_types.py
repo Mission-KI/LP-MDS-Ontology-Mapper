@@ -609,7 +609,7 @@ def expect_datetime_column(ctx: TaskContext, col: list | Series, expected_dtype=
 def parse_column(ctx: TaskContext, col: list | Series, expected_dtype=None):
     COL_ID = "col"
     df = DataFrame(col, columns=[COL_ID])
-    result = ctx.exec(parse_types, df)
+    result = parse_types(ctx, df)
     cols = result.all_cols
     assert len(cols.ids) == 1
     converted_col = cols.get_col(COL_ID)

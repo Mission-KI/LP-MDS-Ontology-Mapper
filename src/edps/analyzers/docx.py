@@ -11,25 +11,24 @@ from extended_dataset_profile.models.v0.edp import (
     DocumentDataSet,
     ImageDataSet,
     ModificationState,
-    StructuredDataSet,
+    UnstructuredTextDataSet,
 )
 from pandas import DataFrame
 
-from edps.analyzers.base import Analyzer
 from edps.analyzers.common import split_keywords
-from edps.analyzers.pandas import PandasAnalyzer
-from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
 from edps.file import File
 from edps.importers.images import raster_image_importer
+from edps.importers.structured import pandas_importer
+from edps.importers.unstructured_text import unstructured_text_importer
 from edps.task import TaskContext
 
 
-class DocxAnalyzer(Analyzer):
+class DocxAnalyzer:
     def __init__(self, doc: Document, file: File):
         self.doc = doc
         self.file = file
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[DataSet]:
+    async def analyze(self, ctx: TaskContext) -> DocumentDataSet:
         ctx.logger.info("Analyzing DOCX document '%s'...", self.file)
 
         doc_uuid = uuid4()
@@ -38,26 +37,25 @@ class DocxAnalyzer(Analyzer):
         modified = props.revision > 1
 
         extracted_text = self._extract_text(ctx)
-        async for dataset in self._analyze_text(ctx, extracted_text):
-            dataset.parentUuid = doc_uuid
-            yield dataset
+        await ctx.exec("text", self._analyze_text, extracted_text)
 
         num_images = 0
         async for media_file in self._extract_media_files(ctx):
-            async for child_ds in self._analyze_media_file(ctx, media_file):
-                child_ds.parentUuid = doc_uuid
+            try:
+                child_ds = await ctx.exec_with_result(media_file.relative.name, self._analyze_media_file, media_file)
                 if isinstance(child_ds, ImageDataSet):
                     num_images += 1
-                yield child_ds
+            except Exception as exception:
+                message = f"Image importer can't process DOCX media file '{media_file}'"
+                ctx.logger.warning(message, exc_info=exception)
+                warnings.warn(message)
 
         num_tables = 0
         async for dataframe in self._extract_tables(ctx):
             num_tables += 1
-            async for structured_ds in self._analyze_table(ctx, dataframe, num_tables):
-                structured_ds.parentUuid = doc_uuid
-                yield structured_ds
+            await ctx.exec(f"table_{num_images:03}", pandas_importer, dataframe, self.file)
 
-        yield DocumentDataSet(
+        return DocumentDataSet(
             uuid=doc_uuid,
             parentUuid=None,
             name=PurePosixPath(self.file.relative),
@@ -113,34 +111,18 @@ class DocxAnalyzer(Analyzer):
             # Assume first row is header
             yield DataFrame(cells[1:], columns=cells[0])
 
-    async def _analyze_text(self, ctx: TaskContext, text: str) -> AsyncIterator[DataSet]:
-        ctx.logger.info("Invoking unstructured text analyzer")
+    async def _analyze_text(self, ctx: TaskContext, text: str) -> UnstructuredTextDataSet:
         # TODO(mka): Rework this after Datasets are added to TaskContext
         with TemporaryDirectory() as tmp_dir:
-            tmp_file = Path(tmp_dir) / "content.txt"
+            tmp_file = Path(tmp_dir) / ctx.qualified_path
+            tmp_file.parent.mkdir(parents=True, exist_ok=True)
             # UTF-8 is needed for umlauts etc.
             with tmp_file.open("wt", encoding="utf-8") as file_io:
                 file_io.write(text)
-            file = File(tmp_file.parent, tmp_file)
-            text_analyzer = UnstructuredTextAnalyzer(file)
-            async for dataset in ctx.exec(text_analyzer.analyze):
-                yield dataset
+            file = File(Path(tmp_dir), tmp_file)
+            return await unstructured_text_importer(ctx, file)
 
-    async def _analyze_media_file(self, ctx: TaskContext, media_file: File) -> AsyncIterator[DataSet]:
-        ctx.logger.info("Importing embedded media file '%s'...", media_file)
+    async def _analyze_media_file(self, ctx: TaskContext, media_file: File) -> DataSet:
+        ctx.logger.info("Analyzing DOCX embedded media file '%s'...", media_file)
         # TODO We can't use the import dictionary yet because we would get a circular dependency. To resolve this we'll move this into the TaskContext.
-        try:
-            async for analyzer in raster_image_importer(ctx, media_file):
-                async for ds in ctx.exec(analyzer.analyze):
-                    yield ds
-        except Exception as exception:
-            message = f"Image importer can't process DOCX media file '{media_file}'"
-            ctx.logger.warning(message, exc_info=exception)
-            warnings.warn(message)
-
-    async def _analyze_table(self, ctx: TaskContext, table: DataFrame, count: int) -> AsyncIterator[StructuredDataSet]:
-        ctx.logger.info("Invoking structured data analyzer for table %d", count)
-        # TODO pass virtual file name!
-        analyzer = PandasAnalyzer(table, self.file)
-        async for ds in ctx.exec(analyzer.analyze):
-            yield ds
+        return await raster_image_importer(ctx, media_file)

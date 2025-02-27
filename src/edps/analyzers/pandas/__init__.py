@@ -3,7 +3,7 @@ from datetime import timedelta
 from enum import Enum
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import (
@@ -25,7 +25,6 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
-from edps.analyzers.base import Analyzer
 from edps.analyzers.pandas.fitter import Fitter, FittingConfig
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
@@ -79,7 +78,7 @@ class _Distributions(str, Enum):
     TooSmallDataset = "dataset too small to determine distribution"
 
 
-class PandasAnalyzer(Analyzer):
+class PandasAnalyzer:
     def __init__(self, data: DataFrame, file: File):
         self._data = data
         self._file = file
@@ -94,14 +93,14 @@ class PandasAnalyzer(Analyzer):
             timedelta(weeks=1),
         ]
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[StructuredDataSet]:
+    async def analyze(self, ctx: TaskContext) -> StructuredDataSet:
         row_count = len(self._data.index)
         ctx.logger.info(
             "Started structured data analysis with dataset containing %d rows",
             row_count,
         )
 
-        type_parser_results = ctx.exec(parse_types, self._data)
+        type_parser_results = parse_types(ctx, self._data)
 
         all_cols = type_parser_results.all_cols
         common_fields = await self._compute_common_fields(all_cols.data)
@@ -162,7 +161,7 @@ class PandasAnalyzer(Analyzer):
             transformed_numeric_column_count + transformed_date_time_column_count + transformed_string_column_count
         )
 
-        yield StructuredDataSet(
+        return StructuredDataSet(
             uuid=uuid4(),
             parentUuid=None,
             name=PurePosixPath(self._file.relative),

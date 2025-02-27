@@ -1,22 +1,33 @@
 from asyncio import get_running_loop
 from csv import Dialect
 from io import TextIOBase
-from typing import AsyncIterator, Literal
+from typing import Literal
 
 from clevercsv import Detector
 from clevercsv.detect import DetectionMethod
 from clevercsv.dialect import SimpleDialect
 from clevercsv.encoding import get_encoding
 from clevercsv.potential_dialects import get_dialects as _get_dialects
-from pandas import Index, read_csv, read_excel
+from extended_dataset_profile.models.v0.edp import StructuredDataSet
+from pandas import DataFrame, Index, read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
 from edps.file import File
 from edps.task import TaskContext
 
 
-async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
-    ctx.logger.info("Importing '%s' as CSV", file)
+async def csv_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
+    data_frame = await csv_import_dataframe(ctx, file)
+    return await pandas_importer(ctx, data_frame, file)
+
+
+async def pandas_importer(ctx: TaskContext, data_frame: DataFrame, file: File) -> StructuredDataSet:
+    ctx.logger.info("Analyzing structured dataset '%s'", ctx.dataset_name)
+    return await PandasAnalyzer(data_frame, file).analyze(ctx)
+
+
+async def csv_import_dataframe(ctx: TaskContext, file: File) -> DataFrame:
+    ctx.logger.info("Analyzing CSV '%s'", file)
 
     dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, file, num_lines=100)
     csv_dialect = _translate_dialect(ctx, dialect)
@@ -31,7 +42,7 @@ async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnal
         )
 
     loop = get_running_loop()
-    data_frame = await loop.run_in_executor(None, runner)
+    data_frame: DataFrame = await loop.run_in_executor(None, runner)
 
     # Set column headers (col000, col001, ...) if the csv doesn't contain headers.
     # Otherwise the headers are just numbers, not strings.
@@ -39,7 +50,7 @@ async def csv_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnal
         col_count = len(data_frame.columns)
         data_frame.columns = Index([f"col{i:03d}" for i in range(col_count)])
 
-    yield PandasAnalyzer(data_frame, file)
+    return data_frame
 
 
 def _translate_dialect(ctx, dialect: None | SimpleDialect) -> None | Dialect:
@@ -52,23 +63,10 @@ def _translate_dialect(ctx, dialect: None | SimpleDialect) -> None | Dialect:
         return None
 
 
-async def excel_importer(
-    ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]
-) -> AsyncIterator[PandasAnalyzer]:
+async def excel_importer(ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]) -> StructuredDataSet:
     """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
 
-    ctx.logger.info("Importing '%s' as Excel", file)
-
-    def runner():
-        return read_excel(
-            file.path,
-            engine=engine,
-            sheet_name=None,  # imports all sheets as dictionary
-            header=0,  # assume header in row 0
-        )
-
-    loop = get_running_loop()
-    dataframes_map = await loop.run_in_executor(None, runner)
+    dataframes_map = await excel_import_dataframes(ctx, file, engine)
 
     sheets = list(dataframes_map.keys())
     dataframes = list(dataframes_map.values())
@@ -81,15 +79,35 @@ async def excel_importer(
     if len(sheets) > 1:
         ctx.logger.warning("Excel contains multiple sheets %s, only first one is used!", sheets)
 
-    yield PandasAnalyzer(dataframes[0], file)
+    return await PandasAnalyzer(dataframes[0], file).analyze(ctx)
 
 
-def xlsx_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
-    return excel_importer(ctx, file, "openpyxl")
+async def excel_import_dataframes(
+    ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]
+) -> dict[str, DataFrame]:
+    """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
+
+    ctx.logger.info("Analyzing Excel file '%s'", file)
+
+    def runner() -> dict[str, DataFrame]:
+        return read_excel(
+            file.path,
+            engine=engine,
+            sheet_name=None,  # imports all sheets as dictionary
+            header=0,  # assume header in row 0
+        )
+
+    loop = get_running_loop()
+    dataframes_map = await loop.run_in_executor(None, runner)
+    return dataframes_map
 
 
-def xls_importer(ctx: TaskContext, file: File) -> AsyncIterator[PandasAnalyzer]:
-    return excel_importer(ctx, file, "xlrd")
+async def xlsx_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
+    return await excel_importer(ctx, file, "openpyxl")
+
+
+async def xls_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
+    return await excel_importer(ctx, file, "xlrd")
 
 
 def get_possible_csv_dialects(opened_file: TextIOBase):

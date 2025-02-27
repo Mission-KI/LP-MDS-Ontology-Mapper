@@ -1,14 +1,14 @@
 from pathlib import Path
 
+import numpy as np
+from PIL.Image import open as open_image
+
 from edps.analyzers.images.ocr import OCR
-from edps.file import File
-from edps.importers.images import raster_image_importer
+from edps.importers.images import parse_raster_image
 
 
 async def test_ocr_single_line(path_data_test_png, download_ocr_models, ctx):
-    file = get_file(path_data_test_png)
-    analyzer = await anext(ctx.exec(raster_image_importer, file))
-    data = analyzer._data
+    data = load_image_data(path_data_test_png)
     ocr_detector = OCR(languages=["en", "de"])
     detected_texts = ocr_detector.read(data)
     assert len(detected_texts) == 1
@@ -17,9 +17,7 @@ async def test_ocr_single_line(path_data_test_png, download_ocr_models, ctx):
 
 
 async def test_ocr_multi_line(path_data_test_with_text, download_ocr_models, ctx):
-    file = get_file(path_data_test_with_text)
-    analyzer = await anext(ctx.exec(raster_image_importer, file))
-    data = analyzer._data
+    data = load_image_data(path_data_test_with_text)
     ocr_detector = OCR(languages=["en", "de"])
     detected_texts = ocr_detector.read(data)
     assert len(detected_texts) == 4
@@ -33,5 +31,7 @@ async def test_ocr_multi_line(path_data_test_with_text, download_ocr_models, ctx
     assert detected_texts.iloc[3]["confidence"] > 0.9
 
 
-def get_file(path: Path):
-    return File(path.parent, path)
+def load_image_data(path: Path) -> np.ndarray:
+    with open_image(path) as img:
+        img_metadata, img_array = parse_raster_image(img)
+        return img_array

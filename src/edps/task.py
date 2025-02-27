@@ -1,15 +1,24 @@
-from abc import ABC, abstractmethod
+import warnings
+from abc import ABC
 from logging import Logger
-from pathlib import Path
-from typing import Callable, Concatenate
+from pathlib import Path, PurePosixPath
+from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast, overload
+from uuid import UUID
+
+from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
+
+from edps.file import sanitize_file_path
 
 
 class TaskContext(ABC):
     """A context provides a logger and supports executing sub-tasks."""
 
-    def __init__(self, logger: Logger, working_path: Path):
+    def __init__(self, logger: Logger, working_path: Path, name_parts: list[str] = []):
         self._logger = logger
         self._working_path = working_path
+        self._name_parts = name_parts
+        self._children: list["TaskContext"] = []
+        self._dataset: Optional[DataSet] = None
 
     @property
     def logger(self) -> Logger:
@@ -31,18 +40,114 @@ class TaskContext(ABC):
         """Return path for output files (not guaranteed that it exists)."""
         return self._working_path / "output"
 
-    @abstractmethod
-    def exec[**P, R](self, task_fn: Callable[Concatenate["TaskContext", P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+    @property
+    def children(self) -> list["TaskContext"]:
+        return self._children
+
+    @property
+    def name_parts(self) -> list[str]:
+        return self._name_parts
+
+    @property
+    def qualified_path(self) -> PurePosixPath:
+        return PurePosixPath("/".join(self._name_parts))
+
+    @property
+    def dataset_name(self) -> Optional[str]:
+        return self.name_parts[-1] if self.name_parts else None
+
+    @property
+    def dataset(self) -> Optional[DataSet]:
+        return self._dataset
+
+    def collect_datasets(self) -> Iterator[DataSet]:
+        parent_uuid: Optional[UUID] = None
+        if own_dataset := self.dataset:
+            parent_uuid = own_dataset.uuid
+            yield own_dataset
+
+        for child in self.children:
+            if direct_child_ds := child.dataset:
+                direct_child_ds.parentUuid = parent_uuid
+            yield from child.collect_datasets()
+
+    async def exec[**P, R_DS: DataSet, *R_Ts](
+        self,
+        dataset_name: str,
+        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R_DS] | Awaitable[tuple[R_DS, Unpack[R_Ts]]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
         """Execute a subtask. This creates a sub-context."""
 
+        try:
+            await self.exec_with_result(dataset_name, task_fn, *args, **kwargs)
+        except Exception as exception:
+            self.logger.error("Error in sub context, continuing anyways...", exc_info=exception)
+            warnings.warn(f"Error in sub context: {exception}")
+            return
 
-class SimpleTaskContext(TaskContext):
-    """Minimal task context."""
+    @overload
+    async def exec_with_result[**P, R_DS: DataSet, *R_Ts](
+        self,
+        dataset_name: str,
+        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[tuple[R_DS, Unpack[R_Ts]]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> tuple[R_DS, Unpack[R_Ts]]: ...
 
-    def __init__(self, logger: Logger, working_path: Path):
-        super().__init__(logger, working_path)
+    @overload
+    async def exec_with_result[**P, R_DS: DataSet](
+        self,
+        dataset_name: str,
+        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R_DS]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R_DS: ...
 
-    def exec[**P, R](self, task_fn: Callable[Concatenate[TaskContext, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
-        new_logger = self.logger.getChild(task_fn.__name__)
-        new_context = SimpleTaskContext(new_logger, self._working_path)
-        return task_fn(new_context, *args, **kwargs)
+    async def exec_with_result[**P, R](
+        self,
+        dataset_name: str,
+        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        """Execute a subtask. This creates a sub-context."""
+
+        # Replace dot with underscore. Keep slash as they are needed in archives.
+        dataset_name = sanitize_file_path(dataset_name.replace(".", "_"))
+        child_context = self._prepare_sub_context(dataset_name)
+        self.children.append(child_context)
+
+        try:
+            result = await task_fn(child_context, *args, **kwargs)
+        except Exception as exception:
+            child_context.logger.error("Error", exc_info=exception)
+            raise exception
+
+        if isinstance(result, _BaseDataSet):
+            child_context._put_dataset(cast(DataSet, result), dataset_name)
+        elif isinstance(result, tuple) and isinstance(result[0], _BaseDataSet):
+            child_context._put_dataset(cast(DataSet, result[0]), dataset_name)
+        else:
+            child_context.logger.error("Task function didn't return a dataset.")
+            raise RuntimeError("Task function didn't return a dataset.")
+        return result
+
+    def _prepare_sub_context(self, dataset_name: str) -> "TaskContext":
+        child_name_parts = self.name_parts + [dataset_name]
+        new_logger = self.logger.getChild(dataset_name)
+        sub_context = TaskContext(
+            new_logger,
+            self._working_path,
+            child_name_parts,
+        )
+        return sub_context
+
+    def _put_dataset(self, dataset: DataSet, dataset_name: str):
+        if self._dataset:
+            raise RuntimeError(
+                "There is already a dataset in this context. You need to put exactly one dataset into this dataset context!"
+            )
+        dataset.name = PurePosixPath(dataset_name)
+        self._dataset = dataset

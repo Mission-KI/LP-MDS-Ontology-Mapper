@@ -212,10 +212,10 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
     assert {str(dataset.name) for dataset in edp.structuredDatasets} == {
-        "test_multiassets_zip/csv/test.csv",
-        "test_multiassets_zip/xls/test.xls",
-        "test_multiassets_zip/xlsx/test.xlsx",
-        "test_multiassets_zip/zip/test_zip/test.csv",
+        "test_multiassets_zip/csv/test_csv",
+        "test_multiassets_zip/xls/test_xls",
+        "test_multiassets_zip/xlsx/test_xlsx",
+        "test_multiassets_zip/zip/test_zip/test_csv",
     }
 
 
@@ -432,11 +432,13 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert doc_dataset.numPages == 18
     assert doc_dataset.numImages == 2
     assert doc_dataset.modified == ModificationState.unmodified
+    assert doc_dataset.name == PurePosixPath("test_pdf")
 
     assert len(edp.imageDatasets) == 2
-    img_dataset = edp.imageDatasets[0]
-    assert img_dataset.parentUuid == doc_dataset.uuid
-    assert img_dataset.name == PurePosixPath("test.pdf/image001")
+    assert edp.imageDatasets[0].parentUuid == doc_dataset.uuid
+    assert edp.imageDatasets[0].name == PurePosixPath("image_001")
+    assert edp.imageDatasets[1].parentUuid == doc_dataset.uuid
+    assert edp.imageDatasets[1].name == PurePosixPath("image_002")
 
     assert len(edp.unstructuredTextDatasets) == 1
     assert len(edp.structuredDatasets) == 0

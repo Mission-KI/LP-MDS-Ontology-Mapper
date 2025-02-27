@@ -71,8 +71,10 @@ class Service:
 
         async for child_file in self._walk_all_files(ctx, path, compression_algorithms):
             extracted_size += child_file.size
-            async for dataset in import_file(ctx, child_file):
-                datasets.append(dataset)
+            await import_file(ctx, child_file)
+
+        for ds in ctx.collect_datasets():
+            datasets.append(ds)
 
         compression: Optional[Compression]
         if len(compression_algorithms) == 0:

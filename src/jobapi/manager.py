@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
-from edps.task import SimpleTaskContext
+from edps.task import TaskContext
 from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.repo import Job, JobRepository
@@ -92,10 +92,10 @@ class AnalysisJobManager:
             try:
                 with (
                     TemporaryDirectory() as temp_working_dir,
-                    init_file_logger("process_job", job.log_file) as job_logger,
+                    init_file_logger(job.log_file) as job_logger,
                 ):
                     self._logger.debug("Temporary working directory: %s", temp_working_dir)
-                    ctx = SimpleTaskContext(job_logger, Path(temp_working_dir))
+                    ctx = TaskContext(job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path)
                     user_data = job.user_data
                     config = Config(userProvidedEdpData=user_data)
@@ -151,9 +151,9 @@ class AnalysisJobManager:
 
 
 @contextmanager
-def init_file_logger(name: str, log_path: Path) -> Iterator[Logger]:
+def init_file_logger(log_path: Path) -> Iterator[Logger]:
     """Create a new logger that logs to the given file. File is closed on contextmanager exit."""
-    logger = getLogger(name)
+    logger = getLogger("edps.jobapi")
     logger.setLevel(logging.DEBUG)
     with closing(logging.FileHandler(log_path)) as file_handler:
         file_handler.setLevel(logging.DEBUG)

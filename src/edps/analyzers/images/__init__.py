@@ -1,7 +1,7 @@
 import io
 import threading
 from pathlib import PurePosixPath
-from typing import AsyncIterator, Optional
+from typing import Optional
 from uuid import uuid4
 
 import brisque
@@ -14,7 +14,6 @@ from PIL.Image import open as open_image
 from skimage.exposure import is_low_contrast
 from skimage.restoration import estimate_sigma
 
-from edps.analyzers.base import Analyzer
 from edps.analyzers.images.ocr import OCR
 from edps.task import TaskContext
 
@@ -27,14 +26,14 @@ class ImageMetadata:
         self.dpi = dpi
 
 
-class ImageAnalyzer(Analyzer):
+class ImageAnalyzer:
     def __init__(self, metadata: ImageMetadata, data: np.ndarray, name: PurePosixPath):
         self._data = data
         self._name = name
         self._metadata = metadata
         self._detected_texts = DataFrame()
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[ImageDataSet]:
+    async def analyze(self, ctx: TaskContext) -> ImageDataSet:
         height, width, _ = self._data.shape
         ctx.logger.info(
             "Started analysis for image dataset of dimensions %d (width) x %d (height)",
@@ -52,7 +51,7 @@ class ImageAnalyzer(Analyzer):
         # TODO: Process in further analysis steps
         self._detected_texts = await self._detect_texts(self._data)
 
-        yield ImageDataSet(
+        return ImageDataSet(
             uuid=uuid4(),
             parentUuid=None,
             name=self._name,

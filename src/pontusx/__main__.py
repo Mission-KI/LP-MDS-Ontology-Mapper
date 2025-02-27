@@ -13,7 +13,7 @@ def config_logging():
 
 async def amain():
     config_logging()
-    logger = getLogger("pontusx")
+    logger = getLogger("edps.pontusx")
     args = get_args()
     logger.debug("Pontus-X CLI got these arguments: %s", args)
     logger.info("Processing asset with DID='%s'", args.did)
