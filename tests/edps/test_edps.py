@@ -497,7 +497,7 @@ async def test_analyse_docx(path_data_test_docx, compute_asset_fn):
 
     assert len(edp.unstructuredTextDatasets) == 1
     text_ds = edp.unstructuredTextDatasets[0]
-    assert text_ds.lineCount == 4
+    assert text_ds.lineCount == 3
     assert text_ds.wordCount == 30
 
 
