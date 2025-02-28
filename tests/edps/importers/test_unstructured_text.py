@@ -47,4 +47,4 @@ async def test_unstructured_text_with_table(ctx, path_unstructured_text_with_tab
     unstructured_dataset = next(dataset for dataset in datasets if isinstance(dataset, UnstructuredTextDataSet))
     assert len(unstructured_dataset.embeddedTables) == 1
     assert unstructured_dataset.wordCount == 20
-    assert unstructured_dataset.lineCount == 4
+    assert unstructured_dataset.lineCount == 2
