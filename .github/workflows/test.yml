@@ -1,4 +1,4 @@
-name: Build container
+name: Tests and Linters
 
 on: [pull_request]
 
