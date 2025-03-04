@@ -23,12 +23,11 @@ from pandas import (
     Series,
     concat,
 )
-from pydantic import BaseModel, Field
 from scipy.stats import distributions
 from seaborn import heatmap
 
 from edps.analyzers.base import Analyzer
-from edps.analyzers.pandas.fitter import Fitter, get_common_distributions
+from edps.analyzers.pandas.fitter import Fitter, FittingConfig
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
@@ -39,20 +38,6 @@ from edps.analyzers.pandas.type_parser import (
 from edps.file import File
 from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
-
-
-class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=30), description="Timeout to use for the fitting")
-    error_function: str = Field(
-        default="sumsquare_error",
-        description="Error function to use to measure performance of the fits",
-    )
-    bins: int = Field(default=100, description="Number of bins to use for the fitting")
-    distributions: List[str] = Field(
-        default_factory=get_common_distributions,
-        description="Distributions to try to fit",
-    )
-
 
 # Labels for fields
 
@@ -99,7 +84,6 @@ class PandasAnalyzer(Analyzer):
     def __init__(self, data: DataFrame, file: File):
         self._data = data
         self._file = file
-        self._fitting_config = FittingConfig()
         self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
         self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
@@ -247,7 +231,6 @@ class PandasAnalyzer(Analyzer):
                     ctx,
                     columns,
                     concat([common_fields, fields], axis=1),
-                    self._fitting_config,
                     self._distribution_threshold,
                     self._workers,
                 ),
@@ -312,7 +295,6 @@ class PandasAnalyzer(Analyzer):
                 ctx,
                 column,
                 computed_fields,
-                self._fitting_config,
                 column_plot_base + "_distribution",
                 computed_fields[_NUMERIC_DISTRIBUTION],
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
@@ -386,7 +368,6 @@ async def _get_distributions(
     ctx: TaskContext,
     columns: DataFrame,
     fields: DataFrame,
-    config: FittingConfig,
     distribution_threshold: int,
     workers: int,
 ) -> DataFrame:
@@ -398,7 +379,6 @@ async def _get_distributions(
                 ctx,
                 column,
                 _get_single_row(name, fields),
-                config,
                 distribution_threshold,
                 workers,
             )
@@ -417,7 +397,6 @@ async def _get_distribution(
     ctx: TaskContext,
     column: Series,
     fields: Series,
-    config: FittingConfig,
     distribution_threshold: int,
     workers: int,
 ) -> Tuple[str, Dict]:
@@ -427,37 +406,27 @@ async def _get_distribution(
     if fields[_COMMON_NON_NULL] < distribution_threshold:
         return _Distributions.TooSmallDataset.value, dict()
 
-    return await _find_best_distribution(ctx, column, config, fields, workers)
+    return await _find_best_distribution(ctx, column, fields, workers)
 
 
 async def _find_best_distribution(
-    ctx: TaskContext, column: Series, config: FittingConfig, column_fields: Series, workers: int
+    ctx: TaskContext, column: Series, column_fields: Series, workers: int
 ) -> Tuple[str, dict]:
     loop = get_running_loop()
-    fitter = Fitter(
-        column,
-        x_min=column_fields[_NUMERIC_LOWER_DIST],
-        x_max=column_fields[_NUMERIC_UPPER_DIST],
-        timeout=config.timeout.total_seconds(),
-        bins=config.bins,
-        distributions=config.distributions,
-    )
+    config = FittingConfig(min=column_fields[_NUMERIC_LOWER_DIST], max=column_fields[_NUMERIC_UPPER_DIST])
+    fitter = Fitter(column, config)
 
     def runner():
         return fitter.fit(ctx)
 
     await loop.run_in_executor(None, runner)
-    # According to documentation, this ony ever contains one entry.
-    best_distribution_dict = fitter.get_best(method=config.error_function)
-    distribution_name, parameters = next(iter(best_distribution_dict.items()))
-    return str(distribution_name), parameters
+    return await fitter.get_best(ctx)
 
 
 async def _plot_distribution(
     ctx: TaskContext,
     column: Series,
     column_fields: Series,
-    config: FittingConfig,
     plot_name: str,
     distribution_name: str,
     distribution_parameters: dict,
@@ -472,7 +441,7 @@ async def _plot_distribution(
         axes.set_xlim(x_min, x_max)
         axes.hist(
             column,
-            bins=config.bins,
+            bins=100,
             range=x_limits,
             density=True,
             label=f"{column.name} Value Distribution",
