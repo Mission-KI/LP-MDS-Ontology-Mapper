@@ -130,6 +130,11 @@ check_untyped_defs = true
 sqlite_cache = true
 cache_fine_grained = true
 
+[tool.uv]
+override-dependencies = [
+    "chardet; sys_platform == 'never'", # Exclude chardet (transitive dependency of xhtml2pdf)
+]
+
 [[tool.mypy.overrides]]
 module = [
     "filetype",
@@ -151,7 +156,6 @@ ignore_errors = true
 from = "classifier"
 ignore-packages = [
     "edps",
-    "chardet",
     "extended-dataset-profile",
     "libsvm-official",
     "torchvision",
