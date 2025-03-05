@@ -4,10 +4,6 @@ from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, List
 
 from extended_dataset_profile.models.v0.edp import (
-    Augmentation,
-    AugmentedColumn,
-    ComputedEdpData,
-    Config,
     DataSetType,
     DataSpace,
     ExtendedDatasetProfile,
@@ -19,7 +15,6 @@ from extended_dataset_profile.models.v0.edp import (
     Publisher,
     Resolution,
     TemporalConsistency,
-    UserProvidedEdpData,
     VideoCodec,
     VideoPixelFormat,
 )
@@ -27,6 +22,13 @@ from pytest import fixture, mark, raises
 
 from edps import Service
 from edps.task import TaskContext
+from edps.types import (
+    Augmentation,
+    AugmentedColumn,
+    ComputedEdpData,
+    Config,
+    UserProvidedEdpData,
+)
 
 ENCODING = "utf-8"
 

@@ -5,10 +5,7 @@ from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
-    AugmentedColumn,
     Compression,
-    ComputedEdpData,
-    Config,
     DataSet,
     DataSetType,
     DocumentDataSet,
@@ -30,6 +27,7 @@ from edps.file import File, calculate_size, sanitize_file_part
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types, import_file
 from edps.task import TaskContext
+from edps.types import AugmentedColumn, ComputedEdpData, Config
 
 
 class Service:

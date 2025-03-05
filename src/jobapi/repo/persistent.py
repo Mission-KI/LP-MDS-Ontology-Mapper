@@ -4,10 +4,10 @@ from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
-from extended_dataset_profile.models.v0.edp import UserProvidedEdpData
 from sqlalchemy import Engine
 from sqlmodel import Field, Session, SQLModel, select
 
+from edps.types import UserProvidedEdpData
 from jobapi.repo.base import Job, JobRepository, JobSession
 from jobapi.types import JobState
 

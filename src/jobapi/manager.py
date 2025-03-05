@@ -9,11 +9,10 @@ from tempfile import TemporaryDirectory
 from typing import Iterator, Optional
 from uuid import UUID, uuid4
 
-from extended_dataset_profile.models.v0.edp import Config, UserProvidedEdpData
-
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
 from edps.task import SimpleTaskContext
+from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.repo import Job, JobRepository
 from jobapi.types import JobState, JobView
