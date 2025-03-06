@@ -7,7 +7,7 @@ from PIL.Image import Image
 from PIL.Image import open as open_image
 
 from edps.analyzers.images import ImageAnalyzer, ImageMetadata
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def raster_image_importer(ctx: TaskContext, path: Path) -> ImageDataSet:

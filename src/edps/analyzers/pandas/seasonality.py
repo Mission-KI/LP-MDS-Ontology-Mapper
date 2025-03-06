@@ -10,7 +10,7 @@ from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency
 from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class PerTimeBaseSeasonalityGraphs:

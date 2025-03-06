@@ -4,8 +4,8 @@ from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import DataSet, Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
 
-from edps.task import TaskContext
-from edps.taskimpl import TaskContextImpl
+from edps.taskcontext import TaskContext
+from edps.taskcontextimpl import TaskContextImpl
 
 
 async def test_simple_context(ctx: TaskContext):

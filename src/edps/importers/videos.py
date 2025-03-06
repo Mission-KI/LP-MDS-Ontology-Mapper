@@ -8,7 +8,7 @@ from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, Video
 from ffmpeg import FFmpeg
 
 from edps.analyzers.videos import VideoAnalyzer, VideoMetadata
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def video_importer(ctx: TaskContext, path: Path) -> VideoDataSet:

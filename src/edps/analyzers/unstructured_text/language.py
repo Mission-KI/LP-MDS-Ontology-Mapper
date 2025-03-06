@@ -4,7 +4,7 @@ from typing import List, Sequence, Set, Union, cast
 from lingua import Language, LanguageDetector, LanguageDetectorBuilder
 from pandas import Series
 
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 MINIMUM_NUMBER_CHARACTERS_PER_SENTENCE = 10
 

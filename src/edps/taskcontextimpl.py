@@ -8,7 +8,7 @@ from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
 
 from edps.file import determine_file_type, sanitize_file_path
 from edps.importers import lookup_importer, lookup_unsupported_type_message
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class TaskContextImpl(TaskContext):

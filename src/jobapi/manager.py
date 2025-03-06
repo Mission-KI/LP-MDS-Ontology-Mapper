@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
-from edps.taskimpl import TaskContextImpl
+from edps.taskcontextimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.repo import Job, JobRepository

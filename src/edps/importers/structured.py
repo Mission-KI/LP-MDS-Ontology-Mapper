@@ -13,7 +13,7 @@ from extended_dataset_profile.models.v0.edp import StructuredDataSet
 from pandas import DataFrame, Index, read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def csv_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:

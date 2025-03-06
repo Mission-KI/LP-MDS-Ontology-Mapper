@@ -15,7 +15,7 @@ from skimage.exposure import is_low_contrast
 from skimage.restoration import estimate_sigma
 
 from edps.analyzers.images.ocr import OCR
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class ImageMetadata:

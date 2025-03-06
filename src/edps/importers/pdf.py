@@ -4,7 +4,7 @@ from extended_dataset_profile.models.v0.edp import DocumentDataSet
 from pypdf import PdfReader
 
 from edps.analyzers.pdf import PdfAnalyzer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def pdf_importer(ctx: TaskContext, path: Path) -> DocumentDataSet:

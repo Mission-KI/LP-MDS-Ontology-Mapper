@@ -15,7 +15,7 @@ from edps.analyzers.pandas.type_parser import (
     StringColumnInfo,
     parse_types,
 )
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 # Test type parsing

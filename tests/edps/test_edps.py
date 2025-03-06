@@ -20,7 +20,7 @@ from extended_dataset_profile.models.v0.edp import (
 from pytest import fixture, mark, raises
 
 from edps import Service
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 from edps.types import (
     Augmentation,
     AugmentedColumn,
@@ -486,7 +486,7 @@ async def test_analyse_docx(path_data_test_docx, compute_asset_fn):
     assert doc_ds.title == "Vornamen von Neugeborenen in der Stadt Aachen 2021"
     assert doc_ds.keywords == ["Vornamen", "Neugeborene", "Aachen", "2021"]
     assert doc_ds.numImages == 2
-    assert doc_ds.numPages is None      # Can't determine pages of DOCX yet!
+    assert doc_ds.numPages is None  # Can't determine pages of DOCX yet!
 
     assert len(edp.imageDatasets) == 2
     image1_ds = edp.imageDatasets[0]

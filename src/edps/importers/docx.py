@@ -4,7 +4,7 @@ from docx import Document
 from extended_dataset_profile.models.v0.edp import DocumentDataSet
 
 from edps.analyzers.docx import DocxAnalyzer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def docx_importer(ctx: TaskContext, path: Path) -> DocumentDataSet:

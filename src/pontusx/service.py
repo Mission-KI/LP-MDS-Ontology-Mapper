@@ -10,7 +10,7 @@ from pydantic import HttpUrl, ValidationError
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
 from edps.file import sanitize_file_part
-from edps.taskimpl import TaskContextImpl
+from edps.taskcontextimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from pontusx.args import Args
 from pontusx.metadata import DDO, read_custom_data_file, read_ddo_file

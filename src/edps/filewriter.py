@@ -13,7 +13,7 @@ import seaborn
 from extended_dataset_profile.models.v0.edp import ExtendedDatasetProfile
 
 from edps.file import sanitize_file_part
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 TEXT_ENCODING = "utf-8"
 

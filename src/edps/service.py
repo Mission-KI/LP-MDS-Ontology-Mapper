@@ -26,7 +26,7 @@ from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size, determine_file_type, sanitize_file_part
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 from edps.types import AugmentedColumn, ComputedEdpData, Config
 
 

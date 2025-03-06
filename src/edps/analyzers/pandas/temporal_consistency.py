@@ -5,7 +5,7 @@ from extended_dataset_profile.models.v0.edp import TemporalConsistency
 from numpy import count_nonzero
 from pandas import DataFrame, Series, Timedelta, UInt64Dtype
 
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class DatetimeColumnTemporalConsistency:

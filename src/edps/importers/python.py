@@ -6,7 +6,7 @@ from extended_dataset_profile.models.v0.edp import StructuredDataSet
 from pandas import DataFrame
 
 from edps.analyzers import PandasAnalyzer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def pickle_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:

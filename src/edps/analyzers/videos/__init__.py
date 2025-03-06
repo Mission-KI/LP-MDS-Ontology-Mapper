@@ -9,7 +9,7 @@ from extended_dataset_profile.models.v0.edp import (
 )
 from pydantic.dataclasses import dataclass
 
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 @dataclass(frozen=True)

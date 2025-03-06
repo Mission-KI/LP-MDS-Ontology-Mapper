@@ -15,7 +15,7 @@ from pypdf.generic import ArrayObject, PdfObject
 from edps.analyzers.common import split_keywords
 from edps.importers.images import raster_image_importer_from_pilimage
 from edps.importers.unstructured_text import unstructured_text_importer_from_string
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class PdfAnalyzer:

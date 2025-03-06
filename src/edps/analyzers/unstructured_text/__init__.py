@@ -16,7 +16,7 @@ from pandas import DataFrame
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
 from edps.analyzers.unstructured_text.language import detect_languages
 from edps.importers.structured import dialect_to_str, get_possible_csv_dialects, pandas_importer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class Analyzer:

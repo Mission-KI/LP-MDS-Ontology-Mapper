@@ -14,7 +14,7 @@ from pandas import DataFrame
 from edps.analyzers.common import split_keywords
 from edps.importers.structured import pandas_importer
 from edps.importers.unstructured_text import unstructured_text_importer_from_string
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class DocxAnalyzer:

@@ -10,7 +10,7 @@ from edps.importers.python import pickle_importer
 from edps.importers.structured import csv_importer, xls_importer, xlsx_importer
 from edps.importers.unstructured_text import unstructured_text_importer
 from edps.importers.videos import video_importer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 Importer = Callable[[TaskContext, Path], Awaitable[DataSet]]
 

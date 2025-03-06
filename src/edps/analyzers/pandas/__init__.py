@@ -34,7 +34,7 @@ from edps.analyzers.pandas.type_parser import (
     parse_types,
 )
 from edps.filewriter import get_pyplot_writer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 # Labels for fields
 

@@ -5,7 +5,7 @@ from clevercsv.encoding import get_encoding
 from extended_dataset_profile.models.v0.edp import UnstructuredTextDataSet
 
 from edps.analyzers.unstructured_text import Analyzer as UnstructuredTextAnalyzer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 async def unstructured_text_importer(ctx: TaskContext, path: Path) -> UnstructuredTextDataSet:

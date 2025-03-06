@@ -6,8 +6,8 @@ from easyocr import easyocr
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
-from edps.task import TaskContext
-from edps.taskimpl import TaskContextImpl
+from edps.taskcontext import TaskContext
+from edps.taskcontextimpl import TaskContextImpl
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 

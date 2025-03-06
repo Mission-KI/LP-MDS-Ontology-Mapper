@@ -2,7 +2,7 @@ from extended_dataset_profile.models.v0.edp import StructuredDataSet, Unstructur
 from pytest import mark
 
 from edps.importers.unstructured_text import unstructured_text_importer
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 from tests.conftest import copy_asset_to_ctx_input_dir
 
 

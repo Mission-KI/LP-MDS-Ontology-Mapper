@@ -8,7 +8,7 @@ from numpy import any as numpy_any
 from pandas import DataFrame, Index, Series, StringDtype, to_datetime, to_numeric
 from pydantic.dataclasses import dataclass
 
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 
 class _BaseColumnInfo(ABC):
