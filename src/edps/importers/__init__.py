@@ -1,10 +1,8 @@
-import warnings
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
 from extended_dataset_profile.models.v0.edp import DataSet
 
-from edps.file import determine_file_type
 from edps.importers.docx import docx_importer
 from edps.importers.images import raster_image_importer
 from edps.importers.pdf import pdf_importer
@@ -63,15 +61,3 @@ def lookup_unsupported_type_message(file_type: str) -> str:
     if file_type in _UNSUPPORTED_TYPE_MESSAGES:
         return _UNSUPPORTED_TYPE_MESSAGES[file_type]
     return f'Import for "{file_type}" not yet supported'
-
-
-async def import_file(ctx: TaskContext, dataset_name: str, path: Path) -> None:
-    """Import and analyze the file if it's a supported type. Yield calculated datasets."""
-    file_type = determine_file_type(path)
-    importer = lookup_importer(file_type)
-    if importer is None:
-        message = lookup_unsupported_type_message(file_type)
-        ctx.logger.warning(message)
-        warnings.warn(message, RuntimeWarning)
-    else:
-        await ctx.exec(dataset_name, importer, path)

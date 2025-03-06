@@ -1,4 +1,3 @@
-import warnings
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator
 from uuid import uuid4
@@ -6,7 +5,6 @@ from zipfile import ZipFile
 
 from docx.document import Document
 from extended_dataset_profile.models.v0.edp import (
-    DataSet,
     DocumentDataSet,
     ImageDataSet,
     ModificationState,
@@ -14,7 +12,6 @@ from extended_dataset_profile.models.v0.edp import (
 from pandas import DataFrame
 
 from edps.analyzers.common import split_keywords
-from edps.importers.images import raster_image_importer
 from edps.importers.structured import pandas_importer
 from edps.importers.unstructured_text import unstructured_text_importer_from_string
 from edps.task import TaskContext
@@ -33,21 +30,16 @@ class DocxAnalyzer:
         extracted_text = self._extract_text(ctx)
         await ctx.exec("text", unstructured_text_importer_from_string, extracted_text)
 
-        num_images = 0
-        async for media_file in self._extract_media_files(ctx):
-            try:
-                child_ds = await ctx.exec_with_result(media_file.name, self._analyze_media_file, media_file)
-                if isinstance(child_ds, ImageDataSet):
-                    num_images += 1
-            except Exception as exception:
-                message = f"Image importer can't process DOCX media file '{media_file}'"
-                ctx.logger.warning(message, exc_info=exception)
-                warnings.warn(message)
-
         num_tables = 0
         async for dataframe in self._extract_tables(ctx):
             num_tables += 1
-            await ctx.exec(f"table_{num_images:03}", pandas_importer, dataframe)
+            await ctx.exec(f"table_{num_tables:03}", pandas_importer, dataframe)
+
+        async for media_file in self._extract_media_files(ctx):
+            ctx.logger.info("Analyzing DOCX embedded media file '%s'...", ctx.relative_path(media_file))
+            await ctx.import_file(media_file.name, media_file)
+
+        num_images = len([ds for ds in ctx.collect_datasets() if isinstance(ds, ImageDataSet)])
 
         return DocumentDataSet(
             uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
@@ -103,8 +95,3 @@ class DocxAnalyzer:
                 cells.append(row_cells)
             # Assume first row is header
             yield DataFrame(cells[1:], columns=cells[0])
-
-    async def _analyze_media_file(self, ctx: TaskContext, media_file: Path) -> DataSet:
-        ctx.logger.info("Analyzing DOCX embedded media file '%s'...", ctx.relative_path(media_file))
-        # TODO We can't use the import dictionary yet because we would get a circular dependency. To resolve this we'll move this into the TaskContext.
-        return await raster_image_importer(ctx, media_file)

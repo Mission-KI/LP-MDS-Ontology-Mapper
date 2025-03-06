@@ -1,13 +1,13 @@
 import warnings
-from abc import ABC
 from logging import Logger
 from pathlib import Path, PurePosixPath
-from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast, overload
+from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast
 from uuid import UUID
 
 from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
 
-from edps.file import sanitize_file_path
+from edps.file import determine_file_type, sanitize_file_path
+from edps.importers import lookup_importer, lookup_unsupported_type_message
 from edps.task import TaskContext
 
 
@@ -130,6 +130,17 @@ class TaskContextImpl(TaskContext):
             child_context.logger.error("Task function didn't return a dataset.")
             raise RuntimeError("Task function didn't return a dataset.")
         return result
+
+    async def import_file(self, dataset_name: str, path: Path) -> None:
+        """Import and analyze the file if it's a supported type. Yield calculated datasets."""
+        file_type = determine_file_type(path)
+        importer = lookup_importer(file_type)
+        if importer is None:
+            message = lookup_unsupported_type_message(file_type)
+            self.logger.warning(message)
+            warnings.warn(message, RuntimeWarning)
+        else:
+            await self.exec(dataset_name, importer, path)
 
     def _prepare_sub_context(self, dataset_name: str) -> "TaskContextImpl":
         child_name_parts = self.name_parts + [dataset_name]

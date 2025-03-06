@@ -25,7 +25,7 @@ from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size, determine_file_type, sanitize_file_part
 from edps.filewriter import write_edp
-from edps.importers import get_importable_types, import_file
+from edps.importers import get_importable_types
 from edps.task import TaskContext
 from edps.types import AugmentedColumn, ComputedEdpData, Config
 
@@ -72,7 +72,7 @@ class Service:
         async for path in self._walk_all_files(ctx, input_path, compression_algorithms):
             extracted_size += calculate_size(path)
             dataset_name = path.relative_to(input_path).as_posix()
-            await import_file(ctx, dataset_name, path)
+            await ctx.import_file(dataset_name, path)
 
         for ds in ctx.collect_datasets():
             datasets.append(ds)

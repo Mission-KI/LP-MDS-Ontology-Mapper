@@ -104,3 +104,7 @@ class TaskContext(ABC):
         **kwargs: P.kwargs,
     ) -> R:
         """Execute a subtask returning the results of the task function. This creates a sub-context."""
+
+    @abstractmethod
+    async def import_file(self, dataset_name: str, path: Path) -> None:
+        """Import and analyze the file if it's a supported type."""
