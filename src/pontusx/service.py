@@ -10,7 +10,7 @@ from pydantic import HttpUrl, ValidationError
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
 from edps.file import sanitize_file_part
-from edps.task import TaskContext
+from edps.taskimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from pontusx.args import Args
 from pontusx.metadata import DDO, read_custom_data_file, read_ddo_file
@@ -70,7 +70,7 @@ async def run_service(logger: Logger, args: Args):
     input_filename = f"data.{file_extension}"
 
     with TemporaryDirectory() as temp_working_dir_path:
-        ctx = TaskContext(logger, Path(temp_working_dir_path))
+        ctx = TaskContextImpl(logger, Path(temp_working_dir_path))
 
         ctx.input_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(args.raw_data_file, ctx.input_path / input_filename)

@@ -7,6 +7,7 @@ from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
 from edps.task import TaskContext
+from edps.taskimpl import TaskContextImpl
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
@@ -190,8 +191,8 @@ def path_language_deu_eng_wiki_llm_txt():
 
 
 @fixture
-def ctx(path_work):
-    return TaskContext(getLogger("edps.test"), path_work)
+def ctx(path_work) -> TaskContext:
+    return TaskContextImpl(getLogger("edps.test"), path_work)
 
 
 @fixture

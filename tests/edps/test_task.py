@@ -5,6 +5,7 @@ from uuid import uuid4
 from extended_dataset_profile.models.v0.edp import DataSet, Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
 
 from edps.task import TaskContext
+from edps.taskimpl import TaskContextImpl
 
 
 async def test_simple_context(ctx: TaskContext):
@@ -39,7 +40,7 @@ async def _sub_contexts_task(child_ctx: TaskContext):
 
 
 async def test_task(path_work):
-    ctx = TaskContext(getLogger("task"), path_work)
+    ctx: TaskContext = TaskContextImpl(getLogger("task"), path_work)
     ds0, r0 = await ctx.exec_with_result("ds_my_task_with_args", my_task_with_args, 42, b=10)
     assert isinstance(ds0, VideoDataSet)
     assert r0 == 52

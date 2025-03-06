@@ -1,90 +1,71 @@
-import warnings
-from abc import ABC
+from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path, PurePosixPath
-from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast, overload
-from uuid import UUID
+from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, overload
 
-from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
-
-from edps.file import sanitize_file_path
+from extended_dataset_profile.models.v0.edp import DataSet
 
 
 class TaskContext(ABC):
-    """A context provides a logger and supports executing sub-tasks."""
-
-    def __init__(self, logger: Logger, base_path: Path, name_parts: list[str] = []):
-        self._logger = logger
-        self._name_parts = name_parts
-        self._children: list["TaskContext"] = []
-        self._dataset: Optional[DataSet] = None
-
-        self._base_path = base_path
-        if not base_path.is_dir():
-            raise FileNotFoundError(f"Path '{base_path}' doesn't exist or is not a directory!")
-        self._input_path = base_path / "input"
-        self._input_path.mkdir(exist_ok=True)
-        self._output_path = base_path / "output"
-        self._output_path.mkdir(exist_ok=True)
+    """Interface. A context provides a logger and supports executing sub-tasks."""
 
     @property
+    @abstractmethod
     def logger(self) -> Logger:
         """Return logger for this context."""
-        return self._logger
 
     @property
+    @abstractmethod
     def input_path(self) -> Path:
         """Return path for input files (common to all TaskContexts in hierarchy)."""
-        return self._input_path
 
     @property
+    @abstractmethod
     def output_path(self) -> Path:
         """Return path for output files (common to all TaskContexts in hierarchy)."""
-        return self._output_path
 
+    @abstractmethod
     def create_working_dir(self, name: str) -> Path:
         """Create a working directory specific to this TaskContext."""
-        working_path = self._base_path / "work" / "_".join(self._name_parts) / name
-        working_path.mkdir(parents=True)
-        return working_path
 
     @property
+    @abstractmethod
     def children(self) -> list["TaskContext"]:
-        return self._children
+        """Return all child TaskContexts."""
 
     @property
+    @abstractmethod
     def name_parts(self) -> list[str]:
-        return self._name_parts
+        """Return all name parts coming from the TaskContext hierarchy."""
 
     @property
+    @abstractmethod
     def qualified_path(self) -> PurePosixPath:
-        return PurePosixPath("/".join(self._name_parts))
-
-    def build_output_reference(self, final_part: str) -> str:
-        return ("_".join(self._name_parts) + "_" + final_part).replace(".", "_")
-
-    def relative_path(self, path: Path) -> Path:
-        return path.relative_to(self._base_path)
+        """Return a qualified path containing of all the name parts."""
 
     @property
+    @abstractmethod
     def dataset_name(self) -> Optional[str]:
-        return self.name_parts[-1] if self.name_parts else None
+        """Return the last name part identifying the dataset."""
 
     @property
+    @abstractmethod
     def dataset(self) -> Optional[DataSet]:
-        return self._dataset
+        """Return the DataSet attached to the TaskContext."""
 
+    @abstractmethod
+    def build_output_reference(self, final_part: str) -> str:
+        """Build a new output reference that can be used for a file name in the output path consisting of all the name parts."""
+
+    @abstractmethod
+    def relative_path(self, path: Path) -> Path:
+        """Convert the input path to a path relative to the TaskContext base path."""
+
+    @abstractmethod
     def collect_datasets(self) -> Iterator[DataSet]:
-        parent_uuid: Optional[UUID] = None
-        if own_dataset := self.dataset:
-            parent_uuid = own_dataset.uuid
-            yield own_dataset
+        """Return the datasets of this TaskContext and all its children using depth-first traversal."""
 
-        for child in self.children:
-            if direct_child_ds := child.dataset:
-                direct_child_ds.parentUuid = parent_uuid
-            yield from child.collect_datasets()
-
+    @abstractmethod
     async def exec[**P, R_DS: DataSet, *R_Ts](
         self,
         dataset_name: str,
@@ -92,14 +73,7 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        """Execute a subtask. This creates a sub-context."""
-
-        try:
-            await self.exec_with_result(dataset_name, task_fn, *args, **kwargs)
-        except Exception as exception:
-            self.logger.error("Error in sub context, continuing anyways...", exc_info=exception)
-            warnings.warn(f"Error in sub context: {exception}")
-            return
+        """Execute a subtask swallowing the results of the task function. Any occuring errors are caught and logged."""
 
     @overload
     async def exec_with_result[**P, R_DS: DataSet, *R_Ts](
@@ -108,7 +82,8 @@ class TaskContext(ABC):
         task_fn: Callable[Concatenate["TaskContext", P], Awaitable[tuple[R_DS, Unpack[R_Ts]]]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> tuple[R_DS, Unpack[R_Ts]]: ...
+    ) -> tuple[R_DS, Unpack[R_Ts]]:
+        """Execute a subtask returning a tuple of DataSet and other information. This creates a sub-context."""
 
     @overload
     async def exec_with_result[**P, R_DS: DataSet](
@@ -117,8 +92,10 @@ class TaskContext(ABC):
         task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R_DS]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> R_DS: ...
+    ) -> R_DS:
+        """Execute a subtask returning just a DataSet. This creates a sub-context."""
 
+    @abstractmethod
     async def exec_with_result[**P, R](
         self,
         dataset_name: str,
@@ -126,42 +103,4 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        """Execute a subtask. This creates a sub-context."""
-
-        # Replace dot with underscore. Keep slash as they are needed in archives.
-        dataset_name = sanitize_file_path(dataset_name.replace(".", "_"))
-        child_context = self._prepare_sub_context(dataset_name)
-        self.children.append(child_context)
-
-        try:
-            result = await task_fn(child_context, *args, **kwargs)
-        except Exception as exception:
-            child_context.logger.error("Error", exc_info=exception)
-            raise exception
-
-        if isinstance(result, _BaseDataSet):
-            child_context._put_dataset(cast(DataSet, result), dataset_name)
-        elif isinstance(result, tuple) and isinstance(result[0], _BaseDataSet):
-            child_context._put_dataset(cast(DataSet, result[0]), dataset_name)
-        else:
-            child_context.logger.error("Task function didn't return a dataset.")
-            raise RuntimeError("Task function didn't return a dataset.")
-        return result
-
-    def _prepare_sub_context(self, dataset_name: str) -> "TaskContext":
-        child_name_parts = self.name_parts + [dataset_name]
-        new_logger = self.logger.getChild(dataset_name)
-        sub_context = TaskContext(
-            new_logger,
-            self._base_path,
-            child_name_parts,
-        )
-        return sub_context
-
-    def _put_dataset(self, dataset: DataSet, dataset_name: str):
-        if self._dataset:
-            raise RuntimeError(
-                "There is already a dataset in this context. You need to put exactly one dataset into this dataset context!"
-            )
-        dataset.name = PurePosixPath(dataset_name)
-        self._dataset = dataset
+        """Execute a subtask returning the results of the task function. This creates a sub-context."""

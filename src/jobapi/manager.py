@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
-from edps.task import TaskContext
+from edps.taskimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.repo import Job, JobRepository
@@ -95,7 +95,7 @@ class AnalysisJobManager:
                     init_file_logger(job.log_file) as job_logger,
                 ):
                     self._logger.debug("Temporary working directory: %s", temp_working_dir)
-                    ctx = TaskContext(job_logger, Path(temp_working_dir))
+                    ctx = TaskContextImpl(job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path)
                     user_data = job.user_data
                     config = Config(userProvidedEdpData=user_data)
