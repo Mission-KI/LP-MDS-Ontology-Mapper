@@ -27,9 +27,8 @@ class ImageMetadata:
 
 
 class ImageAnalyzer:
-    def __init__(self, metadata: ImageMetadata, data: np.ndarray, name: PurePosixPath):
+    def __init__(self, metadata: ImageMetadata, data: np.ndarray):
         self._data = data
-        self._name = name
         self._metadata = metadata
         self._detected_texts = DataFrame()
 
@@ -52,9 +51,9 @@ class ImageAnalyzer:
         self._detected_texts = await self._detect_texts(self._data)
 
         return ImageDataSet(
-            uuid=uuid4(),
+            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
             parentUuid=None,
-            name=self._name,
+            name=PurePosixPath(""),
             codec=self._metadata.codec,
             colorMode=self._metadata.color_mode,
             resolution=self._metadata.resolution,

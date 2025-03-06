@@ -1,5 +1,5 @@
 from asyncio import get_running_loop
-from pathlib import PurePosixPath
+from pathlib import Path
 
 import numpy as np
 from extended_dataset_profile.models.v0.edp import ImageColorMode, ImageDataSet, ImageDPI, Resolution
@@ -7,28 +7,25 @@ from PIL.Image import Image
 from PIL.Image import open as open_image
 
 from edps.analyzers.images import ImageAnalyzer, ImageMetadata
-from edps.file import File
 from edps.task import TaskContext
 
 
-async def raster_image_importer(ctx: TaskContext, file: File) -> ImageDataSet:
-    ctx.logger.info("Analyzing raster image '%s'", file)
+async def raster_image_importer(ctx: TaskContext, path: Path) -> ImageDataSet:
+    ctx.logger.info("Analyzing raster image '%s'", ctx.relative_path(path))
 
     def runner():
-        with open_image(file.path) as img:
+        with open_image(path) as img:
             return parse_raster_image(img)
 
     img_metadata, img_array = await get_running_loop().run_in_executor(None, runner)
-    name = PurePosixPath(file.relative)
-    analyzer = ImageAnalyzer(img_metadata, img_array, name)
+    analyzer = ImageAnalyzer(img_metadata, img_array)
     return await analyzer.analyze(ctx)
 
 
 async def raster_image_importer_from_pilimage(ctx: TaskContext, image: Image) -> ImageDataSet:
-    ctx.logger.info("Analyzing raster image '%s'", ctx.dataset_name)
+    ctx.logger.info("Analyzing raster image '%s'", ctx.qualified_path)
     img_metadata, img_array = parse_raster_image(image)
-    name = PurePosixPath(ctx.dataset_name or "UNKNOWN")
-    analyzer = ImageAnalyzer(img_metadata, img_array, name)
+    analyzer = ImageAnalyzer(img_metadata, img_array)
     return await analyzer.analyze(ctx)
 
 

@@ -22,17 +22,16 @@ class VideoMetadata:
 
 
 class VideoAnalyzer:
-    def __init__(self, metadata: VideoMetadata, name: PurePosixPath):
-        self._name = name
+    def __init__(self, metadata: VideoMetadata):
         self._metadata = metadata
 
     async def analyze(self, ctx: TaskContext) -> VideoDataSet:
         ctx.logger.info("Started analysis for video dataset")
 
         return VideoDataSet(
-            uuid=uuid4(),
+            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
             parentUuid=None,
-            name=self._name,
+            name=PurePosixPath(""),
             codec=self._metadata.codec,
             resolution=self._metadata.resolution,
             fps=self._metadata.fps,

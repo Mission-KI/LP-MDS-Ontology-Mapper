@@ -1,4 +1,3 @@
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, List
@@ -29,6 +28,7 @@ from edps.types import (
     Config,
     UserProvidedEdpData,
 )
+from tests.conftest import copy_asset_to_ctx_input_dir
 
 ENCODING = "utf-8"
 
@@ -515,19 +515,13 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
 
 
 async def analyse_asset(ctx: TaskContext, config_data: Config, asset_path: Path):
-    _copy_asset_to_working_dir(asset_path, ctx)
+    copy_asset_to_ctx_input_dir(asset_path, ctx)
     return await Service().analyse_asset(ctx, config_data)
 
 
 async def compute_asset(ctx: TaskContext, config_data: Config, asset_path: Path):
-    _copy_asset_to_working_dir(asset_path, ctx)
+    copy_asset_to_ctx_input_dir(asset_path, ctx)
     return await Service()._compute_asset(ctx, config_data)
-
-
-def _copy_asset_to_working_dir(asset_path: Path, ctx: TaskContext):
-    shutil.rmtree(ctx.input_path, ignore_errors=True)
-    ctx.input_path.mkdir()
-    shutil.copy(asset_path, ctx.input_path / asset_path.name)
 
 
 def _assert_pickle_temporal_consistencies(

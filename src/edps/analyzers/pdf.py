@@ -1,13 +1,11 @@
 import warnings
-from pathlib import Path, PurePosixPath
-from tempfile import TemporaryDirectory
+from pathlib import PurePosixPath
 from typing import Iterator, Optional
 from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import (
     DocumentDataSet,
     ModificationState,
-    UnstructuredTextDataSet,
 )
 from PIL.Image import Image
 from pypdf import DocumentInformation, PageObject, PdfReader
@@ -15,21 +13,16 @@ from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.common import split_keywords
-from edps.file import File
 from edps.importers.images import raster_image_importer_from_pilimage
-from edps.importers.unstructured_text import unstructured_text_importer
+from edps.importers.unstructured_text import unstructured_text_importer_from_string
 from edps.task import TaskContext
 
 
 class PdfAnalyzer:
-    def __init__(self, pdf_reader: PdfReader, file: File):
+    def __init__(self, pdf_reader: PdfReader):
         self.pdf_reader = pdf_reader
-        self.file = file
 
     async def analyze(self, ctx: TaskContext) -> DocumentDataSet:
-        ctx.logger.info("Analyzing PDF document '%s'...", self.file)
-
-        doc_uuid = uuid4()
         metadata = self.pdf_reader.metadata
         # PDF header is something like that: %PDF-1.6
         file_version = self.pdf_reader.pdf_header.replace("%", "")
@@ -39,7 +32,7 @@ class PdfAnalyzer:
         modified = _calc_modified(self.pdf_reader._ID, metadata)
 
         extracted_text = self._extract_text(ctx)
-        await ctx.exec("text", self._analyze_text, extracted_text)
+        await ctx.exec("text", unstructured_text_importer_from_string, extracted_text)
 
         num_images = 0
         for image in self._extract_images(ctx):
@@ -48,10 +41,10 @@ class PdfAnalyzer:
 
         # TODO: Change DocumentDataSet: give defaults for "uuid", "parent"; maybe make "name" optional and of type str
         return DocumentDataSet(
-            uuid=doc_uuid,
+            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
             parentUuid=None,
-            name=PurePosixPath(self.file.relative),
-            fileSize=self.file.size,
+            name=PurePosixPath(""),
+            fileSize=0,  # TODO remove fileSize from DocumentDataSet because every DataSet has this as an optional property!
             title=metadata.title if metadata is not None else None,
             subject=metadata.subject if metadata is not None else None,
             author=metadata.author if metadata is not None else None,
@@ -80,17 +73,6 @@ class PdfAnalyzer:
                 image = image_file.image
                 if image:
                     yield image
-
-    async def _analyze_text(self, ctx: TaskContext, text: str) -> UnstructuredTextDataSet:
-        # TODO(mka): Rework this after Datasets are added to TaskContext
-        with TemporaryDirectory() as tmp_dir:
-            tmp_file = Path(tmp_dir) / ctx.qualified_path
-            tmp_file.parent.mkdir(parents=True, exist_ok=True)
-            # UTF-8 is needed for umlauts etc.
-            with tmp_file.open("wt", encoding="utf-8") as file_io:
-                file_io.write(text)
-            file = File(Path(tmp_dir), tmp_file)
-            return await unstructured_text_importer(ctx, file)
 
 
 def _calc_modified(ids: Optional[ArrayObject], metadata: Optional[DocumentInformation]) -> ModificationState:

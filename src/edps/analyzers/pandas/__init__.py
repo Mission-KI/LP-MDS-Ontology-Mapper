@@ -33,7 +33,6 @@ from edps.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
     parse_types,
 )
-from edps.file import File
 from edps.filewriter import get_pyplot_writer
 from edps.task import TaskContext
 
@@ -79,9 +78,8 @@ class _Distributions(str, Enum):
 
 
 class PandasAnalyzer:
-    def __init__(self, data: DataFrame, file: File):
+    def __init__(self, data: DataFrame):
         self._data = data
-        self._file = file
         self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
         self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
@@ -149,7 +147,7 @@ class PandasAnalyzer:
         correlation_fields = common_fields.loc[correlation_ids]
         correlation_graph = await _get_correlation_graph(
             ctx,
-            self._file.output_reference + "_correlations",
+            ctx.build_output_reference("correlations"),
             correlation_columns,
             correlation_fields,
         )
@@ -162,9 +160,9 @@ class PandasAnalyzer:
         )
 
         return StructuredDataSet(
-            uuid=uuid4(),
+            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
             parentUuid=None,
-            name=PurePosixPath(self._file.relative),
+            name=PurePosixPath(""),
             rowCount=row_count,
             columnCount=column_count,
             numericColumnCount=transformed_numeric_column_count,
@@ -256,7 +254,7 @@ class PandasAnalyzer:
         self, ctx: TaskContext, column: Series, computed_fields: Series, seasonality_results: Series
     ) -> NumericColumn:
         ctx.logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = self._file.output_reference + "_" + str(column.name)
+        column_plot_base = ctx.build_output_reference(str(column.name))
         box_plot = await _generate_box_plot(ctx, column_plot_base + "_box_plot", column)
 
         column_result = NumericColumn(

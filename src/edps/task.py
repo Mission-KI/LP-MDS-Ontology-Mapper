@@ -13,12 +13,19 @@ from edps.file import sanitize_file_path
 class TaskContext(ABC):
     """A context provides a logger and supports executing sub-tasks."""
 
-    def __init__(self, logger: Logger, working_path: Path, name_parts: list[str] = []):
+    def __init__(self, logger: Logger, base_path: Path, name_parts: list[str] = []):
         self._logger = logger
-        self._working_path = working_path
         self._name_parts = name_parts
         self._children: list["TaskContext"] = []
         self._dataset: Optional[DataSet] = None
+
+        self._base_path = base_path
+        if not base_path.is_dir():
+            raise FileNotFoundError(f"Path '{base_path}' doesn't exist or is not a directory!")
+        self._input_path = base_path / "input"
+        self._input_path.mkdir(exist_ok=True)
+        self._output_path = base_path / "output"
+        self._output_path.mkdir(exist_ok=True)
 
     @property
     def logger(self) -> Logger:
@@ -26,19 +33,20 @@ class TaskContext(ABC):
         return self._logger
 
     @property
-    def working_path(self) -> Path:
-        """Return working path (not guaranteed that it exists, normally temp directory with write access)."""
-        return self._working_path
-
-    @property
     def input_path(self) -> Path:
-        """Return path for input files (not guaranteed that it exists)."""
-        return self._working_path / "input"
+        """Return path for input files (common to all TaskContexts in hierarchy)."""
+        return self._input_path
 
     @property
     def output_path(self) -> Path:
-        """Return path for output files (not guaranteed that it exists)."""
-        return self._working_path / "output"
+        """Return path for output files (common to all TaskContexts in hierarchy)."""
+        return self._output_path
+
+    def create_working_dir(self, name: str) -> Path:
+        """Create a working directory specific to this TaskContext."""
+        working_path = self._base_path / "work" / "_".join(self._name_parts) / name
+        working_path.mkdir(parents=True)
+        return working_path
 
     @property
     def children(self) -> list["TaskContext"]:
@@ -51,6 +59,12 @@ class TaskContext(ABC):
     @property
     def qualified_path(self) -> PurePosixPath:
         return PurePosixPath("/".join(self._name_parts))
+
+    def build_output_reference(self, final_part: str) -> str:
+        return ("_".join(self._name_parts) + "_" + final_part).replace(".", "_")
+
+    def relative_path(self, path: Path) -> Path:
+        return path.relative_to(self._base_path)
 
     @property
     def dataset_name(self) -> Optional[str]:
@@ -139,7 +153,7 @@ class TaskContext(ABC):
         new_logger = self.logger.getChild(dataset_name)
         sub_context = TaskContext(
             new_logger,
-            self._working_path,
+            self._base_path,
             child_name_parts,
         )
         return sub_context

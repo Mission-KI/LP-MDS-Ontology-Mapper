@@ -4,46 +4,39 @@ from itertools import permutations, tee
 from pathlib import PurePosixPath
 from re import compile
 from typing import AsyncIterator, Generator, Iterable, Iterator, List, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 from warnings import warn
 
 from clevercsv.cparser_util import parse_string
 from clevercsv.dialect import SimpleDialect
-from clevercsv.encoding import get_encoding
 from clevercsv.exceptions import Error as CleverCsvError
 from extended_dataset_profile.models.v0.edp import EmbeddedTable, StructuredDataSet, UnstructuredTextDataSet
 from pandas import DataFrame
 
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
 from edps.analyzers.unstructured_text.language import detect_languages
-from edps.file import File
 from edps.importers.structured import dialect_to_str, get_possible_csv_dialects, pandas_importer
 from edps.task import TaskContext
 
 
 class Analyzer:
-    def __init__(self, file: File, parent_uuid: None | UUID = None, minimum_number_rows_csv: int = 3):
-        self._file = file
-        self._encoding = get_encoding(file.path)
-        if self._encoding is None:
-            raise RuntimeError("Could not determine encoding of %s", file)
-        self._parent_uuid = parent_uuid
-        self._uuid = uuid4()
+    def __init__(self, ctx: TaskContext, content: TextIOBase, minimum_number_rows_csv: int = 3):
+        self._ctx = ctx
+        self._content = content
         self._minimum_number_rows_csv = minimum_number_rows_csv
         self._word_splitter_regex = compile(r"\s+")
 
-    async def analyze(self, ctx: TaskContext) -> UnstructuredTextDataSet:
-        with open(self._file.path, "rt", encoding=self._encoding) as opened_file, StringIO() as unstructured_only_file:
+    async def analyze(self) -> UnstructuredTextDataSet:
+        with StringIO() as unstructured_only_file:
             # unstructured_only_file the lines which where not handled by the CSV parsers.
             embedded_tables: List[EmbeddedTable] = []
-            async for embbeded_table in self._analyze_embedded_csv(ctx, opened_file, unstructured_only_file):
+            async for embbeded_table in self._analyze_embedded_csv(self._content, unstructured_only_file):
                 embedded_tables.append(embbeded_table)
-
             unstructured_only_file.seek(0)
-            return self._analyze_unstructured_text(ctx, unstructured_only_file, embedded_tables)
+            return self._analyze_unstructured_text(unstructured_only_file, embedded_tables)
 
     def _analyze_unstructured_text(
-        self, ctx: TaskContext, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
+        self, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
     ) -> UnstructuredTextDataSet:
         word_count = 0
         text = opened_file.read()
@@ -52,11 +45,11 @@ class Analyzer:
         word_count += self._count_words(text)
 
         return UnstructuredTextDataSet(
-            uuid=self._uuid,
-            parentUuid=self._parent_uuid,
-            name=PurePosixPath(self._file.relative.as_posix()),
+            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
+            parentUuid=None,
+            name=PurePosixPath(""),
             embeddedTables=embedded_tables,
-            languages=detect_languages(ctx, text),
+            languages=detect_languages(self._ctx, text),
             lineCount=line_count,
             wordCount=word_count,
         )
@@ -73,7 +66,7 @@ class Analyzer:
         return count
 
     async def _analyze_embedded_csv(
-        self, ctx: TaskContext, opened_file: TextIOBase, remainder_buffer: TextIOBase
+        self, opened_file: TextIOBase, remainder_buffer: TextIOBase
     ) -> AsyncIterator[EmbeddedTable]:
         """This function extracts all CSV's and yields the readily analyzed StructuredDataSets.
 
@@ -82,15 +75,13 @@ class Analyzer:
         """
         with StringIO(newline="") as csv_buffer:
             analyzer = _CsvAnalyzer(
-                ctx=ctx,
+                ctx=self._ctx,
                 opened_file=opened_file,
                 csv_buffer=csv_buffer,
                 remainder_buffer=remainder_buffer,
                 minimum_number_rows=self._minimum_number_rows_csv,
-                file=self._file,
-                uuid=self._uuid,
             )
-            async for embbeded_table in analyzer.analyze(ctx):
+            async for embbeded_table in analyzer.analyze():
                 yield embbeded_table
 
 
@@ -186,27 +177,24 @@ class _CsvAnalyzer:
         csv_buffer: TextIOBase,
         remainder_buffer: TextIOBase,
         minimum_number_rows: int,
-        file: File,
-        uuid: UUID,
     ):
+        self._ctx = ctx
         self._opened_file = opened_file
         self._csv_buffer = csv_buffer
         self.remainder_buffer = remainder_buffer
         self._parsers = _get_all_csv_parsers(ctx, minimum_number_rows, opened_file)
         self._minimum_number_rows = minimum_number_rows
-        self._file = file
-        self._uuid = uuid
 
-    async def analyze(self, ctx: TaskContext) -> AsyncIterator[EmbeddedTable]:
+    async def analyze(self) -> AsyncIterator[EmbeddedTable]:
         chunks = [chunk async for chunk in self._walk_file()]
         grouped_chunks = list(self._group_overlapping_chunks(chunks))
-        chunks = [chunk for group in grouped_chunks for chunk in self._resolve_overlaps(ctx, group)]
+        chunks = [chunk for group in grouped_chunks for chunk in self._resolve_overlaps(self._ctx, group)]
         number_lines = self._count_lines()
         unstructured_text_chunks = [Chunk(0, number_lines + 1)]
         count = 0
 
         for structured_chunk in chunks:
-            ctx.logger.info(
+            self._ctx.logger.info(
                 "Analyzing lines %d to %d as csv with dialect (%s).",
                 structured_chunk.start_line_inclusive,
                 structured_chunk.end_line_exclusive,
@@ -216,11 +204,11 @@ class _CsvAnalyzer:
 
             try:
                 ds_name = f"table{count:03}"
-                _, table = await ctx.exec_with_result(ds_name, self._analyze_structured_dataset, structured_chunk)
+                _, table = await self._ctx.exec_with_result(ds_name, self._analyze_structured_dataset, structured_chunk)
                 yield table
             except Exception as exception:
                 message = f"Error analyzing structured sub-dataset {ds_name}"
-                ctx.logger.warning(message, exc_info=exception)
+                self._ctx.logger.warning(message, exc_info=exception)
                 warnings.warn(message)
 
             # Subtract structured chunk from unstructured chunks
@@ -239,7 +227,7 @@ class _CsvAnalyzer:
         self, ctx: TaskContext, structured_chunk: _TrackedCsvChunk
     ) -> tuple[StructuredDataSet, EmbeddedTable]:
         dataframe = DataFrame(structured_chunk.cells[1:], dtype=str, columns=structured_chunk.cells[0])
-        structured_ds = await pandas_importer(ctx, dataframe, self._file)
+        structured_ds = await pandas_importer(ctx, dataframe)
         embedded_table = EmbeddedTable(
             startLine=structured_chunk.start_line_inclusive,
             endLine=structured_chunk.end_line_exclusive,

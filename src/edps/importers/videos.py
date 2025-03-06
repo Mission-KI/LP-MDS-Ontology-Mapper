@@ -1,6 +1,6 @@
 import json
 import shutil
-from pathlib import PurePosixPath
+from pathlib import Path
 from warnings import warn
 
 import static_ffmpeg
@@ -8,12 +8,11 @@ from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, Video
 from ffmpeg import FFmpeg
 
 from edps.analyzers.videos import VideoAnalyzer, VideoMetadata
-from edps.file import File
 from edps.task import TaskContext
 
 
-async def video_importer(ctx: TaskContext, file: File) -> VideoDataSet:
-    ctx.logger.info("Analyzing video '%s'", file)
+async def video_importer(ctx: TaskContext, path: Path) -> VideoDataSet:
+    ctx.logger.info("Analyzing video '%s'", ctx.relative_path(path))
 
     # Blocks until files are downloaded, but only if ffprobe not already on path
     if not shutil.which("ffprobe"):
@@ -22,7 +21,7 @@ async def video_importer(ctx: TaskContext, file: File) -> VideoDataSet:
     probe = FFmpeg(
         executable="ffprobe",
     ).input(
-        file.path,
+        path,
         print_format="json",
         show_streams=None,
         show_format=None,
@@ -31,7 +30,7 @@ async def video_importer(ctx: TaskContext, file: File) -> VideoDataSet:
     video_streams = [s for s in media.get("streams", []) if s.get("codec_type") == "video"]
 
     if not video_streams:
-        raise RuntimeError(f'Could not detect video streams for "{file.relative}"')
+        raise RuntimeError(f'Could not detect video streams for "{ctx.relative_path(path)}"')
 
     video_stream = video_streams[0]
     codec = video_stream.get("codec_name", "UNKNOWN")
@@ -48,7 +47,7 @@ async def video_importer(ctx: TaskContext, file: File) -> VideoDataSet:
         duration=duration,
         pixel_format=VideoPixelFormat(pixel_format),
     )
-    analyzer = VideoAnalyzer(metadata, PurePosixPath(file.relative))
+    analyzer = VideoAnalyzer(metadata)
     return await analyzer.analyze(ctx)
 
 

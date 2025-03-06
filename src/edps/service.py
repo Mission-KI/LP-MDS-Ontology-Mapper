@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
-from edps.file import File, calculate_size, sanitize_file_part
+from edps.file import calculate_size, determine_file_type, sanitize_file_part
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types, import_file
 from edps.task import TaskContext
@@ -62,16 +62,17 @@ class Service:
         return await write_edp(ctx, json_name, edp)
 
     async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
-        path = ctx.input_path
-        if not path.exists():
-            raise FileNotFoundError(f'File "{path}" can not be found!')
+        input_path = ctx.input_path
+        if not input_path.exists():
+            raise FileNotFoundError(f'File "{input_path}" can not be found!')
         compression_algorithms: Set[str] = set()
         extracted_size = 0
         datasets: List[DataSet] = []
 
-        async for child_file in self._walk_all_files(ctx, path, compression_algorithms):
-            extracted_size += child_file.size
-            await import_file(ctx, child_file)
+        async for path in self._walk_all_files(ctx, input_path, compression_algorithms):
+            extracted_size += calculate_size(path)
+            dataset_name = path.relative_to(input_path).as_posix()
+            await import_file(ctx, dataset_name, path)
 
         for ds in ctx.collect_datasets():
             datasets.append(ds)
@@ -84,7 +85,7 @@ class Service:
 
         if len(datasets) == 0:
             raise RuntimeError("Was not able to analyze any datasets in this asset")
-        computed_edp_data = self._create_computed_edp_data(path, compression, datasets)
+        computed_edp_data = self._create_computed_edp_data(input_path, compression, datasets)
         computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
@@ -122,16 +123,16 @@ class Service:
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
         return edp
 
-    async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[File]:
+    async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[Path]:
         """Will yield all files, recursively through directories and archives."""
 
         if path.is_file():
-            file = File(ctx.input_path, path)
-            if file.type not in DECOMPRESSION_ALGORITHMS:
-                yield file
+            file_type = determine_file_type(path)
+            if file_type not in DECOMPRESSION_ALGORITHMS:
+                yield path
             else:
-                compressions.add(file.type)
-                async with self._extract(ctx, file) as extracted_path:
+                compressions.add(file_type)
+                async with self._extract(ctx, path) as extracted_path:
                     async for child_file in self._walk_all_files(ctx, extracted_path, compressions):
                         yield child_file
         elif path.is_dir():
@@ -142,23 +143,23 @@ class Service:
             ctx.logger.warning('Can not extract or analyse "%s"', path)
 
     @asynccontextmanager
-    async def _extract(self, ctx: TaskContext, file: File) -> AsyncIterator[Path]:
-        archive_type = file.type
+    async def _extract(self, ctx: TaskContext, path: Path) -> AsyncIterator[Path]:
+        archive_type = determine_file_type(path)
         if archive_type not in DECOMPRESSION_ALGORITHMS:
             raise RuntimeError(f'"{archive_type}" is not a know archive type')
         decompressor = DECOMPRESSION_ALGORITHMS[archive_type]
         if decompressor is None:
             raise NotImplementedError(f'Extracting "{archive_type}" is not implemented')
-        archive_name = file.path.name
-        directory = file.path.parent / sanitize_file_part(archive_name)
+        archive_name = path.name
+        directory = path.parent / sanitize_file_part(archive_name)
         while directory.exists():
             directory /= "extracted"
 
         directory.mkdir()
-        ctx.logger.debug('Extracting archive "%s"...', file)
-        await decompressor.extract(file.path, directory)
-        ctx.logger.debug('Extracted archive "%s" is removed now', file)
-        file.path.unlink()
+        ctx.logger.debug('Extracting archive "%s"...', ctx.relative_path(path))
+        await decompressor.extract(path, directory)
+        ctx.logger.debug('Extracted archive "%s" is removed now', ctx.relative_path(path))
+        path.unlink()
         yield directory
 
     async def _add_augmentation(self, ctx: TaskContext, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:

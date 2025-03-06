@@ -1,6 +1,7 @@
 from asyncio import get_running_loop
 from csv import Dialect
 from io import TextIOBase
+from pathlib import Path
 from typing import Literal
 
 from clevercsv import Detector
@@ -12,30 +13,28 @@ from extended_dataset_profile.models.v0.edp import StructuredDataSet
 from pandas import DataFrame, Index, read_csv, read_excel
 
 from edps.analyzers import PandasAnalyzer
-from edps.file import File
 from edps.task import TaskContext
 
 
-async def csv_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
-    data_frame = await csv_import_dataframe(ctx, file)
-    return await pandas_importer(ctx, data_frame, file)
+async def csv_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:
+    ctx.logger.info("Analyzing CSV '%s'", ctx.relative_path(path))
+    data_frame = await csv_import_dataframe(ctx, path)
+    return await PandasAnalyzer(data_frame).analyze(ctx)
 
 
-async def pandas_importer(ctx: TaskContext, data_frame: DataFrame, file: File) -> StructuredDataSet:
-    ctx.logger.info("Analyzing structured dataset '%s'", ctx.dataset_name)
-    return await PandasAnalyzer(data_frame, file).analyze(ctx)
+async def pandas_importer(ctx: TaskContext, data_frame: DataFrame) -> StructuredDataSet:
+    ctx.logger.info("Analyzing structured dataset '%s'", ctx.qualified_path)
+    return await PandasAnalyzer(data_frame).analyze(ctx)
 
 
-async def csv_import_dataframe(ctx: TaskContext, file: File) -> DataFrame:
-    ctx.logger.info("Analyzing CSV '%s'", file)
-
-    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, file, num_lines=100)
+async def csv_import_dataframe(ctx: TaskContext, path: Path) -> DataFrame:
+    dialect, encoding, has_header = _detect_dialect_encoding_and_has_header(ctx, path, num_lines=100)
     csv_dialect = _translate_dialect(ctx, dialect)
     ctx.logger.info("%s", "Detected Header" if has_header else "No Header detected")
 
     def runner():
         return read_csv(
-            file.path,
+            path,
             dialect=csv_dialect,  # type: ignore
             header="infer" if has_header else None,
             encoding=encoding,
@@ -63,10 +62,11 @@ def _translate_dialect(ctx, dialect: None | SimpleDialect) -> None | Dialect:
         return None
 
 
-async def excel_importer(ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]) -> StructuredDataSet:
+async def excel_importer(ctx: TaskContext, path: Path, engine: Literal["xlrd", "openpyxl"]) -> StructuredDataSet:
     """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
 
-    dataframes_map = await excel_import_dataframes(ctx, file, engine)
+    ctx.logger.info("Analyzing Excel file '%s'", ctx.relative_path(path))
+    dataframes_map = await excel_import_dataframes(ctx, path, engine)
 
     sheets = list(dataframes_map.keys())
     dataframes = list(dataframes_map.values())
@@ -79,19 +79,17 @@ async def excel_importer(ctx: TaskContext, file: File, engine: Literal["xlrd", "
     if len(sheets) > 1:
         ctx.logger.warning("Excel contains multiple sheets %s, only first one is used!", sheets)
 
-    return await PandasAnalyzer(dataframes[0], file).analyze(ctx)
+    return await PandasAnalyzer(dataframes[0]).analyze(ctx)
 
 
 async def excel_import_dataframes(
-    ctx: TaskContext, file: File, engine: Literal["xlrd", "openpyxl"]
+    ctx: TaskContext, path: Path, engine: Literal["xlrd", "openpyxl"]
 ) -> dict[str, DataFrame]:
     """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
 
-    ctx.logger.info("Analyzing Excel file '%s'", file)
-
     def runner() -> dict[str, DataFrame]:
         return read_excel(
-            file.path,
+            path,
             engine=engine,
             sheet_name=None,  # imports all sheets as dictionary
             header=0,  # assume header in row 0
@@ -102,17 +100,17 @@ async def excel_import_dataframes(
     return dataframes_map
 
 
-async def xlsx_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
-    return await excel_importer(ctx, file, "openpyxl")
+async def xlsx_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:
+    return await excel_importer(ctx, path, "openpyxl")
 
 
-async def xls_importer(ctx: TaskContext, file: File) -> StructuredDataSet:
-    return await excel_importer(ctx, file, "xlrd")
+async def xls_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:
+    return await excel_importer(ctx, path, "xlrd")
 
 
 def get_possible_csv_dialects(opened_file: TextIOBase):
     data = opened_file.read()
-    encoding = opened_file.encoding
+    encoding = opened_file.encoding or "utf-8"
     return _get_dialects(data, encoding=encoding)
 
 
@@ -124,13 +122,13 @@ def dialect_to_str(dialect: Dialect) -> str:
     return text
 
 
-def _detect_dialect_encoding_and_has_header(ctx: TaskContext, file: File, num_lines: int | None):
-    enc = get_encoding(file.path)
+def _detect_dialect_encoding_and_has_header(ctx: TaskContext, path: Path, num_lines: int | None):
+    enc = get_encoding(path)
     if enc is None:
-        raise RuntimeError(f'Could not detect encoding for "{file.relative}"')
+        raise RuntimeError(f'Could not detect encoding for "{ctx.relative_path(path)}"')
     ctx.logger.info('Detected encoding "%s"', enc)
 
-    data = _read_file_top_lines(file, enc, num_lines)
+    data = _read_file_top_lines(path, enc, num_lines)
 
     detector = Detector()
     dialect = detector.detect(data, verbose=False, method=DetectionMethod.AUTO)
@@ -138,11 +136,11 @@ def _detect_dialect_encoding_and_has_header(ctx: TaskContext, file: File, num_li
     return dialect, enc, has_header
 
 
-def _read_file_top_lines(file: File, enc: str, num_lines: int | None) -> str:
+def _read_file_top_lines(path: Path, enc: str, num_lines: int | None) -> str:
     data: str = ""
     # newline="" is important for CSV files as it preserves line endings.
     # Thus read() passes them through to the detector.
-    with file.path.open("r", newline="", encoding=enc) as fp:
+    with path.open("r", newline="", encoding=enc) as fp:
         for index, line in enumerate(fp):
             if not num_lines or index < num_lines:
                 data += line

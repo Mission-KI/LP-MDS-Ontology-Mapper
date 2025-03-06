@@ -1,3 +1,4 @@
+import shutil
 from logging import getLogger
 from pathlib import Path
 
@@ -197,3 +198,11 @@ def ctx(path_work):
 def download_ocr_models(ctx):
     ctx.logger.info("Downloading OCR models.")
     easyocr.Reader(lang_list=["en", "de"], gpu=False, download_enabled=True)
+
+
+def copy_asset_to_ctx_input_dir(asset_path: Path, ctx: TaskContext):
+    shutil.rmtree(ctx.input_path, ignore_errors=True)
+    ctx.input_path.mkdir()
+    dest_path = ctx.input_path / asset_path.name
+    shutil.copy(asset_path, dest_path)
+    return dest_path

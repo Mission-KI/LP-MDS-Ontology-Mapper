@@ -1,15 +1,15 @@
 from extended_dataset_profile.models.v0.edp import StructuredDataSet, UnstructuredTextDataSet
 from pytest import mark
 
-from edps.file import File
 from edps.importers.unstructured_text import unstructured_text_importer
 from edps.task import TaskContext
+from tests.conftest import copy_asset_to_ctx_input_dir
 
 
 @mark.asyncio
 async def test_unstructured_text_only(ctx, path_unstructured_text_only_txt):
-    file = File(path_unstructured_text_only_txt.parent, path_unstructured_text_only_txt)
-    await ctx.exec("dataset", unstructured_text_importer, file)
+    path_in_ctx = copy_asset_to_ctx_input_dir(path_unstructured_text_only_txt, ctx)
+    await ctx.exec("dataset", unstructured_text_importer, path_in_ctx)
     datasets = list(ctx.collect_datasets())
     assert len(datasets) == 1
     assert any(isinstance(dataset, UnstructuredTextDataSet) for dataset in datasets)
@@ -17,8 +17,8 @@ async def test_unstructured_text_only(ctx, path_unstructured_text_only_txt):
 
 @mark.asyncio
 async def test_unstructured_text_with_table(ctx: TaskContext, path_unstructured_text_with_table):
-    file = File(path_unstructured_text_with_table.parent, path_unstructured_text_with_table)
-    await ctx.exec("dataset", unstructured_text_importer, file)
+    path_in_ctx = copy_asset_to_ctx_input_dir(path_unstructured_text_with_table, ctx)
+    await ctx.exec("dataset", unstructured_text_importer, path_in_ctx)
     datasets = list(ctx.collect_datasets())
     assert len(datasets) == 2
     assert any(isinstance(dataset, UnstructuredTextDataSet) for dataset in datasets)
