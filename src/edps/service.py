@@ -28,6 +28,10 @@ from edps.taskcontext import TaskContext
 from edps.types import AugmentedColumn, ComputedEdpData, Config, DataSet
 
 
+class UserInputError(RuntimeError):
+    pass
+
+
 class Service:
     def __init__(self):
         _logger = getLogger(__name__)
@@ -63,6 +67,9 @@ class Service:
         input_path = ctx.input_path
         if not input_path.exists():
             raise FileNotFoundError(f'File "{input_path}" can not be found!')
+        if not input_path.is_file():
+            raise UserInputError("Expected a single file as input. Directories are not supported!")
+
         compression_algorithms: Set[str] = set()
         extracted_size = 0
         datasets: List[DataSet] = []
