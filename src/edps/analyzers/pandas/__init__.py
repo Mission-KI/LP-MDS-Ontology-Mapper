@@ -1,4 +1,3 @@
-from asyncio import get_running_loop
 from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
@@ -412,14 +411,8 @@ async def _get_distribution(
 async def _find_best_distribution(
     ctx: TaskContext, column: Series, column_fields: Series, workers: int
 ) -> Tuple[str, dict]:
-    loop = get_running_loop()
     config = FittingConfig(min=column_fields[_NUMERIC_LOWER_DIST], max=column_fields[_NUMERIC_UPPER_DIST])
     fitter = Fitter(column, config)
-
-    def runner():
-        return fitter.fit(ctx)
-
-    await loop.run_in_executor(None, runner)
     return await fitter.get_best(ctx)
 
 
