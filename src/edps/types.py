@@ -116,7 +116,15 @@ def recursively_escape_strings(data: Any) -> Any:
         raise NotImplementedError(f"Type {type(data)} not supported")
 
 
-DataSet = Union[ArchiveDataSet, StructuredDataSet, UnstructuredTextDataSet, ImageDataSet, VideoDataSet, DocumentDataSet]
+DataSet = Union[
+    ArchiveDataSet,
+    StructuredDataSet,
+    SemiStructuredDataSet,
+    UnstructuredTextDataSet,
+    ImageDataSet,
+    VideoDataSet,
+    DocumentDataSet,
+]
 
 
 def is_dataset(value: Any) -> bool:

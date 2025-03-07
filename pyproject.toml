@@ -54,6 +54,7 @@ dependencies = [
     "easyocr",
     "python-ffmpeg",
     "static-ffmpeg",
+    "genson",
 ]
 
 [project.scripts]
@@ -129,6 +130,7 @@ module = [
     "easyocr",
     "ffmpeg",
     "static_ffmpeg",
+    "genson",
 ]
 ignore_missing_imports = true
 

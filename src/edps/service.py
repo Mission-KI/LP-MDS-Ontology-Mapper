@@ -13,6 +13,7 @@ from extended_dataset_profile.models.v0.edp import (
     FileReference,
     ImageDataSet,
     JsonReference,
+    SemiStructuredDataSet,
     StructuredDataSet,
     TemporalCover,
     UnstructuredTextDataSet,
@@ -122,6 +123,10 @@ class Service:
             edp.structuredDatasets.append(dataset)
             edp.dataTypes.add(DataSetType.structured)
             return "structuredDatasets", (len(edp.structuredDatasets) - 1)
+        elif isinstance(dataset, SemiStructuredDataSet):
+            edp.semiStructuredDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.semiStructured)
+            return "semiStructuredDatasets", (len(edp.semiStructuredDatasets) - 1)
         elif isinstance(dataset, UnstructuredTextDataSet):
             edp.unstructuredTextDatasets.append(dataset)
             edp.dataTypes.add(DataSetType.unstructuredText)
