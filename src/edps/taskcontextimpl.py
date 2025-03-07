@@ -1,3 +1,4 @@
+import asyncio
 import re
 import warnings
 from logging import Logger
@@ -136,6 +137,13 @@ class TaskContextImpl(TaskContext):
 
     async def import_file(self, dataset_name: str, path: Path) -> None:
         """Import file if supported. Store the dataset. Catch and log any errors."""
+        if path.is_dir():
+            dir_context = self._prepare_sub_context(dataset_name)
+            async with asyncio.TaskGroup() as group:
+                for sub_file in path.iterdir():
+                    group.create_task(dir_context.import_file(sub_file.name, sub_file))
+            return
+
         file_type = determine_file_type(path)
         importer = lookup_importer(file_type)
         if importer is None:
