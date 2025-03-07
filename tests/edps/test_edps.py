@@ -491,6 +491,117 @@ async def test_unstructured_text_with_table(path_unstructured_text_with_table, c
     assert unstructured_dataset.lineCount == 2
 
 
+@mark.asyncio
+async def test_analyse_semi_structured_json(path_data_test_json, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_json)
+
+    assert len(edp.semiStructuredDatasets) == 1
+    assert edp.semiStructuredDatasets[0].jsonSchema is not None
+
+    assert len(edp.structuredDatasets) == 3
+    table1_ds = edp.structuredDatasets[0]
+    table1_headers = [col.name for col in table1_ds.all_columns]
+    assert set(table1_headers) == {"id", "type", "name", "ppu", "topping", "batters.batter"}
+    assert table1_ds.rowCount == 2
+    assert table1_ds.columnCount == 6
+    assert table1_ds.numericColumnCount == 2
+    assert table1_ds.stringColumnCount == 4
+    assert table1_ds.datetimeColumnCount == 0
+    assert table1_ds.numericColumns[1].name == "ppu"
+    assert table1_ds.numericColumns[1].dataType == "Float32"
+    assert table1_ds.numericColumns[1].numberUnique == 2
+    assert abs(table1_ds.numericColumns[1].min - 0.55) < 0.01
+    assert abs(table1_ds.numericColumns[1].max - 0.70) < 0.01
+    assert abs(table1_ds.numericColumns[1].mean - 0.625) < 0.001
+
+    table2_ds = edp.structuredDatasets[1]
+    table2_headers = [col.name for col in table2_ds.all_columns]
+    assert set(table2_headers) == {"id", "type"}
+    assert table2_ds.rowCount == 3
+    assert table2_ds.columnCount == 2
+    assert table2_ds.numericColumnCount == 1
+    assert table2_ds.stringColumnCount == 1
+    assert table2_ds.datetimeColumnCount == 0
+    assert table2_ds.stringColumns[0].name == "type"
+    assert table2_ds.stringColumns[0].nonNullCount == 3
+    assert table2_ds.stringColumns[0].numberUnique == 2
+
+    table3_ds = edp.structuredDatasets[2]
+    table3_headers = [col.name for col in table3_ds.all_columns]
+    assert set(table3_headers) == {"id", "type"}
+    assert table3_ds.rowCount == 4
+    assert table3_ds.columnCount == 2
+    assert table3_ds.numericColumnCount == 1
+    assert table3_ds.stringColumnCount == 1
+    assert table3_ds.datetimeColumnCount == 0
+    assert table3_ds.stringColumns[0].name == "type"
+    assert table3_ds.stringColumns[0].nonNullCount == 4
+    assert table3_ds.stringColumns[0].numberUnique == 3
+
+
+@mark.asyncio
+async def test_analyse_json_without_structured_data(path_data_test_without_structured_data, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_without_structured_data)
+
+    assert len(edp.semiStructuredDatasets) == 1
+    assert edp.semiStructuredDatasets[0].jsonSchema is not None
+
+    assert len(edp.structuredDatasets) == 0
+
+
+@mark.asyncio
+async def test_analyse_json_with_normalization(path_data_test_with_normalization, compute_asset_fn):
+    edp = await compute_asset_fn(path_data_test_with_normalization)
+
+    assert len(edp.semiStructuredDatasets) == 1
+    assert edp.semiStructuredDatasets[0].jsonSchema is not None
+
+    assert len(edp.structuredDatasets) == 2
+    table1_ds = edp.structuredDatasets[0]
+    table1_headers = [col.name for col in table1_ds.all_columns]
+    assert set(table1_headers) == {
+        "_id",
+        "index",
+        "guid",
+        "isActive",
+        "balance",
+        "picture",
+        "age",
+        "eyeColor",
+        "name",
+        "gender",
+        "company",
+        "email",
+        "phone",
+        "address",
+        "about",
+        "registered",
+        "geoLocation.latitude",
+        "geoLocation.longitude",
+        "tags",
+        "friends",
+        "greeting",
+        "favoriteFruit",
+    }
+    assert table1_ds.numericColumns[3].name == "geoLocation.latitude"
+    assert table1_ds.numericColumns[3].nonNullCount == 15
+    assert table1_ds.numericColumns[3].numberUnique == 15
+    assert abs(table1_ds.numericColumns[3].min - -80.34) < 0.01
+    assert abs(table1_ds.numericColumns[3].max - 77.75) < 0.01
+    assert abs(table1_ds.numericColumns[3].mean - -1.25) < 0.01
+
+    assert table1_ds.numericColumns[4].name == "geoLocation.longitude"
+    assert table1_ds.numericColumns[4].nonNullCount == 15
+    assert table1_ds.numericColumns[4].numberUnique == 15
+    assert abs(table1_ds.numericColumns[4].min - -134.89) < 0.01
+    assert abs(table1_ds.numericColumns[4].max - 143.67) < 0.01
+    assert abs(table1_ds.numericColumns[4].mean - -14.18) < 0.01
+
+    table2_ds = edp.structuredDatasets[1]
+    table2_headers = [col.name for col in table2_ds.all_columns]
+    assert set(table2_headers) == {"id", "name"}
+
+
 async def test_analyse_docx(path_data_test_docx, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_docx)
 

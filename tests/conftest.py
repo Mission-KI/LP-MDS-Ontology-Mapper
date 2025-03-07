@@ -178,6 +178,21 @@ def path_unstructured_text_with_table():
 
 
 @fixture
+def path_data_test_json():
+    return TESTS_ROOT_PATH / "data/test.json"
+
+
+@fixture
+def path_data_test_without_structured_data():
+    return TESTS_ROOT_PATH / "data/test_without_structured_data.json"
+
+
+@fixture
+def path_data_test_with_normalization():
+    return TESTS_ROOT_PATH / "data/test_with_normalization.json"
+
+
+@fixture
 def path_language_deu_wiki_llm_txt():
     return TESTS_ROOT_PATH / "data/language/deu_wiki_llm.txt"
 
