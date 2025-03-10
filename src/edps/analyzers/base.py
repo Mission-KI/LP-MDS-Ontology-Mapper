@@ -1,3 +1,0 @@
-# class Analyzer(ABC):
-#     @abstractmethod
-#     def analyze(self, ctx: TaskContext) -> AsyncIterator[DataSet]: ...

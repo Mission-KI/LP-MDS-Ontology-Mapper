@@ -44,7 +44,7 @@ class TaskContextImpl(TaskContext):
         return self._output_path
 
     def create_working_dir(self, name: str) -> Path:
-        """Create a working directory specific to this TaskContext."""
+        """Create a working directory specified by this TaskContext and the provided name."""
         working_path = self._base_path / "work" / "_".join(self._name_parts) / name
         working_path.mkdir(parents=True)
         return working_path
@@ -93,7 +93,7 @@ class TaskContextImpl(TaskContext):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        """Execute a subtask. This creates a sub-context."""
+        """Execute a subtask, store the dataset and swallow the results. Catch and log any errors."""
 
         try:
             await self.exec_with_result(dataset_name, task_fn, *args, **kwargs)
@@ -109,7 +109,7 @@ class TaskContextImpl(TaskContext):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        """Execute a subtask. This creates a sub-context."""
+        """Execute a subtask, store the dataset and return the results."""
 
         # Replace dot with underscore. Keep slash as they are needed in archives.
         dataset_name = sanitize_file_path(dataset_name.replace(".", "_"))
@@ -132,7 +132,7 @@ class TaskContextImpl(TaskContext):
         return result
 
     async def import_file(self, dataset_name: str, path: Path) -> None:
-        """Import and analyze the file if it's a supported type. Yield calculated datasets."""
+        """Import file if supported. Store the dataset. Catch and log any errors."""
         file_type = determine_file_type(path)
         importer = lookup_importer(file_type)
         if importer is None:
@@ -141,6 +141,16 @@ class TaskContextImpl(TaskContext):
             warnings.warn(message, RuntimeWarning)
         else:
             await self.exec(dataset_name, importer, path)
+
+    async def import_file_with_result(self, dataset_name: str, path: Path) -> DataSet:
+        """Import file if supported. Store and return the dataset."""
+        file_type = determine_file_type(path)
+        importer = lookup_importer(file_type)
+        if importer is None:
+            message = lookup_unsupported_type_message(file_type)
+            raise NotImplementedError(message)
+        else:
+            return await self.exec_with_result(dataset_name, importer, path)
 
     def _prepare_sub_context(self, dataset_name: str) -> "TaskContextImpl":
         child_name_parts = self.name_parts + [dataset_name]

@@ -26,7 +26,9 @@ class TaskContext(ABC):
 
     @abstractmethod
     def create_working_dir(self, name: str) -> Path:
-        """Create a working directory specific to this TaskContext."""
+        """Create a working directory specified by this TaskContext and the provided name.
+        This allows multiple working directories per TaskContext.
+        Trying to create the same working directory twice (same TaskContext and name) will raise an error."""
 
     @property
     @abstractmethod
@@ -73,7 +75,8 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        """Execute a subtask swallowing the results of the task function. Any occuring errors are caught and logged."""
+        """Execute a subtask swallowing the results of the task function. The returned dataset is stored in the TaskContext.
+        Contrary to exec_with_result() any occuring errors are automatically caught and logged."""
 
     @overload
     async def exec_with_result[**P, R_DS: DataSet, *R_Ts](
@@ -83,7 +86,7 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> tuple[R_DS, Unpack[R_Ts]]:
-        """Execute a subtask returning a tuple of DataSet and other information. This creates a sub-context."""
+        """[Overload] Execute a subtask returning a tuple of DataSet and other information. The returned dataset is also stored in the TaskContext."""
 
     @overload
     async def exec_with_result[**P, R_DS: DataSet](
@@ -93,7 +96,7 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R_DS:
-        """Execute a subtask returning just a DataSet. This creates a sub-context."""
+        """[Overload] Execute a subtask returning just a DataSet. The returned dataset is also stored in the TaskContext."""
 
     @abstractmethod
     async def exec_with_result[**P, R](
@@ -103,8 +106,16 @@ class TaskContext(ABC):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        """Execute a subtask returning the results of the task function. This creates a sub-context."""
+        """Execute a subtask returning the results of the task function (which must at least contain a DataSet).
+        This creates a sub-context. The returned dataset is also stored in the TaskContext.
+        Contrary to method exec() any errors occuring while trying to execute the subtask must be handled by the caller."""
 
     @abstractmethod
     async def import_file(self, dataset_name: str, path: Path) -> None:
-        """Import and analyze the file if it's a supported type."""
+        """Import and analyze the file if it's a supported type. The dataset is stored in the TaskContext.
+        Contrary to method import_file_with_result() any occuring errors are automatically caught and logged."""
+
+    @abstractmethod
+    async def import_file_with_result(self, dataset_name: str, path: Path) -> DataSet:
+        """Import and analyze the file if it's a supported type. The dataset is stored in the TaskContext and additionally returned.
+        Contrary to method import_file() any occuring errors must be handled by the caller."""

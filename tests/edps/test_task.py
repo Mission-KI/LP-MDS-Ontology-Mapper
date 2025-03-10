@@ -8,7 +8,7 @@ from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
 
 
-async def test_simple_context(ctx: TaskContext):
+async def test_root_context(ctx: TaskContext):
     await ctx.exec("C1", my_simple_hello_task)
     ds_list = list(ctx.collect_datasets())
     assert len(ds_list) == 1
