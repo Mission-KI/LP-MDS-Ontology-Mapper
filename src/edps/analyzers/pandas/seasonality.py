@@ -86,7 +86,6 @@ def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[
 async def get_seasonality_graphs(
     ctx: TaskContext,
     column_name: str,
-    column_plot_base: str,
     time_base_column_name: str,
     seasonality: DecomposeResult,
 ) -> PerTimeBaseSeasonalityGraphs:
@@ -94,7 +93,7 @@ async def get_seasonality_graphs(
 
     @asynccontextmanager
     async def get_plot(plot_type: str):
-        plot_name = column_plot_base + "_over_" + time_base_column_name + "_" + plot_type.lower()
+        plot_name = ctx.build_output_reference(f"{column_name}_over_{time_base_column_name}_{plot_type.lower()}")
         async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
             axes.set_title(f"{plot_type} of {column_name} over {time_base_column_name}")
             axes.set_xlabel(time_base_column_name)

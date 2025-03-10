@@ -96,7 +96,7 @@ class AnalysisJobManager:
                 ):
                     self._logger.debug("Temporary working directory: %s", temp_working_dir)
                     ctx = TaskContextImpl(job_logger, Path(temp_working_dir))
-                    shutil.copytree(job.input_data_dir, ctx.input_path)
+                    shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
                     user_data = job.user_data
                     config = Config(userProvidedEdpData=user_data)
                     job_logger.info("Analysing asset '%s' version '%s'...", user_data.assetId, user_data.version)

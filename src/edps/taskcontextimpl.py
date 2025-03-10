@@ -1,3 +1,4 @@
+import re
 import warnings
 from logging import Logger
 from pathlib import Path, PurePosixPath
@@ -6,7 +7,7 @@ from uuid import UUID
 
 from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
 
-from edps.file import determine_file_type, sanitize_file_path
+from edps.file import determine_file_type, sanitize_path
 from edps.importers import lookup_importer, lookup_unsupported_type_message
 from edps.taskcontext import TaskContext
 
@@ -20,7 +21,7 @@ class TaskContextImpl(TaskContext):
         self._children: list[TaskContext] = []
         self._dataset: Optional[DataSet] = None
 
-        self._base_path = base_path
+        self._base_path = base_path.resolve()
         if not base_path.is_dir():
             raise FileNotFoundError(f"Path '{base_path}' doesn't exist or is not a directory!")
         self._input_path = base_path / "input"
@@ -61,8 +62,9 @@ class TaskContextImpl(TaskContext):
     def qualified_path(self) -> PurePosixPath:
         return PurePosixPath("/".join(self._name_parts))
 
-    def build_output_reference(self, final_part: str) -> str:
-        return ("_".join(self._name_parts) + "_" + final_part).replace(".", "_")
+    def build_output_reference(self, final_part: str) -> PurePosixPath:
+        ref = "_".join(self._name_parts) + "_" + final_part
+        return PurePosixPath(re.sub("[./]", "_", ref))
 
     def relative_path(self, path: Path) -> Path:
         return path.relative_to(self._base_path)
@@ -112,7 +114,7 @@ class TaskContextImpl(TaskContext):
         """Execute a subtask, store the dataset and return the results."""
 
         # Replace dot with underscore. Keep slash as they are needed in archives.
-        dataset_name = sanitize_file_path(dataset_name.replace(".", "_"))
+        dataset_name = sanitize_path(dataset_name.replace(".", "_"))
         child_context = self._prepare_sub_context(dataset_name)
         self.children.append(child_context)
 

@@ -9,9 +9,9 @@ def sanitize_file_part(file_part: str) -> str:
     return re.sub(r"[^a-zA-Z0-9-_]", "", file_part.replace(".", "_"))
 
 
-def sanitize_file_path(file_path: str) -> str:
-    """Keep only alphanumeric characters and dash, underscore, slash, dot."""
-    return re.sub(r"[^a-zA-Z0-9-_/.]", "", file_path)
+def sanitize_path(path: str) -> str:
+    """Keep only alphanumeric characters and dash, underscore, dot and slash."""
+    return re.sub(r"[^a-zA-Z0-9-_/.]", "", path)
 
 
 def calculate_size(path: Path) -> int:

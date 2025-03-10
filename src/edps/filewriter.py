@@ -12,23 +12,23 @@ import matplotlib.style
 import seaborn
 from extended_dataset_profile.models.v0.edp import ExtendedDatasetProfile
 
-from edps.file import sanitize_file_part
+from edps.file import sanitize_path
 from edps.taskcontext import TaskContext
 
 TEXT_ENCODING = "utf-8"
 
 MATPLOTLIB_BACKEND: str = "AGG"
-MATPLOTLIB_PLOT_FORMAT = "png"
+MATPLOTLIB_PLOT_FORMAT = ".png"
 MATPLOTLIB_STYLE_PATH = Path(__file__).parent / "styles/plot.mplstyle"
 
 
-async def write_edp(ctx: TaskContext, name: str, edp: ExtendedDatasetProfile) -> PurePosixPath:
+async def write_edp(ctx: TaskContext, name: PurePosixPath, edp: ExtendedDatasetProfile) -> PurePosixPath:
     """Write EDP to a JSON file.
 
     Create a file with the given name (and ".json" extension) in ctx.output_path.
     Return the path of the new file relative to ctx.output_path."""
 
-    save_path = _prepare_save_path(ctx, name, "json")
+    save_path = _prepare_save_path(ctx, name.with_suffix(".json"))
     relative_save_path = save_path.relative_to(ctx.output_path)
     with open(save_path, "wt", encoding=TEXT_ENCODING) as io_wrapper:
         json: str = edp.model_dump_json()
@@ -57,14 +57,16 @@ def _get_default_colormap() -> matplotlib.colors.Colormap:
 
 
 @asynccontextmanager
-async def get_pyplot_writer(ctx: TaskContext, name: str) -> AsyncIterator[Tuple[matplotlib.axes.Axes, PurePosixPath]]:
+async def get_pyplot_writer(
+    ctx: TaskContext, name: PurePosixPath
+) -> AsyncIterator[Tuple[matplotlib.axes.Axes, PurePosixPath]]:
     """Context manager for a matplotlib `Axes` object.
 
     The caller should use the yielded `Axes` object to plot her graph.
     This is saved to an image when the context is exited.
     Before using this function `setup_matplotlib()` must be called exactly once."""
 
-    save_path = _prepare_save_path(ctx, name, MATPLOTLIB_PLOT_FORMAT)
+    save_path = _prepare_save_path(ctx, name.with_suffix(MATPLOTLIB_PLOT_FORMAT))
     relative_save_path = save_path.relative_to(ctx.output_path)
     figure, axes = matplotlib.pyplot.subplots()
     axes.autoscale(True)
@@ -75,9 +77,10 @@ async def get_pyplot_writer(ctx: TaskContext, name: str) -> AsyncIterator[Tuple[
     ctx.logger.debug('Generated plot "%s"', relative_save_path)
 
 
-def _prepare_save_path(ctx: TaskContext, name: str, suffix: str):
-    full_name = sanitize_file_part(name) + "." + sanitize_file_part(suffix)
-    save_path = ctx.output_path / full_name
+def _prepare_save_path(ctx: TaskContext, name: PurePosixPath):
+    save_path = ctx.output_path / sanitize_path(str(name))
+    # Enforce that save_path is sub-path of output_path
+    save_path.resolve().relative_to(ctx.output_path.resolve())
     if save_path.exists():
         message = f'The path "{save_path}" already exists, will overwrite! This is most likely an implementation error.'
         warn(message, RuntimeWarning)

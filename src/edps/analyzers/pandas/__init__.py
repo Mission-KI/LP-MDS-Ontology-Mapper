@@ -254,8 +254,7 @@ class PandasAnalyzer:
         self, ctx: TaskContext, column: Series, computed_fields: Series, seasonality_results: Series
     ) -> NumericColumn:
         ctx.logger.debug('Transforming numeric column "%s" results to EDP', column.name)
-        column_plot_base = ctx.build_output_reference(str(column.name))
-        box_plot = await _generate_box_plot(ctx, column_plot_base + "_box_plot", column)
+        box_plot = await _generate_box_plot(ctx, column)
 
         column_result = NumericColumn(
             name=str(column.name),
@@ -291,7 +290,6 @@ class PandasAnalyzer:
                 ctx,
                 column,
                 computed_fields,
-                column_plot_base + "_distribution",
                 computed_fields[_NUMERIC_DISTRIBUTION],
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
             )
@@ -300,7 +298,6 @@ class PandasAnalyzer:
             seasonality_graphs = await get_seasonality_graphs(
                 ctx,
                 str(column.name),
-                column_plot_base,
                 str(datetime_column_name),
                 seasonality,
             )
@@ -347,7 +344,8 @@ class PandasAnalyzer:
         )
 
 
-async def _generate_box_plot(ctx: TaskContext, plot_name: str, column: Series) -> FileReference:
+async def _generate_box_plot(ctx: TaskContext, column: Series) -> FileReference:
+    plot_name = ctx.build_output_reference(f"{column.name}_box_plot")
     async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         if isinstance(axes.figure, Figure):
             axes.figure.set_figwidth(3.0)
@@ -417,13 +415,13 @@ async def _plot_distribution(
     ctx: TaskContext,
     column: Series,
     column_fields: Series,
-    plot_name: str,
     distribution_name: str,
     distribution_parameters: dict,
 ):
     x_min = column_fields[_NUMERIC_LOWER_DIST]
     x_max = column_fields[_NUMERIC_UPPER_DIST]
     x_limits = (x_min, x_max)
+    plot_name = ctx.build_output_reference(f"{column.name}_distribution")
     async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         axes.set_title(f"Distribution of {column.name}")
         axes.set_xlabel(f"Value of {column.name}")
@@ -451,7 +449,7 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
 
 async def _get_correlation_graph(
     ctx: TaskContext,
-    plot_name: str,
+    plot_name: PurePosixPath,
     columns: DataFrame,
     fields: DataFrame,
 ) -> Optional[FileReference]:

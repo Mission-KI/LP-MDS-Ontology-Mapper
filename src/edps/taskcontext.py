@@ -56,7 +56,7 @@ class TaskContext(ABC):
         """Return the DataSet attached to the TaskContext."""
 
     @abstractmethod
-    def build_output_reference(self, final_part: str) -> str:
+    def build_output_reference(self, final_part: str) -> PurePosixPath:
         """Build a new output reference that can be used for a file name in the output path consisting of all the name parts."""
 
     @abstractmethod

@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from logging import getLogger
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
@@ -59,7 +59,7 @@ class Service:
         user_data = config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
-        return await write_edp(ctx, json_name, edp)
+        return await write_edp(ctx, PurePosixPath(json_name), edp)
 
     async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
         input_path = ctx.input_path
