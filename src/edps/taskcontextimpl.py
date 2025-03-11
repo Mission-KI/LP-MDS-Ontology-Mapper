@@ -135,10 +135,12 @@ class TaskContextImpl(TaskContext):
             raise RuntimeError("Task function didn't return a dataset.")
         return result
 
-    async def import_file(self, dataset_name: str, path: Path) -> None:
+    async def import_file(self, path: Path, dataset_name: Optional[str] = None) -> None:
         """Import file if supported. Store the dataset. Catch and log any errors."""
+        if dataset_name is None:
+            dataset_name = path.name
+
         if path.is_dir():
-            dir_context = self._prepare_sub_context(dataset_name)
             async with asyncio.TaskGroup() as group:
                 for sub_file in path.iterdir():
                     group.create_task(dir_context.import_file(sub_file.name, sub_file))
@@ -153,8 +155,11 @@ class TaskContextImpl(TaskContext):
         else:
             await self.exec(dataset_name, importer, path)
 
-    async def import_file_with_result(self, dataset_name: str, path: Path) -> DataSet:
+    async def import_file_with_result(self, path: Path, dataset_name: Optional[str] = None) -> DataSet:
         """Import file if supported. Store and return the dataset."""
+        if path.is_dir():
+            raise RuntimeError("Can not run the import_file_with_results() on directories. Use import_file instead!")
+
         file_type = determine_file_type(path)
         importer = lookup_importer(file_type)
         if importer is None:

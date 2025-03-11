@@ -36,7 +36,7 @@ class DocxAnalyzer:
 
         async for media_file in self._extract_media_files(ctx):
             ctx.logger.info("Analyzing DOCX embedded media file '%s'...", ctx.relative_path(media_file))
-            await ctx.import_file(media_file.name, media_file)
+            await ctx.import_file(media_file)
 
         num_images = len([ds for ds in ctx.collect_datasets() if isinstance(ds, ImageDataSet)])
 

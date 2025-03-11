@@ -111,11 +111,11 @@ class TaskContext(ABC):
         Contrary to method exec() any errors occuring while trying to execute the subtask must be handled by the caller."""
 
     @abstractmethod
-    async def import_file(self, dataset_name: str, path: Path) -> None:
+    async def import_file(self, path: Path, dataset_name: Optional[str] = None) -> None:
         """Import and analyze the file if it's a supported type. The dataset is stored in the TaskContext.
         Contrary to method import_file_with_result() any occuring errors are automatically caught and logged."""
 
     @abstractmethod
-    async def import_file_with_result(self, dataset_name: str, path: Path) -> DataSet:
+    async def import_file_with_result(self, path: Path, dataset_name: Optional[str] = None) -> DataSet:
         """Import and analyze the file if it's a supported type. The dataset is stored in the TaskContext and additionally returned.
         Contrary to method import_file() any occuring errors must be handled by the caller."""
