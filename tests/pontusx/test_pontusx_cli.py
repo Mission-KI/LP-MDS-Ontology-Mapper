@@ -1,4 +1,3 @@
-import os
 import shutil
 from logging import getLogger
 from pathlib import Path
@@ -13,7 +12,7 @@ DID = "did230948"
 _logger = getLogger(__file__)
 
 
-async def test_cli(path_data_test_csv, path_data_pontusx_ddo, path_data_pontusx_algocustomdata):
+async def test_cli(path_data_test_csv, path_data_pontusx_ddo, path_data_pontusx_algocustomdata, monkeypatch):
     with TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
         _logger.info("Preparing Pontux-X container data dir: %s", temp_dir)
@@ -34,8 +33,8 @@ async def test_cli(path_data_test_csv, path_data_pontusx_ddo, path_data_pontusx_
             temp_dir_path / f"inputs/{DID}/0",
         )
 
-        os.environ["BASEDIR"] = temp_dir
-        os.environ["DIDS"] = f'["{DID}"]'
+        monkeypatch.setenv("BASEDIR", temp_dir)
+        monkeypatch.setenv("DIDS", f'["{DID}"]')
         args = get_args()
         await run_service(_logger, args)
 
