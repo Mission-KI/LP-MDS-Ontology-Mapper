@@ -69,7 +69,7 @@ class TaskContextImpl(TaskContext):
         return PurePosixPath(re.sub("[./]", "_", ref))
 
     def relative_path(self, path: Path) -> Path:
-        return path.relative_to(self._base_path)
+        return path.resolve().relative_to(self._base_path)
 
     @property
     def dataset_name(self) -> Optional[str]:
