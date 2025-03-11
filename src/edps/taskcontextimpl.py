@@ -118,7 +118,6 @@ class TaskContextImpl(TaskContext):
         # Replace dot with underscore. Keep slash as they are needed in archives.
         dataset_name = sanitize_path(dataset_name.replace(".", "_"))
         child_context = self._prepare_sub_context(dataset_name)
-        self.children.append(child_context)
 
         try:
             result = await task_fn(child_context, *args, **kwargs)
@@ -176,6 +175,7 @@ class TaskContextImpl(TaskContext):
             self._base_path,
             child_name_parts,
         )
+        self.children.append(sub_context)
         return sub_context
 
     def _put_dataset(self, dataset: DataSet, dataset_name: str):
