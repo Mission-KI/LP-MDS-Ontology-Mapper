@@ -38,7 +38,6 @@ class PdfAnalyzer:
             await ctx.exec(f"image_{num_images:03}", raster_image_importer_from_pilimage, image)
 
         return DocumentDataSet(
-            fileSize=0,  # TODO remove fileSize from DocumentDataSet because every DataSet has this as an optional property!
             title=metadata.title if metadata is not None else None,
             subject=metadata.subject if metadata is not None else None,
             author=metadata.author if metadata is not None else None,

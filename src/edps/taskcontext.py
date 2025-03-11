@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path, PurePosixPath
-from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, overload
+from typing import Any, Awaitable, Callable, Concatenate, Iterator, Optional, Tuple, Unpack, overload
+
+from extended_dataset_profile.models.v0.edp import FileProperties
 
 from edps.types import DataSet
 
@@ -47,13 +49,18 @@ class TaskContext(ABC):
 
     @property
     @abstractmethod
-    def dataset_name(self) -> Optional[str]:
+    def dataset_name(self) -> str:
         """Return the last name part identifying the dataset."""
 
     @property
     @abstractmethod
     def dataset(self) -> Optional[DataSet]:
         """Return the DataSet attached to the TaskContext."""
+
+    @property
+    @abstractmethod
+    def file_properties(self) -> Optional[FileProperties]:
+        """Return the file properties, if this instance had import file executed."""
 
     @abstractmethod
     def build_output_reference(self, final_part: str) -> PurePosixPath:
@@ -82,10 +89,10 @@ class TaskContext(ABC):
     async def exec_with_result[**P, R_DS: DataSet, *R_Ts](
         self,
         dataset_name: str,
-        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[tuple[R_DS, Unpack[R_Ts]]]],
+        task_fn: Callable[Concatenate["TaskContext", P], Awaitable[Tuple[R_DS, Unpack[R_Ts]]]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> tuple[R_DS, Unpack[R_Ts]]:
+    ) -> Tuple["TaskContext", R_DS, Unpack[R_Ts]]:
         """[Overload] Execute a subtask returning a tuple of DataSet and other information. The returned dataset is also stored in the TaskContext."""
 
     @overload
@@ -95,7 +102,7 @@ class TaskContext(ABC):
         task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R_DS]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> R_DS:
+    ) -> Tuple["TaskContext", R_DS]:
         """[Overload] Execute a subtask returning just a DataSet. The returned dataset is also stored in the TaskContext."""
 
     @abstractmethod
@@ -105,7 +112,7 @@ class TaskContext(ABC):
         task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> R:
+    ) -> Any:
         """Execute a subtask returning the results of the task function (which must at least contain a DataSet).
         This creates a sub-context. The returned dataset is also stored in the TaskContext.
         Contrary to method exec() any errors occuring while trying to execute the subtask must be handled by the caller."""

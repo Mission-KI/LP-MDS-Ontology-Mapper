@@ -199,7 +199,9 @@ class _CsvAnalyzer:
 
             try:
                 ds_name = f"table{count:03}"
-                _, table = await self._ctx.exec_with_result(ds_name, self._analyze_structured_dataset, structured_chunk)
+                _, _, table = await self._ctx.exec_with_result(
+                    ds_name, self._analyze_structured_dataset, structured_chunk
+                )
                 yield table
             except Exception as exception:
                 message = f"Error analyzing structured sub-dataset {ds_name}"
@@ -226,7 +228,7 @@ class _CsvAnalyzer:
         embedded_table = EmbeddedTable(
             startLine=structured_chunk.start_line_inclusive,
             endLine=structured_chunk.end_line_exclusive,
-            structuredDatasetUuid=structured_ds.uuid,
+            structuredDatasetName=ctx.dataset_name,
         )
         return structured_ds, embedded_table
 

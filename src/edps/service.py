@@ -1,20 +1,22 @@
+from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path, PurePosixPath
-from typing import Dict, Iterator, List, Optional
+from typing import Iterator, List, Optional, Tuple
 from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
+    DatasetTreeNode,
     DataSetType,
     DocumentDataSet,
     ExtendedDatasetProfile,
     FileReference,
     ImageDataSet,
+    JsonReference,
     StructuredDataSet,
     TemporalCover,
     UnstructuredTextDataSet,
     VideoDataSet,
-    _BaseColumn,
 )
 from pandas import DataFrame
 from pydantic import BaseModel
@@ -70,91 +72,74 @@ class Service:
             raise UserInputError(f"Expected exactly one input file in input_path. Got {number_input_files}.")
         file = input_files[0]
 
-        await ctx.import_file(file, file.name)
-        datasets = list(ctx.collect_datasets())
-
-        if len(datasets) == 0:
-            raise RuntimeError("Was not able to analyze any datasets in this asset")
-        number_top_level_datasets = sum(1 for dataset in datasets if dataset.parentUuid is None)
-        if number_top_level_datasets != 1:
-            raise UserInputError(
-                f"There must be exactly one top level file/archive! Found {number_top_level_datasets}."
-            )
-
-        computed_edp_data = self._create_computed_edp_data(file, datasets)
-        computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
+        await ctx.import_file_with_result(file, file.name)
+        computed_edp_data = self._create_computed_edp_data(ctx, config, file)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
-    def _create_computed_edp_data(self, path: Path, datasets: List[DataSet]) -> ComputedEdpData:
+    def _create_computed_edp_data(self, ctx: TaskContext, config: Config, path: Path) -> ComputedEdpData:
         edp = ComputedEdpData(volume=calculate_size(path))
-        for dataset in datasets:
-            if isinstance(dataset, ArchiveDataSet):
-                edp.archiveDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.archive)
-            elif isinstance(dataset, StructuredDataSet):
-                edp.structuredDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.structured)
-            elif isinstance(dataset, UnstructuredTextDataSet):
-                edp.unstructuredTextDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.unstructuredText)
-            elif isinstance(dataset, ImageDataSet):
-                edp.imageDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.image)
-            elif isinstance(dataset, VideoDataSet):
-                edp.videoDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.video)
-            elif isinstance(dataset, DocumentDataSet):
-                edp.documentDatasets.append(dataset)
-                edp.dataTypes.add(DataSetType.documents)
-            else:
-                raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
+        augmenter = _Augmenter(ctx, config.augmentedColumns)
+        self._insert_datasets_into_edp(ctx, edp, augmenter, None)
+        augmenter.warn_unapplied_augmentations()
         return edp
 
-    async def _add_augmentation(self, ctx: TaskContext, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
-        structured_datasets = {dataset.name: dataset.get_columns_dict() for dataset in edp.structuredDatasets}
-
-        def _get_all_matching_columns(name: str) -> Iterator[_BaseColumn]:
-            for columns in structured_datasets.values():
-                if name in columns:
-                    yield columns[name]
-
-        def augment_column_in_all_files(augmented_column: AugmentedColumn) -> None:
-            columns = list(_get_all_matching_columns(augmented_column.name))
-            if len(columns) == 0:
-                message = f'No column "{augmented_column.name}" found in any dataset!'
-                warn(message)
-                ctx.logger.warning(message)
-                return
-            for column in columns:
-                column.augmentation = augmented_column.augmentation
-
-        def augment_column_in_file(augmented_column: AugmentedColumn, dataset: Dict[str, _BaseColumn]) -> None:
-            try:
-                dataset[augmented_column.name].augmentation = augmented_column.augmentation
-            except KeyError:
-                message = (
-                    f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.datasetName}'
+    def _insert_datasets_into_edp(
+        self,
+        ctx: TaskContext,
+        edp: ComputedEdpData,
+        augmenter: "_Augmenter",
+        parent_node_reference: Optional[JsonReference],
+    ):
+        childrens_parent_node_reference: Optional[JsonReference]
+        if ctx.dataset:
+            augmenter.apply(ctx.dataset, ctx.dataset_name)
+            list_name, index = self._insert_dataset_into_edp(edp, ctx.dataset)
+            reference = _make_json_reference(f"#/{list_name}/{index}")
+            edp.datasetTree.append(
+                DatasetTreeNode(
+                    dataset=reference,
+                    parent=parent_node_reference,
+                    name=ctx.dataset_name,
+                    fileProperties=ctx.file_properties,
                 )
-                ctx.logger.warning(message)
-                warn(message)
+            )
+            childrens_parent_node_reference = _make_json_reference(f"#/datasetTree/{len(edp.datasetTree) - 1}")
+        else:
+            childrens_parent_node_reference = parent_node_reference
 
-        for augmented_column in config_data.augmentedColumns:
-            if augmented_column.datasetName is None:
-                augment_column_in_all_files(augmented_column)
-            else:
-                try:
-                    dataset = structured_datasets[augmented_column.datasetName]
-                except KeyError:
-                    message = f'"{augmented_column}" is not a known structured dataset!"'
-                    warn(message)
-                    ctx.logger.warning(message)
-                    continue
-                augment_column_in_file(augmented_column, dataset)
+        for child in ctx.children:
+            self._insert_datasets_into_edp(child, edp, augmenter, childrens_parent_node_reference)
 
-        return edp
+    def _insert_dataset_into_edp(self, edp: ComputedEdpData, dataset: DataSet) -> Tuple[str, int]:
+        if isinstance(dataset, ArchiveDataSet):
+            edp.archiveDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.archive)
+            return "archiveDatasets", (len(edp.archiveDatasets) - 1)
+        elif isinstance(dataset, StructuredDataSet):
+            edp.structuredDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.structured)
+            return "structuredDatasets", (len(edp.structuredDatasets) - 1)
+        elif isinstance(dataset, UnstructuredTextDataSet):
+            edp.unstructuredTextDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.unstructuredText)
+            return "unstructuredTextDatasets", (len(edp.unstructuredTextDatasets) - 1)
+        elif isinstance(dataset, ImageDataSet):
+            edp.imageDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.image)
+            return "imageDatasets", (len(edp.imageDatasets) - 1)
+        elif isinstance(dataset, VideoDataSet):
+            edp.videoDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.video)
+            return "videoDatasets", (len(edp.videoDatasets) - 1)
+        elif isinstance(dataset, DocumentDataSet):
+            edp.documentDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.documents)
+            return "documentDatasets", (len(edp.documentDatasets) - 1)
+
+        raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
 
     def _has_temporal_columns(self, edp: ComputedEdpData) -> bool:
         for structured in edp.structuredDatasets:
@@ -199,3 +184,57 @@ class Service:
 def _as_dict(model: BaseModel):
     field_keys = model.model_fields.keys()
     return {key: model.__dict__[key] for key in field_keys}
+
+
+@dataclass
+class _AugmentationStep:
+    augmented_column: AugmentedColumn
+    applied: bool = False
+
+
+class _Augmenter:
+    def __init__(self, ctx: TaskContext, augmentations: List[AugmentedColumn]):
+        self._ctx = ctx
+        self._augmentations = [_AugmentationStep(augmented_column=augmentation) for augmentation in augmentations]
+
+    def apply(self, dataset: DataSet, dataset_name: str):
+        if not isinstance(dataset, StructuredDataSet):
+            return
+
+        for step in self._augmentations:
+            step.applied |= self._apply_single_augmentation(dataset, step.augmented_column, dataset_name)
+
+    def _apply_single_augmentation(
+        self, dataset: StructuredDataSet, augmented_column: AugmentedColumn, dataset_name: str
+    ) -> bool:
+        if augmented_column.datasetName is not None and augmented_column.datasetName != dataset_name:
+            return False
+
+        try:
+            dataset.get_columns_dict()[augmented_column.name].augmentation = augmented_column.augmentation
+            return True
+        except KeyError:
+            if augmented_column.datasetName is not None:
+                message = (
+                    f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.datasetName}'
+                )
+                self._ctx.logger.warning(message)
+                warn(message)
+                return True
+            return False
+
+    def warn_unapplied_augmentations(self) -> None:
+        non_applied_augmentations = [step.augmented_column for step in self._augmentations if not step.applied]
+        for augmented_column in non_applied_augmentations:
+            if augmented_column.datasetName is None:
+                message = f'No column "{augmented_column.name}" found in any dataset!'
+                warn(message)
+                self._ctx.logger.warning(message)
+            else:
+                message = f'"{augmented_column}" is not a known structured dataset!"'
+                warn(message)
+                self._ctx.logger.warning(message)
+
+
+def _make_json_reference(text: str) -> JsonReference:
+    return JsonReference(reference=text)

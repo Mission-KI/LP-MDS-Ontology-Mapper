@@ -3,14 +3,13 @@ import warnings
 from logging import Logger
 from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast
-from uuid import UUID
 
-from extended_dataset_profile.models.v0.edp import _BaseDataSet
+from extended_dataset_profile.models.v0.edp import FileProperties
 
 from edps.file import determine_file_type, sanitize_path
 from edps.importers import lookup_importer, lookup_unsupported_type_message
 from edps.taskcontext import TaskContext
-from edps.types import DataSet
+from edps.types import DataSet, is_dataset
 
 
 class TaskContextImpl(TaskContext):
@@ -21,6 +20,7 @@ class TaskContextImpl(TaskContext):
         self._name_parts = name_parts
         self._children: list[TaskContext] = []
         self._dataset: Optional[DataSet] = None
+        self._file_properties: Optional[FileProperties] = None
 
         self._base_path = base_path.resolve()
         if not base_path.is_dir():
@@ -72,22 +72,24 @@ class TaskContextImpl(TaskContext):
         return path.resolve().relative_to(self._base_path)
 
     @property
-    def dataset_name(self) -> Optional[str]:
-        return self.name_parts[-1] if self.name_parts else None
+    def dataset_name(self) -> str:
+        if not self.name_parts:
+            raise RuntimeError("Can not give dataset name for root TaskContext")
+        return self.name_parts[-1]
 
     @property
     def dataset(self) -> Optional[DataSet]:
         return self._dataset
 
+    @property
+    def file_properties(self) -> Optional[FileProperties]:
+        return self._file_properties
+
     def collect_datasets(self) -> Iterator[DataSet]:
-        parent_uuid: Optional[UUID] = None
         if own_dataset := self.dataset:
-            parent_uuid = own_dataset.uuid
             yield own_dataset
 
         for child in self.children:
-            if direct_child_ds := child.dataset:
-                direct_child_ds.parentUuid = parent_uuid
             yield from child.collect_datasets()
 
     async def exec[**P, R_DS: DataSet, *R_Ts](
@@ -112,7 +114,7 @@ class TaskContextImpl(TaskContext):
         task_fn: Callable[Concatenate["TaskContext", P], Awaitable[R]],
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> R:
+    ):
         """Execute a subtask, store the dataset and return the results."""
 
         # Replace dot with underscore. Keep slash as they are needed in archives.
@@ -125,14 +127,15 @@ class TaskContextImpl(TaskContext):
             child_context.logger.error("Error", exc_info=exception)
             raise exception
 
-        if isinstance(result, _BaseDataSet):
-            child_context._put_dataset(cast(DataSet, result), dataset_name)
-        elif isinstance(result, tuple) and isinstance(result[0], _BaseDataSet):
-            child_context._put_dataset(cast(DataSet, result[0]), dataset_name)
+        if is_dataset(result):
+            child_context._put_dataset(cast(DataSet, result))
+            return child_context, result
+        elif isinstance(result, tuple) and is_dataset(result[0]):
+            child_context._put_dataset(cast(DataSet, result[0]))
+            return child_context, *result
         else:
             child_context.logger.error("Task function didn't return a dataset.")
             raise RuntimeError("Task function didn't return a dataset.")
-        return result
 
     async def import_file(self, path: Path, dataset_name: Optional[str] = None) -> None:
         """Import file if supported. Store the dataset. Catch and log any errors."""
@@ -143,16 +146,11 @@ class TaskContextImpl(TaskContext):
                     group.create_task(self.import_file(sub_file, sub_dataset_name))
             return
 
-        if dataset_name is None:
-            dataset_name = path.name
-        file_type = determine_file_type(path)
-        importer = lookup_importer(file_type)
-        if importer is None:
-            message = lookup_unsupported_type_message(file_type)
-            self.logger.warning(message)
-            warnings.warn(message, RuntimeWarning)
-        else:
-            await self.exec(dataset_name, importer, path)
+        try:
+            await self.import_file_with_result(path, dataset_name)
+        except Exception as exception:
+            self.logger.error("Error while importing file. continuing anyways...", exc_info=exception)
+            warnings.warn(f"Error while importing file: {exception}")
 
     async def import_file_with_result(self, path: Path, dataset_name: Optional[str] = None) -> DataSet:
         """Import file if supported. Store and return the dataset."""
@@ -162,29 +160,31 @@ class TaskContextImpl(TaskContext):
         if path.is_dir():
             raise RuntimeError("Can not run the import_file_with_results() on directories. Use import_file instead!")
 
+        file_properties = FileProperties(name=path.name, size=path.stat().st_size)
         file_type = determine_file_type(path)
         importer = lookup_importer(file_type)
         if importer is None:
             message = lookup_unsupported_type_message(file_type)
             raise NotImplementedError(message)
-        else:
-            return await self.exec_with_result(dataset_name, importer, path)
+
+        context, dataset = await self.exec_with_result(
+            dataset_name,
+            importer,
+            path,
+        )
+        context._file_properties = file_properties
+        return cast(DataSet, dataset)
 
     def _prepare_sub_context(self, dataset_name: str) -> "TaskContextImpl":
         child_name_parts = self.name_parts + [dataset_name]
         new_logger = self.logger.getChild(dataset_name)
-        sub_context = TaskContextImpl(
-            new_logger,
-            self._base_path,
-            child_name_parts,
-        )
+        sub_context = TaskContextImpl(new_logger, self._base_path, child_name_parts)
         self.children.append(sub_context)
         return sub_context
 
-    def _put_dataset(self, dataset: DataSet, dataset_name: str):
+    def _put_dataset(self, dataset: DataSet):
         if self._dataset:
             raise RuntimeError(
                 "There is already a dataset in this context. You need to put exactly one dataset into this dataset context!"
             )
-        dataset.name = dataset_name
         self._dataset = dataset

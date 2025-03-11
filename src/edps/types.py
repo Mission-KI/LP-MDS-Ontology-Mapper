@@ -1,6 +1,6 @@
 import html
 from datetime import datetime
-from typing import Any, List, Optional, Set, Union
+from typing import Any, List, Optional, Set, Union, get_args
 
 from extended_dataset_profile import SchemaVersion
 from extended_dataset_profile.models.v0.edp import (
@@ -10,6 +10,7 @@ from extended_dataset_profile.models.v0.edp import (
     DataSetFrequency,
     DataSetImmutability,
     DataSetTransfer,
+    DatasetTreeNode,
     DataSetType,
     DataSetVolume,
     DataSpace,
@@ -81,6 +82,7 @@ class ComputedEdpData(BaseModel):
     temporalCover: TemporalCover | None = _get_edp_field("temporalCover")
     periodicity: str | None = _get_edp_field("periodicity")
     documentDatasets: List[DocumentDataSet] = _get_edp_field("documentDatasets")
+    datasetTree: List[DatasetTreeNode] = _get_edp_field("datasetTree")
 
 
 class AugmentedColumn(BaseModel):
@@ -115,3 +117,8 @@ def recursively_escape_strings(data: Any) -> Any:
 
 
 DataSet = Union[ArchiveDataSet, StructuredDataSet, UnstructuredTextDataSet, ImageDataSet, VideoDataSet, DocumentDataSet]
+
+
+def is_dataset(value: Any) -> bool:
+    dataset_types = get_args(DataSet)
+    return any(isinstance(value, dataset_type) for dataset_type in dataset_types)

@@ -31,7 +31,7 @@ async def write_edp(ctx: TaskContext, name: PurePosixPath, edp: ExtendedDatasetP
     save_path = _prepare_save_path(ctx, name.with_suffix(".json"))
     relative_save_path = save_path.relative_to(ctx.output_path)
     with open(save_path, "wt", encoding=TEXT_ENCODING) as io_wrapper:
-        json: str = edp.model_dump_json()
+        json: str = edp.model_dump_json(by_alias=True)
         loop = get_running_loop()
         await loop.run_in_executor(None, io_wrapper.write, json)
     ctx.logger.debug('Generated EDP file "%s"', relative_save_path)

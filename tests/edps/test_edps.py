@@ -204,15 +204,12 @@ async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
 
     assert len(edp.archiveDatasets) == 1
     archive = edp.archiveDatasets[0]
-    assert str(archive.name) == "test_zip"
     assert archive.algorithm == "zip"
 
     assert len(edp.structuredDatasets) == 1
     structured = edp.structuredDatasets[0]
-    assert str(structured.name) == "test_csv"
     assert structured.columnCount == 5
     assert structured.rowCount == 50
-    assert structured.parentUuid == archive.uuid
 
 
 @mark.asyncio
@@ -220,22 +217,12 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
     edp = await compute_asset_fn(path_data_test_multiassets_zip)
 
     assert len(edp.archiveDatasets) == 2
-    archive_names = [str(archive.name) for archive in edp.archiveDatasets]
-    assert "test_multiassets_zip" in archive_names
-    assert "zip/test_zip" in archive_names
     for archive in edp.archiveDatasets:
         assert archive.algorithm == "zip"
 
     assert len(edp.structuredDatasets) == 4
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
-    structured_names = {str(dataset.name) for dataset in edp.structuredDatasets}
-    assert structured_names == {
-        "csv/test_csv",
-        "xls/test_xls",
-        "xlsx/test_xlsx",
-        "test_csv",
-    }
 
 
 @mark.asyncio
@@ -451,14 +438,8 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert doc_dataset.numPages == 18
     assert doc_dataset.numImages == 2
     assert doc_dataset.modified == ModificationState.unmodified
-    assert doc_dataset.name == "test_pdf"
 
     assert len(edp.imageDatasets) == 2
-    assert edp.imageDatasets[0].parentUuid == doc_dataset.uuid
-    assert edp.imageDatasets[0].name == "image_001"
-    assert edp.imageDatasets[1].parentUuid == doc_dataset.uuid
-    assert edp.imageDatasets[1].name == "image_002"
-
     assert len(edp.unstructuredTextDatasets) == 1
     assert len(edp.structuredDatasets) == 0
 
