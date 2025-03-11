@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
+from edps.importers.archive import archive_importer
 from edps.importers.docx import docx_importer
 from edps.importers.images import raster_image_importer
 from edps.importers.pdf import pdf_importer
@@ -37,6 +38,7 @@ _IMPORTERS: dict[str, Importer] = {
     "mov": video_importer,
     "flv": video_importer,
     "wmv": video_importer,
+    "zip": archive_importer,
 }
 
 

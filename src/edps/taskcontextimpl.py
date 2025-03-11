@@ -142,7 +142,7 @@ class TaskContextImpl(TaskContext):
         if path.is_dir():
             async with asyncio.TaskGroup() as group:
                 for sub_file in path.iterdir():
-                    group.create_task(dir_context.import_file(sub_file.name, sub_file))
+                    group.create_task(self.import_file(sub_file, dataset_name + "/" + sub_file.name))
             return
 
         file_type = determine_file_type(path)
@@ -156,6 +156,9 @@ class TaskContextImpl(TaskContext):
 
     async def import_file_with_result(self, path: Path, dataset_name: Optional[str] = None) -> DataSet:
         """Import file if supported. Store and return the dataset."""
+        if dataset_name is None:
+            dataset_name = path.name
+
         if path.is_dir():
             raise RuntimeError("Can not run the import_file_with_results() on directories. Use import_file instead!")
 

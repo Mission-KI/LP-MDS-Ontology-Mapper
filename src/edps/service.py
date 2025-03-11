@@ -1,10 +1,10 @@
-from contextlib import asynccontextmanager
 from logging import getLogger
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
+from typing import Dict, Iterator, List, Optional
 from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
+    ArchiveDataSet,
     DataSetType,
     DocumentDataSet,
     ExtendedDatasetProfile,
@@ -21,7 +21,7 @@ from pydantic import BaseModel
 
 from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
-from edps.file import calculate_size, determine_file_type, sanitize_file_part
+from edps.file import calculate_size
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types
 from edps.taskcontext import TaskContext
@@ -64,27 +64,24 @@ class Service:
         return await write_edp(ctx, PurePosixPath(json_name), edp)
 
     async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
-        input_path = ctx.input_path
-        if not input_path.exists():
-            raise FileNotFoundError(f'File "{input_path}" can not be found!')
-        if not input_path.is_file():
-            raise UserInputError("Expected a single file as input. Directories are not supported!")
+        input_files = [path for path in ctx.input_path.iterdir() if path.is_file()]
+        number_input_files = len(input_files)
+        if number_input_files != 1:
+            raise UserInputError(f"Expected exactly one input file in input_path. Got {number_input_files}.")
+        file = input_files[0]
 
-        compression_algorithms: Set[str] = set()
-        extracted_size = 0
-        datasets: List[DataSet] = []
-
-        async for path in self._walk_all_files(ctx, input_path, compression_algorithms):
-            extracted_size += calculate_size(path)
-            dataset_name = path.relative_to(input_path).as_posix()
-            await ctx.import_file(dataset_name, path)
-
-        for ds in ctx.collect_datasets():
-            datasets.append(ds)
+        await ctx.import_file(file, file.name)
+        datasets = list(ctx.collect_datasets())
 
         if len(datasets) == 0:
             raise RuntimeError("Was not able to analyze any datasets in this asset")
-        computed_edp_data = self._create_computed_edp_data(input_path, datasets)
+        number_top_level_datasets = sum(1 for dataset in datasets if dataset.parentUuid is None)
+        if number_top_level_datasets != 1:
+            raise UserInputError(
+                f"There must be exactly one top level file/archive! Found {number_top_level_datasets}."
+            )
+
+        computed_edp_data = self._create_computed_edp_data(file, datasets)
         computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
@@ -94,7 +91,10 @@ class Service:
     def _create_computed_edp_data(self, path: Path, datasets: List[DataSet]) -> ComputedEdpData:
         edp = ComputedEdpData(volume=calculate_size(path))
         for dataset in datasets:
-            if isinstance(dataset, StructuredDataSet):
+            if isinstance(dataset, ArchiveDataSet):
+                edp.archiveDatasets.append(dataset)
+                edp.dataTypes.add(DataSetType.archive)
+            elif isinstance(dataset, StructuredDataSet):
                 edp.structuredDatasets.append(dataset)
                 edp.dataTypes.add(DataSetType.structured)
             elif isinstance(dataset, UnstructuredTextDataSet):
@@ -112,45 +112,6 @@ class Service:
             else:
                 raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
         return edp
-
-    async def _walk_all_files(self, ctx: TaskContext, path: Path, compressions: Set[str]) -> AsyncIterator[Path]:
-        """Will yield all files, recursively through directories and archives."""
-
-        if path.is_file():
-            file_type = determine_file_type(path)
-            if file_type not in DECOMPRESSION_ALGORITHMS:
-                yield path
-            else:
-                compressions.add(file_type)
-                async with self._extract(ctx, path) as extracted_path:
-                    async for child_file in self._walk_all_files(ctx, extracted_path, compressions):
-                        yield child_file
-        elif path.is_dir():
-            for file_path in path.iterdir():
-                async for child_file in self._walk_all_files(ctx, file_path, compressions):
-                    yield child_file
-        else:
-            ctx.logger.warning('Can not extract or analyse "%s"', path)
-
-    @asynccontextmanager
-    async def _extract(self, ctx: TaskContext, path: Path) -> AsyncIterator[Path]:
-        archive_type = determine_file_type(path)
-        if archive_type not in DECOMPRESSION_ALGORITHMS:
-            raise RuntimeError(f'"{archive_type}" is not a know archive type')
-        decompressor = DECOMPRESSION_ALGORITHMS[archive_type]
-        if decompressor is None:
-            raise NotImplementedError(f'Extracting "{archive_type}" is not implemented')
-        archive_name = path.name
-        directory = path.parent / sanitize_file_part(archive_name)
-        while directory.exists():
-            directory /= "extracted"
-
-        directory.mkdir()
-        ctx.logger.debug('Extracting archive "%s"...', ctx.relative_path(path))
-        await decompressor.extract(path, directory)
-        ctx.logger.debug('Extracted archive "%s" is removed now', ctx.relative_path(path))
-        path.unlink()
-        yield directory
 
     async def _add_augmentation(self, ctx: TaskContext, config_data: Config, edp: ComputedEdpData) -> ComputedEdpData:
         structured_datasets = {dataset.name: dataset.get_columns_dict() for dataset in edp.structuredDatasets}
@@ -174,16 +135,18 @@ class Service:
             try:
                 dataset[augmented_column.name].augmentation = augmented_column.augmentation
             except KeyError:
-                message = f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.file}'
+                message = (
+                    f'Augmented column "{augmented_column.name}" is not known in file "{augmented_column.datasetName}'
+                )
                 ctx.logger.warning(message)
                 warn(message)
 
         for augmented_column in config_data.augmentedColumns:
-            if augmented_column.file is None:
+            if augmented_column.datasetName is None:
                 augment_column_in_all_files(augmented_column)
             else:
                 try:
-                    dataset = structured_datasets[str(augmented_column.file)]
+                    dataset = structured_datasets[augmented_column.datasetName]
                 except KeyError:
                     message = f'"{augmented_column}" is not a known structured dataset!"'
                     warn(message)

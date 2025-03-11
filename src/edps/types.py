@@ -1,6 +1,5 @@
 import html
 from datetime import datetime
-from pathlib import PurePosixPath
 from typing import Any, List, Optional, Set, Union
 
 from extended_dataset_profile import SchemaVersion
@@ -86,9 +85,9 @@ class ComputedEdpData(BaseModel):
 
 class AugmentedColumn(BaseModel):
     name: str = Field(description="Name of the augmented column")
-    file: Optional[PurePosixPath] = Field(
+    datasetName: Optional[str] = Field(
         default=None,
-        description="Path of the augmented file this column was added. If augmentedFile is None, EDPS will assume that the augmented column contained in all files.",
+        description="Name of the dataset this column was added to. If datasetName is None, EDPS will assume that the augmented column contained in all structured datasets.",
     )
     augmentation: Augmentation = Field(description="Augmentation information")
 
