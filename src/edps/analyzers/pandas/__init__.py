@@ -2,7 +2,6 @@ from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
 from multiprocessing import cpu_count
-from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Tuple
 
 from extended_dataset_profile.models.v0.edp import (
