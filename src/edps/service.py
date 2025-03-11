@@ -5,8 +5,6 @@ from typing import AsyncIterator, Dict, Iterator, List, Optional, Set
 from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
-    Compression,
-    DataSet,
     DataSetType,
     DocumentDataSet,
     ExtendedDatasetProfile,
@@ -27,7 +25,7 @@ from edps.file import calculate_size, determine_file_type, sanitize_file_part
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types
 from edps.taskcontext import TaskContext
-from edps.types import AugmentedColumn, ComputedEdpData, Config
+from edps.types import AugmentedColumn, ComputedEdpData, Config, DataSet
 
 
 class Service:
@@ -77,32 +75,17 @@ class Service:
         for ds in ctx.collect_datasets():
             datasets.append(ds)
 
-        compression: Optional[Compression]
-        if len(compression_algorithms) == 0:
-            compression = None
-        else:
-            compression = Compression(algorithms=compression_algorithms, extractedSize=extracted_size)
-
         if len(datasets) == 0:
             raise RuntimeError("Was not able to analyze any datasets in this asset")
-        computed_edp_data = self._create_computed_edp_data(input_path, compression, datasets)
+        computed_edp_data = self._create_computed_edp_data(input_path, datasets)
         computed_edp_data = await self._add_augmentation(ctx, config, computed_edp_data)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
-    def _create_computed_edp_data(
-        self, path: Path, compression: Optional[Compression], datasets: List[DataSet]
-    ) -> ComputedEdpData:
-        edp = ComputedEdpData(
-            volume=calculate_size(path),
-            compression=compression,
-            dataTypes=set(),
-            structuredDatasets=[],
-            imageDatasets=[],
-            documentDatasets=[],
-        )
+    def _create_computed_edp_data(self, path: Path, datasets: List[DataSet]) -> ComputedEdpData:
+        edp = ComputedEdpData(volume=calculate_size(path))
         for dataset in datasets:
             if isinstance(dataset, StructuredDataSet):
                 edp.structuredDatasets.append(dataset)
@@ -193,7 +176,7 @@ class Service:
                 augment_column_in_all_files(augmented_column)
             else:
                 try:
-                    dataset = structured_datasets[augmented_column.file]
+                    dataset = structured_datasets[str(augmented_column.file)]
                 except KeyError:
                     message = f'"{augmented_column}" is not a known structured dataset!"'
                     warn(message)

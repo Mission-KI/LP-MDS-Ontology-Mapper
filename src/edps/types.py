@@ -1,13 +1,13 @@
 import html
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import Any, List, Optional, Set
+from typing import Any, List, Optional, Set, Union
 
 from extended_dataset_profile import SchemaVersion
 from extended_dataset_profile.models.v0.edp import (
+    ArchiveDataSet,
     AssetProcessingStatus,
     Augmentation,
-    Compression,
     DataSetFrequency,
     DataSetImmutability,
     DataSetTransfer,
@@ -19,6 +19,7 @@ from extended_dataset_profile.models.v0.edp import (
     ImageDataSet,
     License,
     Publisher,
+    SemiStructuredDataSet,
     StructuredDataSet,
     TemporalCover,
     UnstructuredTextDataSet,
@@ -70,10 +71,11 @@ class ComputedEdpData(BaseModel):
     """All fields of the extended dataset profile that get calculated by this service."""
 
     dataTypes: Set[DataSetType] = _get_edp_field("dataTypes")
-    unstructuredTextDatasets: List[UnstructuredTextDataSet] = _get_edp_field("unstructuredTextDatasets")
+    archiveDatasets: List[ArchiveDataSet] = _get_edp_field("archiveDatasets")
     structuredDatasets: List[StructuredDataSet] = _get_edp_field("structuredDatasets")
+    semiStructuredDatasets: List[SemiStructuredDataSet] = _get_edp_field("semiStructuredDatasets")
+    unstructuredTextDatasets: List[UnstructuredTextDataSet] = _get_edp_field("unstructuredTextDatasets")
     imageDatasets: List[ImageDataSet] = _get_edp_field("imageDatasets")
-    compression: Compression | None = _get_edp_field("compression")
     schema_version: SchemaVersion = _get_edp_field("schema_version")
     volume: int = _get_edp_field("volume")
     videoDatasets: List[VideoDataSet] = _get_edp_field("videoDatasets")
@@ -111,3 +113,6 @@ def recursively_escape_strings(data: Any) -> Any:
         return data.__class__(**escaped_dict)
     else:
         raise NotImplementedError(f"Type {type(data)} not supported")
+
+
+DataSet = Union[ArchiveDataSet, StructuredDataSet, UnstructuredTextDataSet, ImageDataSet, VideoDataSet, DocumentDataSet]

@@ -1,11 +1,8 @@
-from pathlib import Path
-
 import numpy as np
 from pandas import Series
 
 from edps.analyzers.pandas.fitter import Fitter
-from edps.file import File
-from edps.importers import csv_importer
+from edps.importers.structured import csv_import_dataframe
 
 
 async def test_detect_norm(ctx):
@@ -62,9 +59,7 @@ async def test_detect_gamma(ctx):
 
 
 async def test_same_as_original_fitter(path_data_test_csv, ctx):
-    file = get_file(path_data_test_csv)
-    analyzer = await anext(ctx.exec(csv_importer, file))
-    data = analyzer._data
+    data = await csv_import_dataframe(ctx, path_data_test_csv)
     column = data["aufenthalt"]
 
     fitter = Fitter(column)
@@ -74,7 +69,3 @@ async def test_same_as_original_fitter(path_data_test_csv, ctx):
     assert abs(params.get("s", 0.0) - 0.98) < 0.01
     assert abs(params.get("loc", 0.0) - -599.22) < 0.01
     assert abs(params.get("scale", 0.0) - 6846.56) < 0.01
-
-
-def get_file(path: Path):
-    return File(path.parent, path)

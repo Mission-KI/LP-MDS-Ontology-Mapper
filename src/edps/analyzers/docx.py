@@ -1,6 +1,5 @@
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator
-from uuid import uuid4
 from zipfile import ZipFile
 
 from docx.document import Document
@@ -42,9 +41,6 @@ class DocxAnalyzer:
         num_images = len([ds for ds in ctx.collect_datasets() if isinstance(ds, ImageDataSet)])
 
         return DocumentDataSet(
-            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
-            parentUuid=None,
-            name=PurePosixPath(""),
             fileSize=0,  # TODO remove fileSize from DocumentDataSet because every DataSet has this as an optional property!
             title=props.title,
             subject=props.subject,

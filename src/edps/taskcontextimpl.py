@@ -5,11 +5,12 @@ from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, cast
 from uuid import UUID
 
-from extended_dataset_profile.models.v0.edp import DataSet, _BaseDataSet
+from extended_dataset_profile.models.v0.edp import _BaseDataSet
 
 from edps.file import determine_file_type, sanitize_path
 from edps.importers import lookup_importer, lookup_unsupported_type_message
 from edps.taskcontext import TaskContext
+from edps.types import DataSet
 
 
 class TaskContextImpl(TaskContext):
@@ -169,5 +170,5 @@ class TaskContextImpl(TaskContext):
             raise RuntimeError(
                 "There is already a dataset in this context. You need to put exactly one dataset into this dataset context!"
             )
-        dataset.name = PurePosixPath(dataset_name)
+        dataset.name = dataset_name
         self._dataset = dataset

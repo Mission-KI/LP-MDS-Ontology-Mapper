@@ -1,10 +1,8 @@
 import warnings
 from io import StringIO, TextIOBase
 from itertools import permutations, tee
-from pathlib import PurePosixPath
 from re import compile
 from typing import AsyncIterator, Generator, Iterable, Iterator, List, Optional
-from uuid import uuid4
 from warnings import warn
 
 from clevercsv.cparser_util import parse_string
@@ -45,9 +43,6 @@ class Analyzer:
         word_count += self._count_words(text)
 
         return UnstructuredTextDataSet(
-            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
-            parentUuid=None,
-            name=PurePosixPath(""),
             embeddedTables=embedded_tables,
             languages=detect_languages(self._ctx, text),
             lineCount=line_count,

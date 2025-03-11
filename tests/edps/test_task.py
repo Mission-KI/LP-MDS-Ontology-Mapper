@@ -1,11 +1,10 @@
 from logging import getLogger
-from pathlib import PurePosixPath
-from uuid import uuid4
 
-from extended_dataset_profile.models.v0.edp import DataSet, Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
+from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
 
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
+from edps.types import DataSet
 
 
 async def test_root_context(ctx: TaskContext):
@@ -13,7 +12,7 @@ async def test_root_context(ctx: TaskContext):
     ds_list = list(ctx.collect_datasets())
     assert len(ds_list) == 1
     ds = ds_list[0]
-    assert ds.name == PurePosixPath("C1")
+    assert ds.name == "C1"
     assert ds.parentUuid is None
 
 
@@ -25,11 +24,11 @@ async def test_sub_contexts(ctx: TaskContext):
     ds1 = ds_list[0]
     ds1a = ds_list[1]
     ds1b = ds_list[2]
-    assert ds1.name == PurePosixPath("C1")
+    assert ds1.name == "C1"
     assert ds1.parentUuid is None
-    assert ds1a.name == PurePosixPath("C1A")
+    assert ds1a.name == "C1A"
     assert ds1a.parentUuid == ds1.uuid
-    assert ds1b.name == PurePosixPath("C1B")
+    assert ds1b.name == "C1B"
     assert ds1b.parentUuid == ds1.uuid
 
 
@@ -51,12 +50,12 @@ async def test_task(path_work):
     assert len(dss) == 3
     assert dss[0] == ds0
     assert dss[0].parentUuid is None
-    assert dss[0].name == PurePosixPath("ds_my_task_with_args")
+    assert dss[0].name == "ds_my_task_with_args"
     assert dss[1] == ds1
     assert dss[1].parentUuid is None
-    assert dss[1].name == PurePosixPath("ds_my_recursive_task")
+    assert dss[1].name == "ds_my_recursive_task"
     assert dss[2].parentUuid == dss[1].uuid
-    assert dss[2].name == PurePosixPath("ds_my_simple_hello_task")
+    assert dss[2].name == "ds_my_simple_hello_task"
 
 
 async def my_task_with_args(ctx: TaskContext, a: int, b: int) -> tuple[DataSet, int]:
@@ -83,9 +82,6 @@ async def incompatible_task(ctx: TaskContext) -> int:
 
 def dummy_dataset() -> VideoDataSet:
     return VideoDataSet(
-        uuid=uuid4(),
-        parentUuid=None,
-        name=PurePosixPath(""),  # TODO
         codec=VideoCodec.MPEG4,
         resolution=Resolution(width=640, height=480),
         fps=24.0,

@@ -1,7 +1,5 @@
 import warnings
-from pathlib import PurePosixPath
 from typing import Iterator, Optional
-from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import (
     DocumentDataSet,
@@ -39,11 +37,7 @@ class PdfAnalyzer:
             num_images += 1
             await ctx.exec(f"image_{num_images:03}", raster_image_importer_from_pilimage, image)
 
-        # TODO: Change DocumentDataSet: give defaults for "uuid", "parent"; maybe make "name" optional and of type str
         return DocumentDataSet(
-            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
-            parentUuid=None,
-            name=PurePosixPath(""),
             fileSize=0,  # TODO remove fileSize from DocumentDataSet because every DataSet has this as an optional property!
             title=metadata.title if metadata is not None else None,
             subject=metadata.subject if metadata is not None else None,

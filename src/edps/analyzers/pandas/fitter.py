@@ -10,7 +10,7 @@ import scipy.stats
 from pandas import Series
 from pydantic import BaseModel, Field
 
-from edps.task import TaskContext
+from edps.taskcontext import TaskContext
 
 Distribution = scipy.stats.rv_continuous
 DistributionParameters = Dict[str, float]
@@ -84,7 +84,7 @@ class Fitter:
         self,
         ctx: TaskContext,
         tasks: Dict[Distribution, asyncio.Task[Union[np.ndarray, _FittingError]]],
-    ) -> AsyncIterator[Tuple[str, float, DistributionParameters]]:
+    ) -> AsyncIterator[Tuple[str, np.float64, DistributionParameters]]:
         for distribution, task in tasks.items():
             parameters_or_error = await task
             if isinstance(parameters_or_error, _FittingError):

@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
-from extended_dataset_profile.models.v0.edp import DataSet
-
 from edps.importers.docx import docx_importer
 from edps.importers.images import raster_image_importer
 from edps.importers.pdf import pdf_importer
@@ -11,6 +9,7 @@ from edps.importers.structured import csv_importer, xls_importer, xlsx_importer
 from edps.importers.unstructured_text import unstructured_text_importer
 from edps.importers.videos import video_importer
 from edps.taskcontext import TaskContext
+from edps.types import DataSet
 
 Importer = Callable[[TaskContext, Path], Awaitable[DataSet]]
 

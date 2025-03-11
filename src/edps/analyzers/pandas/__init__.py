@@ -4,7 +4,6 @@ from enum import Enum
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Tuple
-from uuid import uuid4
 
 from extended_dataset_profile.models.v0.edp import (
     DateTimeColumn,
@@ -19,6 +18,7 @@ from matplotlib.pyplot import get_cmap
 from numpy import linspace, ones_like, triu
 from pandas import (
     DataFrame,
+    Index,
     Series,
     concat,
 )
@@ -104,17 +104,17 @@ class PandasAnalyzer:
         common_fields = await self._compute_common_fields(all_cols.data)
 
         datetime_cols = type_parser_results.datetime_cols
-        datetime_common_fields = common_fields.loc[datetime_cols.ids]
+        datetime_common_fields = common_fields.loc[Index(datetime_cols.ids)]
         datetime_fields = await self._compute_datetime_fields(ctx, datetime_cols.data)
         datetime_fields = concat([datetime_common_fields, datetime_fields], axis=1)
 
         numeric_cols = type_parser_results.numeric_cols
-        numeric_common_fields = common_fields.loc[numeric_cols.ids]
+        numeric_common_fields = common_fields.loc[Index(numeric_cols.ids)]
         numeric_fields = await self._compute_numeric_fields(ctx, numeric_cols.data, numeric_common_fields)
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
         string_cols = type_parser_results.string_cols
-        string_fields = common_fields.loc[string_cols.ids]
+        string_fields = common_fields.loc[Index(string_cols.ids)]
 
         timebase_periodicities = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY]
         seasonality_results = await compute_seasonality(ctx, datetime_cols, timebase_periodicities, numeric_cols.data)
@@ -144,7 +144,7 @@ class PandasAnalyzer:
 
         correlation_ids = numeric_cols.ids
         correlation_columns = all_cols.data.loc[:, correlation_ids]
-        correlation_fields = common_fields.loc[correlation_ids]
+        correlation_fields = common_fields.loc[Index(correlation_ids)]
         correlation_graph = await _get_correlation_graph(
             ctx,
             ctx.build_output_reference("correlations"),
@@ -160,9 +160,6 @@ class PandasAnalyzer:
         )
 
         return StructuredDataSet(
-            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
-            parentUuid=None,
-            name=PurePosixPath(""),
             rowCount=row_count,
             columnCount=column_count,
             numericColumnCount=transformed_numeric_column_count,

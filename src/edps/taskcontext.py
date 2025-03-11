@@ -3,7 +3,7 @@ from logging import Logger
 from pathlib import Path, PurePosixPath
 from typing import Awaitable, Callable, Concatenate, Iterator, Optional, Unpack, overload
 
-from extended_dataset_profile.models.v0.edp import DataSet
+from edps.types import DataSet
 
 
 class TaskContext(ABC):

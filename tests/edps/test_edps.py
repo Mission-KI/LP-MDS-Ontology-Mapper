@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Awaitable, Callable, List
 
 from extended_dataset_profile.models.v0.edp import (
@@ -119,7 +119,6 @@ async def test_analyse_pickle(path_data_test_pickle, ctx, config_data_with_augme
 @mark.asyncio
 async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_csv)
-    assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
     assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
@@ -148,7 +147,6 @@ async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_p
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_headerless_csv)
 
-    assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
     assert edp.structuredDatasets[0].stringColumns[0].name == "col000"
@@ -165,7 +163,6 @@ async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_p
 @mark.asyncio
 async def test_analyse_xlsx(path_data_test_xlsx, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_xlsx)
-    assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
     assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
@@ -182,7 +179,6 @@ async def test_analyse_xlsx(path_data_test_xlsx, compute_asset_fn):
 @mark.asyncio
 async def test_analyse_xls(path_data_test_xls, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_xls)
-    assert edp.compression is None
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
     assert edp.structuredDatasets[0].stringColumns[0].name == "uuid"
@@ -199,7 +195,6 @@ async def test_analyse_xls(path_data_test_xls, compute_asset_fn):
 @mark.asyncio
 async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_zip)
-    assert "zip" in edp.compression.algorithms
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
 
@@ -207,7 +202,6 @@ async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
 @mark.asyncio
 async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_multiassets_zip)
-    assert "zip" in edp.compression.algorithms
     assert len(edp.structuredDatasets) == 4
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -223,7 +217,6 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
 async def test_analyse_png(ctx, path_data_test_png, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_png)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "PNG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -236,7 +229,6 @@ async def test_analyse_png(ctx, path_data_test_png, download_ocr_models, user_pr
 async def test_analyse_jpg(ctx, path_data_test_jpg, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_jpg)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -249,7 +241,6 @@ async def test_analyse_jpg(ctx, path_data_test_jpg, download_ocr_models, user_pr
 async def test_analyse_jpeg(ctx, path_data_test_jpeg, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_jpeg)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -262,7 +253,6 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg, download_ocr_models, user_
 async def test_analyse_gif(ctx, path_data_test_gif, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_gif)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "GIF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -274,7 +264,6 @@ async def test_analyse_gif(ctx, path_data_test_gif, download_ocr_models, user_pr
 async def test_analyse_bmp(ctx, path_data_test_bmp, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_bmp)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "BMP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -287,7 +276,6 @@ async def test_analyse_bmp(ctx, path_data_test_bmp, download_ocr_models, user_pr
 async def test_analyse_tiff(ctx, path_data_test_tiff, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_tiff)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -300,7 +288,6 @@ async def test_analyse_tiff(ctx, path_data_test_tiff, download_ocr_models, user_
 async def test_analyse_tif(ctx, path_data_test_tif, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_tif)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -313,7 +300,6 @@ async def test_analyse_tif(ctx, path_data_test_tif, download_ocr_models, user_pr
 async def test_analyse_webp(ctx, path_data_test_webp, download_ocr_models, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_webp)
-    assert edp.compression is None
     assert edp.imageDatasets[0].codec == "WEBP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
@@ -346,7 +332,6 @@ async def test_analyse_mp4(ctx, path_data_test_mp4, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_mp4)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.H264
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -359,7 +344,6 @@ async def test_analyse_avi(ctx, path_data_test_avi, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_avi)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.MPEG4
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -372,7 +356,6 @@ async def test_analyse_mkv(ctx, path_data_test_mkv, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_mkv)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.H264
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -385,7 +368,6 @@ async def test_analyse_mov(ctx, path_data_test_mov, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_mov)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.H264
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -398,7 +380,6 @@ async def test_analyse_flv(ctx, path_data_test_flv, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_flv)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.FLV1
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -411,7 +392,6 @@ async def test_analyse_wmv(ctx, path_data_test_wmv, user_provided_data):
     config_data = Config(userProvidedEdpData=user_provided_data)
     edp = await compute_asset(ctx, config_data, path_data_test_wmv)
     video_dataset = edp.videoDatasets[0]
-    assert edp.compression is None
     assert video_dataset.codec == VideoCodec.WMV2
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
@@ -432,13 +412,13 @@ async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     assert doc_dataset.numPages == 18
     assert doc_dataset.numImages == 2
     assert doc_dataset.modified == ModificationState.unmodified
-    assert doc_dataset.name == PurePosixPath("test_pdf")
+    assert doc_dataset.name == "test_pdf"
 
     assert len(edp.imageDatasets) == 2
     assert edp.imageDatasets[0].parentUuid == doc_dataset.uuid
-    assert edp.imageDatasets[0].name == PurePosixPath("image_001")
+    assert edp.imageDatasets[0].name == "image_001"
     assert edp.imageDatasets[1].parentUuid == doc_dataset.uuid
-    assert edp.imageDatasets[1].name == PurePosixPath("image_002")
+    assert edp.imageDatasets[1].name == "image_002"
 
     assert len(edp.unstructuredTextDatasets) == 1
     assert len(edp.structuredDatasets) == 0

@@ -1,8 +1,6 @@
 import io
 import threading
-from pathlib import PurePosixPath
 from typing import Optional
-from uuid import uuid4
 
 import brisque
 import cv2
@@ -51,9 +49,6 @@ class ImageAnalyzer:
         self._detected_texts = await self._detect_texts(self._data)
 
         return ImageDataSet(
-            uuid=uuid4(),  # TODO uuid, parentUuid & name are set by the TaskContext and don't need explicit initialization!
-            parentUuid=None,
-            name=PurePosixPath(""),
             codec=self._metadata.codec,
             colorMode=self._metadata.color_mode,
             resolution=self._metadata.resolution,

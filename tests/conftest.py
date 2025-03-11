@@ -1,3 +1,4 @@
+import pickle
 import shutil
 from logging import getLogger
 from pathlib import Path
@@ -6,6 +7,7 @@ from easyocr import easyocr
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
+from edps.importers.structured import csv_import_dataframe
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
 
@@ -38,11 +40,6 @@ def path_data_test_csv():
 @fixture
 def path_data_test_headerless_csv():
     return TESTS_ROOT_PATH / "data/test_headerless.csv"
-
-
-@fixture
-def path_data_test_pickle():
-    return TESTS_ROOT_PATH / "data/test.pickle"
 
 
 @fixture
@@ -207,3 +204,13 @@ def copy_asset_to_ctx_input_dir(asset_path: Path, ctx: TaskContext):
     dest_path = ctx.input_path / asset_path.name
     shutil.copy(asset_path, dest_path)
     return dest_path
+
+
+@fixture
+async def path_data_test_pickle(ctx, path_data_test_csv, tmp_path):
+    # Freshly pickle the dataframe from the CSV
+    dataframe = await csv_import_dataframe(ctx, path_data_test_csv)
+    pickle_path = tmp_path / "test.pickle"
+    with open(pickle_path, "wb") as file:  # Use "wb" mode to write in binary
+        pickle.dump(dataframe, file)
+    return pickle_path
