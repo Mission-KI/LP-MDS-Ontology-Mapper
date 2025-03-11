@@ -1,5 +1,4 @@
 import asyncio
-import re
 import warnings
 from logging import Logger
 from pathlib import Path, PurePosixPath
@@ -65,8 +64,9 @@ class TaskContextImpl(TaskContext):
         return PurePosixPath("/".join(self._name_parts))
 
     def build_output_reference(self, final_part: str) -> PurePosixPath:
-        ref = "_".join(self._name_parts) + "_" + final_part
-        return PurePosixPath(re.sub("[./]", "_", ref))
+        ref = "/".join(self._name_parts) + "/" + final_part
+        ref = ref.replace(".", "_")
+        return PurePosixPath(ref)
 
     def relative_path(self, path: Path) -> Path:
         return path.resolve().relative_to(self._base_path)
@@ -136,15 +136,15 @@ class TaskContextImpl(TaskContext):
 
     async def import_file(self, path: Path, dataset_name: Optional[str] = None) -> None:
         """Import file if supported. Store the dataset. Catch and log any errors."""
-        if dataset_name is None:
-            dataset_name = path.name
-
         if path.is_dir():
             async with asyncio.TaskGroup() as group:
                 for sub_file in path.iterdir():
-                    group.create_task(self.import_file(sub_file, dataset_name + "/" + sub_file.name))
+                    sub_dataset_name = dataset_name + "/" + sub_file.name if dataset_name else sub_file.name
+                    group.create_task(self.import_file(sub_file, sub_dataset_name))
             return
 
+        if dataset_name is None:
+            dataset_name = path.name
         file_type = determine_file_type(path)
         importer = lookup_importer(file_type)
         if importer is None:

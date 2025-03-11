@@ -209,7 +209,7 @@ async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
 
     assert len(edp.structuredDatasets) == 1
     structured = edp.structuredDatasets[0]
-    assert str(structured.name) == "test_zip/test_csv"
+    assert str(structured.name) == "test_csv"
     assert structured.columnCount == 5
     assert structured.rowCount == 50
     assert structured.parentUuid == archive.uuid
@@ -222,7 +222,7 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
     assert len(edp.archiveDatasets) == 2
     archive_names = [str(archive.name) for archive in edp.archiveDatasets]
     assert "test_multiassets_zip" in archive_names
-    assert "test_multiassets_zip/zip/test_zip" in archive_names
+    assert "zip/test_zip" in archive_names
     for archive in edp.archiveDatasets:
         assert archive.algorithm == "zip"
 
@@ -231,10 +231,10 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
     assert edp.structuredDatasets[0].rowCount == 50
     structured_names = {str(dataset.name) for dataset in edp.structuredDatasets}
     assert structured_names == {
-        "test_multiassets_zip/csv/test_csv",
-        "test_multiassets_zip/xls/test_xls",
-        "test_multiassets_zip/xlsx/test_xlsx",
-        "test_multiassets_zip/zip/test_zip/test_csv",
+        "csv/test_csv",
+        "xls/test_xls",
+        "xlsx/test_xlsx",
+        "test_csv",
     }
 
 

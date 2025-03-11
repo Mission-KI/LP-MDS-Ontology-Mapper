@@ -20,5 +20,5 @@ async def archive_importer(ctx: TaskContext, path: Path) -> ArchiveDataSet:
         extractedSize=calculate_size(extraction_path),
     )
 
-    await ctx.import_file(extraction_path, dataset_name=ctx.dataset_name)
+    await ctx.import_file(extraction_path, dataset_name=None)
     return archive_dataset
