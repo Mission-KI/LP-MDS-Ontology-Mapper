@@ -25,8 +25,8 @@ async def _sub_contexts_task(child_ctx: TaskContext):
     return dummy_dataset()
 
 
-async def test_task(path_work):
-    ctx: TaskContext = TaskContextImpl(getLogger("task"), path_work)
+async def test_task(config_data, path_work):
+    ctx: TaskContext = TaskContextImpl(config_data, getLogger("task"), path_work)
     _, ds0, r0 = await ctx.exec_with_result("ds_my_task_with_args", my_task_with_args, 42, b=10)
     assert isinstance(ds0, VideoDataSet)
     assert r0 == 52

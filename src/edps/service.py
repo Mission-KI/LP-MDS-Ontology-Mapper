@@ -28,7 +28,7 @@ from edps.file import calculate_size
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types
 from edps.taskcontext import TaskContext
-from edps.types import AugmentedColumn, ComputedEdpData, Config, DataSet
+from edps.types import AugmentedColumn, ComputedEdpData, DataSet
 
 
 class UserInputError(RuntimeError):
@@ -44,7 +44,7 @@ class Service:
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, ctx: TaskContext, config: Config) -> FileReference:
+    async def analyse_asset(self, ctx: TaskContext) -> FileReference:
         """Let the service analyse the assets in ctx.input_path
 
         Parameters
@@ -60,13 +60,13 @@ class Service:
         FileReference
             File path or URL to the generated edp.service.
         """
-        computed_data = await self._compute_asset(ctx, config)
-        user_data = config.userProvidedEdpData
+        computed_data = await self._compute_asset(ctx)
+        user_data = ctx.config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
         return await write_edp(ctx, PurePosixPath(json_name), edp)
 
-    async def _compute_asset(self, ctx: TaskContext, config: Config) -> ComputedEdpData:
+    async def _compute_asset(self, ctx: TaskContext) -> ComputedEdpData:
         input_files = [path for path in ctx.input_path.iterdir() if path.is_file()]
         number_input_files = len(input_files)
         if number_input_files != 1:
@@ -74,15 +74,15 @@ class Service:
         file = input_files[0]
 
         await ctx.import_file_with_result(file, file.name)
-        computed_edp_data = self._create_computed_edp_data(ctx, config, file)
+        computed_edp_data = self._create_computed_edp_data(ctx, file)
         if self._has_temporal_columns(computed_edp_data):
             computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
         computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
         return computed_edp_data
 
-    def _create_computed_edp_data(self, ctx: TaskContext, config: Config, path: Path) -> ComputedEdpData:
+    def _create_computed_edp_data(self, ctx: TaskContext, path: Path) -> ComputedEdpData:
         edp = ComputedEdpData(volume=calculate_size(path))
-        augmenter = _Augmenter(ctx, config.augmentedColumns)
+        augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
         self._insert_datasets_into_edp(ctx, edp, augmenter, None)
         augmenter.warn_unapplied_augmentations()
         return edp

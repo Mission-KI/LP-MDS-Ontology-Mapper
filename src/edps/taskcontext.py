@@ -5,11 +5,16 @@ from typing import Any, Awaitable, Callable, Concatenate, Iterator, Optional, Tu
 
 from extended_dataset_profile.models.v0.edp import FileProperties
 
-from edps.types import DataSet
+from edps.types import Config, DataSet
 
 
 class TaskContext(ABC):
     """Interface. A context provides a logger and supports executing sub-tasks."""
+
+    @property
+    @abstractmethod
+    def config(self) -> Config:
+        """Return the configuration of this service run."""
 
     @property
     @abstractmethod

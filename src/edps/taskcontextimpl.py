@@ -9,13 +9,14 @@ from extended_dataset_profile.models.v0.edp import FileProperties
 from edps.file import determine_file_type, sanitize_path
 from edps.importers import lookup_importer, lookup_unsupported_type_message
 from edps.taskcontext import TaskContext
-from edps.types import DataSet, is_dataset
+from edps.types import Config, DataSet, is_dataset
 
 
 class TaskContextImpl(TaskContext):
     """A context provides a logger and supports executing sub-tasks."""
 
-    def __init__(self, logger: Logger, base_path: Path, name_parts: list[str] = []):
+    def __init__(self, config: Config, logger: Logger, base_path: Path, name_parts: list[str] = []):
+        self._config = config
         self._logger = logger
         self._name_parts = name_parts
         self._children: list[TaskContext] = []
@@ -29,6 +30,10 @@ class TaskContextImpl(TaskContext):
         self._input_path.mkdir(exist_ok=True)
         self._output_path = base_path / "output"
         self._output_path.mkdir(exist_ok=True)
+
+    @property
+    def config(self) -> Config:
+        return self._config
 
     @property
     def logger(self) -> Logger:
@@ -178,7 +183,7 @@ class TaskContextImpl(TaskContext):
     def _prepare_sub_context(self, dataset_name: str) -> "TaskContextImpl":
         child_name_parts = self.name_parts + [dataset_name]
         new_logger = self.logger.getChild(dataset_name)
-        sub_context = TaskContextImpl(new_logger, self._base_path, child_name_parts)
+        sub_context = TaskContextImpl(self._config, new_logger, self._base_path, child_name_parts)
         self.children.append(sub_context)
         return sub_context
 

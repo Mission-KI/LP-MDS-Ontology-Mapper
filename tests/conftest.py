@@ -1,15 +1,22 @@
 import pickle
 import shutil
+from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
 
 from easyocr import easyocr
+from extended_dataset_profile.models.v0.edp import (
+    DataSpace,
+    License,
+    Publisher,
+)
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
 from edps.importers.structured import csv_import_dataframe
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
+from edps.types import Config, UserProvidedEdpData
 
 TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 
@@ -25,9 +32,10 @@ def path_work(tmp_path):
 
     Example:
         path = TESTS_ROOT_PATH / "work"
-        if not path.exists():
-            path.mkdir()
-        yield path
+        if path.exists() and path.is_dir():
+            shutil.rmtree(path)
+        path.mkdir()
+        return path
     """
     return tmp_path
 
@@ -202,14 +210,42 @@ def path_language_deu_eng_wiki_llm_txt():
     return TESTS_ROOT_PATH / "data/language/deu_eng_wiki_llm.txt"
 
 
-@fixture
-def ctx(path_work) -> TaskContext:
-    return TaskContextImpl(getLogger("edps.test"), path_work)
+@fixture(scope="session")
+def user_provided_data():
+    return UserProvidedEdpData(
+        assetId="my-dataset-id",
+        name="dataset-dummy-name",
+        url="https://beebucket.ai/en/",
+        dataCategory="TestDataCategory",
+        dataSpace=DataSpace(name="TestDataSpace", url="https://beebucket.ai/en/"),
+        publisher=Publisher(name="beebucket"),
+        license=License(url="https://opensource.org/license/mit"),
+        description="Our very first test edp",
+        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
+        version="2.3.1",
+        tags=["test", "csv"],
+        freely_available=True,
+    )
+
+
+@fixture(scope="session")
+def config_data(user_provided_data):
+    return Config(userProvidedEdpData=user_provided_data, augmentedColumns=[])
+
+
+@fixture(scope="session")
+def logger():
+    return getLogger("edps.test")
 
 
 @fixture
-def download_ocr_models(ctx):
-    ctx.logger.info("Downloading OCR models.")
+def ctx(path_work, config_data, logger) -> TaskContext:
+    return TaskContextImpl(config_data, logger, path_work)
+
+
+@fixture(scope="session")
+def download_ocr_models(logger):
+    logger.info("Downloading OCR models.")
     easyocr.Reader(lang_list=["en", "de"], gpu=False, download_enabled=True)
 
 
