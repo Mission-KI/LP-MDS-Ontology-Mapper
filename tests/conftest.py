@@ -46,6 +46,11 @@ def path_data_test_csv():
 
 
 @fixture
+def path_data_bast_csv():
+    return TESTS_ROOT_PATH / "data/bast.csv"
+
+
+@fixture
 def path_data_test_headerless_csv():
     return TESTS_ROOT_PATH / "data/test_headerless.csv"
 

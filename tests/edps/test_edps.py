@@ -137,6 +137,16 @@ async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, ctx, 
 
 
 @mark.asyncio
+async def test_seasonality_bast_csv(path_data_bast_csv, analyse_asset_fn, ctx):
+    edp_file = await analyse_asset_fn(path_data_bast_csv)
+    edp = read_edp_file(ctx.output_path / edp_file)
+    assert len(edp.structuredDatasets) == 1
+    dataset = edp.structuredDatasets[0]
+    columns_with_seasonality = list(filter(lambda col: len(col.seasonalities) > 0, dataset.numericColumns))
+    assert len(columns_with_seasonality) == 10
+
+
+@mark.asyncio
 async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data):
     edp = await compute_asset(ctx, path_data_test_headerless_csv)
     assert len(edp.archiveDatasets) == 0
