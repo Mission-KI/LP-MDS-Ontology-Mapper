@@ -94,9 +94,19 @@ class AugmentedColumn(BaseModel):
     augmentation: Augmentation = Field(description="Augmentation information")
 
 
+class DistributionConfig(BaseModel):
+    minimum_number_unique: int = Field(
+        default=16, description="Minimum number of unique values to run distribution analysis"
+    )
+
+
 class Config(BaseModel):
     userProvidedEdpData: UserProvidedEdpData = Field(description="User provided EDP meta data")
     augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
+    distribution: DistributionConfig = Field(
+        default_factory=DistributionConfig,
+        description="Configuration parameters specific to the distribution analysis.",
+    )
 
 
 def recursively_escape_strings(data: Any) -> Any:

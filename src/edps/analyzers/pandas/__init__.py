@@ -84,7 +84,6 @@ class PandasAnalyzer:
         self._data = data
         self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
-        self._distribution_threshold = 30  # Number of elements in row required to cause distribution to be determined.
         self._intervals = [
             timedelta(seconds=1),
             timedelta(minutes=1),
@@ -232,7 +231,6 @@ class PandasAnalyzer:
                     ctx,
                     columns,
                     concat([common_fields, fields], axis=1),
-                    self._distribution_threshold,
                     self._workers,
                 ),
             ],
@@ -289,16 +287,28 @@ class PandasAnalyzer:
             dataType=str(column.dtype),
             boxPlot=box_plot,
         )
-        if computed_fields[_NUMERIC_DISTRIBUTION] not in [
-            _Distributions.SingleValue.value,
-            _Distributions.TooSmallDataset.value,
-        ]:
+        distribution = computed_fields[_NUMERIC_DISTRIBUTION]
+        if (
+            distribution
+            not in [
+                _Distributions.SingleValue.value,
+                _Distributions.TooSmallDataset.value,
+            ]
+            and column_result.numberUnique > ctx.config.distribution.minimum_number_unique
+        ):
             column_result.distributionGraph = await _plot_distribution(
                 ctx,
                 column,
                 computed_fields,
                 computed_fields[_NUMERIC_DISTRIBUTION],
                 computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
+            )
+        else:
+            ctx.logger.debug(
+                "Too few unique values for distribution analysis on column %s. Have %d unique, need at least %d.",
+                column.name,
+                column_result.numberUnique,
+                ctx.config.distribution.minimum_number_unique,
             )
 
         for datetime_column_name, seasonality in seasonality_results.items():
@@ -369,7 +379,6 @@ async def _get_distributions(
     ctx: TaskContext,
     columns: DataFrame,
     fields: DataFrame,
-    distribution_threshold: int,
     workers: int,
 ) -> DataFrame:
     distributions: List[Tuple[str, Dict]] = []
@@ -380,7 +389,6 @@ async def _get_distributions(
                 ctx,
                 column,
                 _get_single_row(name, fields),
-                distribution_threshold,
                 workers,
             )
         )
@@ -398,13 +406,12 @@ async def _get_distribution(
     ctx: TaskContext,
     column: Series,
     fields: Series,
-    distribution_threshold: int,
     workers: int,
 ) -> Tuple[str, Dict]:
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_NON_NULL] < distribution_threshold:
+    if fields[_COMMON_NON_NULL] < ctx.config.distribution.minimum_number_unique:
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(ctx, column, fields, workers)
@@ -427,6 +434,8 @@ async def _plot_distribution(
 ):
     x_min = column_fields[_NUMERIC_LOWER_DIST]
     x_max = column_fields[_NUMERIC_UPPER_DIST]
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
     x_limits = (x_min, x_max)
     plot_name = ctx.build_output_reference(f"{column.name}_distribution")
     async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
@@ -436,7 +445,7 @@ async def _plot_distribution(
         axes.set_xlim(x_min, x_max)
         axes.hist(
             column,
-            bins=100,
+            bins="fd",
             range=x_limits,
             density=True,
             label=f"{column.name} Value Distribution",
