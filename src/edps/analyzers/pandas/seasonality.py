@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from pandas import DataFrame, Series
 from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
 
-from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency
+from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, Granularity
 from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
 from edps.taskcontext import TaskContext
@@ -58,29 +58,64 @@ async def compute_seasonality(
             ctx.logger.warning(message)
             continue
 
-        different_abundances = periodicity.get_main_temporal_consistency().differentAbundancies
         filtered_numeric_columns = numeric_columns.loc[periodicity.cleaned_series.index].set_index(
             periodicity.cleaned_series, inplace=False
         )
 
         for numeric_column_name, numeric_column in filtered_numeric_columns.items():
             dataframe.loc[str(numeric_column_name), str(datetime_column_name)] = _seasonal_decompose_column(
-                numeric_column, different_abundances
+                ctx, numeric_column, periodicity.main_period, str(datetime_column_name)
             )
 
     ctx.logger.info("Finished seasonality analysis.")
     return dataframe
 
 
-def _seasonal_decompose_column(column: Series, distinct_count: int) -> Optional[DecomposeResult]:
-    non_null_column = column[column.notnull()]
+def _seasonal_decompose_column(
+    ctx: TaskContext, column: Series, resample_period: Granularity, datetime_column_name: str
+) -> Optional[DecomposeResult]:
+    config = ctx.config.structured_config.seasonality
+    non_null_column: Series = column[column.notnull()]
     number_non_null = len(non_null_column)
-    if number_non_null < 1:
+    if number_non_null > config.max_samples:
+        ctx.logger.info(
+            'Column "%s" contains too many entries. Running seasonality on the first %d entries only.',
+            column.name,
+            config.max_samples,
+        )
+        non_null_column = non_null_column[: config.max_samples]
+    non_null_column = non_null_column.resample(resample_period.timedelta).mean().interpolate()
+    resample_period_samples = resample_period.samples_per_period
+    number_non_null = len(non_null_column.index)
+
+    number_periods = number_non_null / resample_period_samples
+    if number_periods < 2.0:
+        ctx.logger.info(
+            'Column "%s" contains only %d samples when resampled to %s for running seasonality analysis. Need at least %d samples.',
+            column.name,
+            number_non_null,
+            resample_period,
+            2 * resample_period_samples,
+        )
         return None
-    divider = min(16, number_non_null)
-    period = int(distinct_count / divider)
-    period = max(1, period)
-    return seasonal_decompose(non_null_column, period=period, model="additive")
+
+    if number_periods > config.max_periods:
+        ctx.logger.debug(
+            'Column "%s" contains %d periods of data. Will be capped to %d periods.',
+            column.name,
+            number_periods,
+            config.max_periods,
+        )
+        number_non_null = config.max_periods * resample_period_samples
+        non_null_column = non_null_column[:number_non_null]
+
+    try:
+        return seasonal_decompose(non_null_column, model="additive", period=resample_period_samples)
+    except ValueError as error:
+        message = f"Seasonal decompose of {column.name} over {datetime_column_name} failed: {error}"
+        ctx.logger.warning(message)
+        warn(message)
+        return None
 
 
 async def get_seasonality_graphs(

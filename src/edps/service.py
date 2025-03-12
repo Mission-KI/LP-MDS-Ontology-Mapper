@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path, PurePosixPath
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple, cast
 from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
@@ -171,8 +171,11 @@ class Service:
         if len(all_temporal_consistencies) == 0:
             return None
         sum_temporal_consistencies = sum(all_temporal_consistencies[1:], all_temporal_consistencies[0])
-        return determine_periodicity(
-            sum_temporal_consistencies["numberOfGaps"], sum_temporal_consistencies["differentAbundancies"]
+        return cast(
+            Optional[str],
+            determine_periodicity(
+                sum_temporal_consistencies["numberOfGaps"], sum_temporal_consistencies["differentAbundancies"]
+            ),
         )
 
     def _iterate_all_temporal_consistencies(self, edp: ComputedEdpData) -> Iterator[DataFrame]:

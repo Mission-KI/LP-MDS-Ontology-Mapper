@@ -294,7 +294,7 @@ class PandasAnalyzer:
                 _Distributions.SingleValue.value,
                 _Distributions.TooSmallDataset.value,
             ]
-            and column_result.numberUnique > ctx.config.distribution.minimum_number_unique
+            and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_unique
         ):
             column_result.distributionGraph = await _plot_distribution(
                 ctx,
@@ -308,10 +308,13 @@ class PandasAnalyzer:
                 "Too few unique values for distribution analysis on column %s. Have %d unique, need at least %d.",
                 column.name,
                 column_result.numberUnique,
-                ctx.config.distribution.minimum_number_unique,
+                ctx.config.structured_config.distribution.minimum_number_unique,
             )
 
         for datetime_column_name, seasonality in seasonality_results.items():
+            if seasonality is None:
+                continue
+
             seasonality_graphs = await get_seasonality_graphs(
                 ctx,
                 str(column.name),
@@ -345,7 +348,7 @@ class PandasAnalyzer:
             monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
-            periodicity=temporal_consistency.period if temporal_consistency else None,
+            periodicity=temporal_consistency.main_period.name if temporal_consistency else None,
             format=info.get_format(),
         )
 
@@ -408,10 +411,11 @@ async def _get_distribution(
     fields: Series,
     workers: int,
 ) -> Tuple[str, Dict]:
+    config = ctx.config.structured_config.distribution
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_NON_NULL] < ctx.config.distribution.minimum_number_unique:
+    if fields[_COMMON_NON_NULL] < config.minimum_number_unique:
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(ctx, column, fields, workers)

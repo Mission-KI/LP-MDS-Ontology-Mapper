@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 from warnings import warn
 
@@ -8,19 +10,41 @@ from pandas import DataFrame, Series, Timedelta, UInt64Dtype
 from edps.taskcontext import TaskContext
 
 
+@dataclass(frozen=True)
+class Granularity:
+    name: str
+    timedelta: Timedelta
+    samples_per_period: int
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Granularities(Enum):
+    Microseconds = Granularity(name="microseconds", timedelta=Timedelta(microseconds=1), samples_per_period=1000)
+    Milliseconds = Granularity(name="milliseconds", timedelta=Timedelta(milliseconds=1), samples_per_period=1000)
+    Seconds = Granularity(name="seconds", timedelta=Timedelta(seconds=1), samples_per_period=60)
+    Minutes = Granularity(name="minutes", timedelta=Timedelta(minutes=1), samples_per_period=60)
+    Hours = Granularity(name="hours", timedelta=Timedelta(hours=1), samples_per_period=24)
+    Days = Granularity(name="days", timedelta=Timedelta(days=1), samples_per_period=7)
+    Weeks = Granularity(name="weeks", timedelta=Timedelta(weeks=1), samples_per_period=4)
+    Months = Granularity(name="months", timedelta=Timedelta(days=30), samples_per_period=12)
+    Years = Granularity(name="years", timedelta=Timedelta(days=365), samples_per_period=10)
+
+
 class DatetimeColumnTemporalConsistency:
     def __init__(
         self,
-        period: str,
+        main_period: Granularity,
         temporal_consistencies: List[TemporalConsistency],
         cleaned_series: Series,
     ) -> None:
-        self.period = period
+        self.main_period = main_period
         self.temporal_consistencies = temporal_consistencies
         self.cleaned_series = cleaned_series
 
     def get_main_temporal_consistency(self) -> TemporalConsistency:
-        return self.__getitem__(self.period)
+        return self.__getitem__(self.main_period.name)
 
     def __getitem__(self, period: str) -> TemporalConsistency:
         try:
@@ -33,9 +57,9 @@ async def compute_temporal_consistency(ctx: TaskContext, columns: DataFrame) -> 
     return Series({name: _compute_temporal_consistency_for_column(ctx, column) for name, column in columns.items()})
 
 
-def determine_periodicity(gaps: Series, distincts: Series) -> str:
+def determine_periodicity(gaps: Series, distincts: Series):
     diff = distincts - gaps
-    return str(diff.idxmax())
+    return diff.idxmax()
 
 
 def _compute_temporal_consistency_for_column(
@@ -65,37 +89,25 @@ def _compute_temporal_consistency_for_column(
         warn(message)
         row_count = new_count
 
-    granularities = {
-        "microseconds": Timedelta(microseconds=1),
-        "milliseconds": Timedelta(milliseconds=1),
-        "seconds": Timedelta(seconds=1),
-        "minutes": Timedelta(minutes=1),
-        "hours": Timedelta(hours=1),
-        "days": Timedelta(days=1),
-        "weeks": Timedelta(weeks=1),
-        "months": Timedelta(days=30),
-        "years": Timedelta(days=365),
-    }
-
     deltas = column.diff()[1:]
     gaps = Series(
-        {label: count_nonzero(deltas > time_base) for label, time_base in granularities.items()},
+        {granularity.value: count_nonzero(deltas > granularity.value.timedelta) for granularity in Granularities},
         dtype=UInt64Dtype(),
     )
     distincts = Series(
-        {label: column.dt.round(time_base).nunique() for label, time_base in granularities.items()},  # type: ignore
+        {granularity.value: column.dt.round(granularity.value.timedelta).nunique() for granularity in Granularities},  # type: ignore
         dtype=UInt64Dtype(),
     )
     stable = distincts == 1
-    periodicity = determine_periodicity(gaps, distincts)
+    periodicity: Granularity = determine_periodicity(gaps, distincts)
     temporal_consistencies = [
         TemporalConsistency(
-            timeScale=time_base,
-            differentAbundancies=distincts[time_base],
-            stable=stable[time_base],
-            numberOfGaps=gaps[time_base],
+            timeScale=granularity.value.name,
+            differentAbundancies=distincts[granularity.value],  # type: ignore
+            stable=stable[granularity.value],  # type: ignore
+            numberOfGaps=gaps[granularity.value],  # type: ignore
         )
-        for time_base in granularities
+        for granularity in Granularities
     ]
 
     return DatetimeColumnTemporalConsistency(periodicity, temporal_consistencies, column)

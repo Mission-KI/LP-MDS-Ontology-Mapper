@@ -95,17 +95,40 @@ class AugmentedColumn(BaseModel):
 
 
 class DistributionConfig(BaseModel):
+    """Configuration parameters specific to the distribution analysis."""
+
     minimum_number_unique: int = Field(
         default=16, description="Minimum number of unique values to run distribution analysis"
+    )
+
+
+class SeasonalityConfig(BaseModel):
+    """Configuration for the seasonality analysis step."""
+
+    max_samples: int = Field(default=int(1e6), description="Maximum number of samples to use for seasonality analysis.")
+    max_periods: int = Field(
+        default=10,
+        description="Maximum number of periods to use in seasonality analysis. If this is too hight, the seasonality graphs become none readable.",
+    )
+
+
+class StructuredConfig(BaseModel):
+    """Configurations for the structured data analysis"""
+
+    distribution: DistributionConfig = Field(
+        default_factory=DistributionConfig,
+        description="Configuration parameters specific to the distribution analysis.",
+    )
+    seasonality: SeasonalityConfig = Field(
+        default_factory=SeasonalityConfig, description="Configurations specific to the seasonality analysis."
     )
 
 
 class Config(BaseModel):
     userProvidedEdpData: UserProvidedEdpData = Field(description="User provided EDP meta data")
     augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
-    distribution: DistributionConfig = Field(
-        default_factory=DistributionConfig,
-        description="Configuration parameters specific to the distribution analysis.",
+    structured_config: StructuredConfig = Field(
+        default_factory=StructuredConfig, description="Configurations for the structured data analysis"
     )
 
 
