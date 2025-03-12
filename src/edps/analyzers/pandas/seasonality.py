@@ -5,7 +5,7 @@ from warnings import warn
 from extended_dataset_profile.models.v0.edp import TimeBasedGraph
 from matplotlib.figure import Figure
 from pandas import DataFrame, Series
-from statsmodels.tsa.seasonal import DecomposeResult, seasonal_decompose
+from statsmodels.tsa.seasonal import STL, DecomposeResult
 
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, Granularity
 from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
@@ -89,6 +89,7 @@ def _seasonal_decompose_column(
     number_non_null = len(non_null_column.index)
 
     number_periods = number_non_null / resample_period_samples
+    # Check if we have enough samples to run seasonal decompose.
     if number_periods < 2.0:
         ctx.logger.info(
             'Column "%s" contains only %d samples when resampled to %s for running seasonality analysis. Need at least %d samples.',
@@ -110,7 +111,8 @@ def _seasonal_decompose_column(
         non_null_column = non_null_column[:number_non_null]
 
     try:
-        return seasonal_decompose(non_null_column, model="additive", period=resample_period_samples)
+        stl = STL(non_null_column, period=resample_period_samples, robust=True)
+        return stl.fit()
     except ValueError as error:
         message = f"Seasonal decompose of {column.name} over {datetime_column_name} failed: {error}"
         ctx.logger.warning(message)
