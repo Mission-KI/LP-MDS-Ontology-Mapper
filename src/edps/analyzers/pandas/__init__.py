@@ -62,6 +62,7 @@ _NUMERIC_LOWER_IQR = "lower-iqr-limit"
 _NUMERIC_UPPER_IQR = "upper-iqr-limit"
 _NUMERIC_IQR = "inter-quartile-range"
 _NUMERIC_IQR_OUTLIERS = "iqr-outlier-count"
+_NUMERIC_RELATIVE_OUTLIERS = "relative-outliers"
 _NUMERIC_DISTRIBUTION = "distribution"
 _NUMERIC_DISTRIBUTION_PARAMETERS = "distribution-parameters"
 
@@ -211,6 +212,11 @@ class PandasAnalyzer:
         fields[_NUMERIC_LOWER_IQR] = fields[_NUMERIC_LOWER_QUANT] - 1.5 * fields[_NUMERIC_IQR]
         fields[_NUMERIC_UPPER_IQR] = fields[_NUMERIC_UPPER_QUANT] + 1.5 * fields[_NUMERIC_IQR]
         fields[_NUMERIC_IQR_OUTLIERS] = _get_outliers(columns, fields[_NUMERIC_LOWER_IQR], fields[_NUMERIC_UPPER_IQR])
+        # Relative outliers
+        fields[_NUMERIC_RELATIVE_OUTLIERS] = (
+            fields[[_NUMERIC_PERCENTILE_OUTLIERS, _NUMERIC_Z_OUTLIERS, _NUMERIC_IQR_OUTLIERS]].mean(axis=1, skipna=True)
+            / common_fields[_COMMON_NON_NULL]
+        )
         # Distribution
         fields[_NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_IQR]
         fields.loc[fields[_NUMERIC_LOWER_IQR] < fields[_NUMERIC_MIN], _NUMERIC_LOWER_DIST] = fields[_NUMERIC_MIN]
@@ -278,6 +284,7 @@ class PandasAnalyzer:
             lowerIQR=computed_fields[_NUMERIC_LOWER_IQR],
             iqr=computed_fields[_NUMERIC_IQR],
             iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
+            relativeOutlierCount=computed_fields[_NUMERIC_RELATIVE_OUTLIERS],
             distribution=computed_fields[_NUMERIC_DISTRIBUTION],
             dataType=str(column.dtype),
             boxPlot=box_plot,

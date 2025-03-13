@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from math import isclose
 from pathlib import Path
 from typing import Awaitable, Callable, List
 
@@ -136,6 +137,7 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     assert aufenthalt.percentileOutlierCount == 2
     assert aufenthalt.zScoreOutlierCount == 2
     assert aufenthalt.iqrOutlierCount == 4
+    assert isclose(aufenthalt.relativeOutlierCount, 0.0533333333, rel_tol=1e-6)
 
     parkhaus = structured_dataset.numericColumns[1]
     assert parkhaus.name == "parkhaus"
@@ -143,6 +145,7 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     assert parkhaus.percentileOutlierCount == 0
     assert parkhaus.zScoreOutlierCount == 0
     assert parkhaus.iqrOutlierCount == 0
+    assert isclose(parkhaus.relativeOutlierCount, 0.0)
 
 
 @mark.asyncio
