@@ -129,10 +129,20 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     assert structured_dataset.datetimeColumns[0].format == "ISO8601"
     assert structured_dataset.datetimeColumns[1].name == "ausfahrt"
     assert structured_dataset.datetimeColumns[1].format == "ISO8601"
-    assert structured_dataset.numericColumns[0].name == "aufenthalt"
-    assert structured_dataset.numericColumns[0].dataType == "UInt32"
-    assert structured_dataset.numericColumns[1].name == "parkhaus"
-    assert structured_dataset.numericColumns[1].dataType == "UInt8"
+
+    aufenthalt = structured_dataset.numericColumns[0]
+    assert aufenthalt.name == "aufenthalt"
+    assert aufenthalt.dataType == "UInt32"
+    assert aufenthalt.percentileOutlierCount == 2
+    assert aufenthalt.zScoreOutlierCount == 2
+    assert aufenthalt.iqrOutlierCount == 4
+
+    parkhaus = structured_dataset.numericColumns[1]
+    assert parkhaus.name == "parkhaus"
+    assert parkhaus.dataType == "UInt8"
+    assert parkhaus.percentileOutlierCount == 0
+    assert parkhaus.zScoreOutlierCount == 0
+    assert parkhaus.iqrOutlierCount == 0
 
 
 @mark.asyncio

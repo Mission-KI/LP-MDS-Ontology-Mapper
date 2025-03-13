@@ -355,7 +355,7 @@ async def _generate_box_plot(ctx: TaskContext, column: Series) -> FileReference:
 
 def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -> Series:
     is_outlier = (column < lower_limit) | (column > upper_limit)
-    return is_outlier.count()
+    return is_outlier.sum()
 
 
 async def _get_distributions(
