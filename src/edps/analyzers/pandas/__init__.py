@@ -49,6 +49,7 @@ _NUMERIC_UPPER_PERCENTILE = "upper-percentile"
 _NUMERIC_PERCENTILE_OUTLIERS = "percentile-outliers"
 _NUMERIC_MEAN = "mean"
 _NUMERIC_MEDIAN = "median"
+_NUMERIC_VARIANCE = "variance"
 _NUMERIC_STD_DEV = "std-dev"
 _NUMERIC_LOWER_Z = "lower-z-limit"
 _NUMERIC_UPPER_Z = "upper-z-limit"
@@ -198,6 +199,7 @@ class PandasAnalyzer:
         # Standard Distribution
         fields[_NUMERIC_MEAN] = columns.mean()
         fields[_NUMERIC_MEDIAN] = columns.median()
+        fields[_NUMERIC_VARIANCE] = columns.var()
         fields[_NUMERIC_STD_DEV] = columns.std()
         fields[_NUMERIC_LOWER_Z] = fields[_NUMERIC_MEAN] - 3.0 * fields[_NUMERIC_STD_DEV]
         fields[_NUMERIC_UPPER_Z] = fields[_NUMERIC_MEAN] + 3.0 * fields[_NUMERIC_STD_DEV]
@@ -262,6 +264,7 @@ class PandasAnalyzer:
             max=computed_fields[_NUMERIC_MAX],
             mean=computed_fields[_NUMERIC_MEAN],
             median=computed_fields[_NUMERIC_MEDIAN],
+            variance=computed_fields[_NUMERIC_VARIANCE],
             stddev=computed_fields[_NUMERIC_STD_DEV],
             upperPercentile=computed_fields[_NUMERIC_UPPER_PERCENTILE],
             lowerPercentile=computed_fields[_NUMERIC_LOWER_PERCENTILE],
