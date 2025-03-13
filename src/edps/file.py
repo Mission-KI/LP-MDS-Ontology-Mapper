@@ -35,3 +35,11 @@ def determine_file_type(path: Path) -> str:
     if type_by_suffix is not None:
         return type_by_suffix
     raise RuntimeError(f'Unable to determine type of "{path}"')
+
+
+def build_real_sub_path(base_path: Path, sub_path: Path | str) -> Path:
+    """Combine base_path and sub_path, enforcing that the resulting path is a sub path of base_path."""
+    full_path = base_path / sub_path
+    if not full_path.resolve().is_relative_to(base_path.resolve()):
+        raise ValueError(f"{sub_path} escapes the base path {base_path}")
+    return full_path

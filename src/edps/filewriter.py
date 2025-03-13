@@ -12,7 +12,7 @@ import matplotlib.style
 import seaborn
 from extended_dataset_profile.models.v0.edp import ExtendedDatasetProfile
 
-from edps.file import sanitize_path
+from edps.file import build_real_sub_path, sanitize_path
 from edps.taskcontext import TaskContext
 
 TEXT_ENCODING = "utf-8"
@@ -78,9 +78,7 @@ async def get_pyplot_writer(
 
 
 def _prepare_save_path(ctx: TaskContext, name: PurePosixPath):
-    save_path = ctx.output_path / sanitize_path(str(name))
-    # Enforce that save_path is sub-path of output_path
-    save_path.resolve().relative_to(ctx.output_path.resolve())
+    save_path = build_real_sub_path(ctx.output_path, sanitize_path(str(name)))
     if save_path.exists():
         message = f'The path "{save_path}" already exists, will overwrite! This is most likely an implementation error.'
         warn(message, RuntimeWarning)
