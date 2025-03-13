@@ -56,6 +56,8 @@ dependencies = [
     "static-ffmpeg",
     "genson",
     "spacy",
+    "Jinja2",
+    "xhtml2pdf",
 ]
 
 [project.scripts]
@@ -132,6 +134,7 @@ module = [
     "ffmpeg",
     "static_ffmpeg",
     "genson",
+    "xhtml2pdf",
 ]
 ignore_missing_imports = true
 
