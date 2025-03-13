@@ -1,9 +1,10 @@
+import itertools
 from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
 from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from extended_dataset_profile.models.v0.edp import (
     CorrelationSummary,
@@ -147,12 +148,15 @@ class PandasAnalyzer:
         correlation_ids = numeric_cols.ids
         correlation_columns = all_cols.data.loc[:, correlation_ids]
         correlation_fields = common_fields.loc[Index(correlation_ids)]
-        correlation_graph = await _get_correlation_graph(
+        correlation_matrix = await _get_correlation_matrix(
             ctx,
-            ctx.build_output_reference("correlations"),
             correlation_columns,
             correlation_fields,
         )
+        correlation_graph = await _get_correlation_graph(
+            ctx, ctx.build_output_reference("correlations"), correlation_matrix
+        )
+        correlation_summary = await _get_correlation_summary(ctx, correlation_matrix)
 
         transformed_numeric_column_count = len(transformed_numeric_columns)
         transformed_date_time_column_count = len(transformed_datetime_columns)
@@ -171,7 +175,7 @@ class PandasAnalyzer:
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
             correlationGraph=correlation_graph,
-            correlationSummary=CorrelationSummary(),
+            correlationSummary=correlation_summary,
         )
 
     async def _compute_common_fields(self, columns: DataFrame) -> DataFrame:
@@ -469,19 +473,29 @@ def _get_single_row(row_name: str | Hashable, data_frame: DataFrame) -> Series:
     return data_frame.loc[str(row_name)]  # type: ignore
 
 
-async def _get_correlation_graph(
+async def _get_correlation_matrix(
     ctx: TaskContext,
-    plot_name: PurePosixPath,
     columns: DataFrame,
     fields: DataFrame,
-) -> Optional[FileReference]:
+) -> Optional[DataFrame]:
     filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
+
     if len(filtered_column_names) < 2:
         return None
+
     filtered_columns = columns[filtered_column_names]
     ctx.logger.debug("Computing correlation between columns %s", filtered_columns.columns)
-    correlation = filtered_columns.corr()
+    return filtered_columns.corr()
+
+
+async def _get_correlation_graph(
+    ctx: TaskContext, plot_name: PurePosixPath, correlation: Optional[DataFrame]
+) -> Optional[FileReference]:
+    if correlation is None:
+        return None
+
     mask = triu(ones_like(correlation, dtype=bool))
+
     async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
         figure = axes.figure
         if isinstance(figure, Figure):
@@ -506,5 +520,23 @@ async def _get_correlation_graph(
             cmap=get_cmap(),
             ax=axes,
         )
-    ctx.logger.debug("Finished computing correlations")
+    ctx.logger.debug("Finished computing correlation graph")
     return reference
+
+
+async def _get_correlation_summary(ctx: TaskContext, correlation: Optional[DataFrame]) -> CorrelationSummary:
+    summary = CorrelationSummary()
+    if correlation is None:
+        return summary
+
+    for col1, col2 in itertools.combinations(correlation.columns, 2):
+        corr = abs(cast(float, correlation.loc[col1, col2]))
+        if corr < 0.5:
+            summary.no += 1
+        elif corr < 0.8:
+            summary.partial += 1
+        else:
+            summary.strong += 1
+
+    ctx.logger.debug("Finished computing correlation summary")
+    return summary
