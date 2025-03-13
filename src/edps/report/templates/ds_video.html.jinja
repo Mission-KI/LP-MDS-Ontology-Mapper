@@ -1,0 +1,13 @@
+{%- import "utils.html.jinja" as utils -%}
+
+{% macro print(ds) -%}
+    {{
+        utils.print_dataset_table("Video", ds, [
+            ("Codec", ds.details.codec),
+            ("Resolution", ds.details.resolution),
+            ("FPS", ds.details.fps),
+            ("Duration", ds.details.duration),
+            ("Pixel format", ds.details.pixel_format),
+        ])
+    }}
+{% endmacro %}

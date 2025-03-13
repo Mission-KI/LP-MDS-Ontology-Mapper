@@ -1,0 +1,63 @@
+{% macro print_key_value_table(key_value_list) -%}
+    <table>
+        {% for key,value in key_value_list %}
+            <tr>
+                <td class="key">{{key}}</td>
+                <td>{{"" ~ value if value}}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{%- endmacro %}
+
+
+{% macro print_table(rows, headers=None) -%}
+    {% if rows | count %}
+        <table>
+            {% if headers %}
+                <tr>
+                    {% for header in headers %}
+                        <th>{{header}}</th>
+                    {% endfor %}
+                </tr>
+            {% endif %}
+            {% for row in rows %}
+                <tr>
+                    {{ caller(row) }}
+                </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+{%- endmacro %}
+
+
+{% macro print_dataset_table(type, ds, key_value_list) -%}
+    {% set file_props = ds.node.fileProperties %}
+    {% set list = [
+        ("Dataset type", type), 
+        ("File type", file_props.fileType | upper), 
+        ("File size", (file_props.size | filesizeformat) if file_props else None),
+    ] %}
+    {% do list.extend(key_value_list) %}
+    {{ print_key_value_table(list) }}
+{%- endmacro %}
+
+
+{% macro print_images(image_list, num_per_row) -%}
+    {% for row_images in image_list | batch(num_per_row) %}
+        <div>
+            {% for image in row_images %}
+                <img class="batch{{num_per_row}}" src="{{image}}">
+            {% endfor %}
+        </div>
+    {% endfor %}
+{%- endmacro %}
+
+
+{% macro format_datetime(ts) -%}
+    {{ ts.strftime("%d.%m.%Y %H:%M") }}
+{%- endmacro %}
+
+
+{% macro join(elements) -%}
+    {{ elements | select('!=', None) | join(", ") }}
+{%- endmacro %}

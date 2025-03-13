@@ -1,0 +1,165 @@
+{%- import "utils.html.jinja" as utils -%}
+
+{% macro print_basics(ds) -%}
+    {{
+        utils.print_dataset_table("Structured", ds, [
+            ("Data types", "numeric ({}), string ({}), date ({})".format(ds.details.numericColumnCount, ds.details.stringColumnCount, ds.details.datetimeColumnCount)), 
+            ("Number of columns", ds.details.rowCount), 
+            ("Number of rows", ds.details.columnCount), 
+        ])
+    }}
+{% endmacro %}
+
+
+{% macro print_attributes(ds) -%}
+    {% set cols = ds.details.all_columns | list %}
+    {% if cols %}
+        <h3>Attribute list</h3>
+
+        {% set headers = (
+                "attribute",
+                "type",
+                "specification",
+                "no. missing",
+                "no. inconsistent",
+                "no. interpretable",
+                "no. unique",
+        ) %}
+        {% call(col) utils.print_table(cols, headers) %}
+            <td>{{col.name}}</td>
+            <td>{{ 
+                'numeric' if col is type_NumericColumn 
+                else 'date/time' if col is type_DateTimeColumn 
+                else 'string' if col is type_StringColumn 
+            }}</td>
+            <td>{{ 
+                col.dataType if col is type_NumericColumn 
+                else col.format if col is type_DateTimeColumn 
+                else 'string' if col is type_StringColumn 
+            }}</td>
+            <td>{{col.nullCount}}</td>
+            <td>{{col.inconsistentCount}}</td>
+            <td>{{col.interpretableCount}}</td>
+            <td>{{col.numberUnique}}</td>
+        {% endcall %}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_numeric_value_distribution(ds) -%}
+    {% set cols = ds.details.numericColumns %}
+    {% set graphs = cols | map(attribute="distributionGraph") | select("!=", None) | list %}
+    {% if cols %}
+        <h3>Numeric value distribution</h3>
+
+        {% set headers = ("attribute", "distribution") %}
+        {% call(col) utils.print_table(cols, headers) %}
+            <td>{{col.name}}</td>
+            <td>{{col.distribution}}</td>
+        {% endcall %}
+
+        {{ utils.print_images(graphs, 3) }}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_string_value_distribution(ds) -%}
+    {% set cols = ds.details.stringColumns %}
+    {% set graphs = cols | map(attribute="distributionGraph") | select("!=", None) | list %}
+    {% if graphs %}
+        <h3>String value distribution</h3>
+
+        {{ utils.print_images(graphs, 3) }}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_datetime_value_distribution(ds) -%}
+    {% set cols = ds.details.datetimeColumns %}
+    {% if cols %}
+        <h3>Date/time value distribution</h3>
+
+        {% set headers = ("attribute", "periodicity") %}
+        {% call(col) utils.print_table(cols, headers) %}
+            <td>{{col.name}}</td>
+            <td>{{col.periodicity}}</td>
+        {% endcall %}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_numeric_correlations(ds) -%}
+    {% if ds.details.correlationGraph != None %}
+        <h3>Numeric correlation analysis</h3>
+
+        {# This is only one graph but it uses 50% width! #}
+        {% set graphs = [ds.details.correlationGraph] %}
+        {{ utils.print_images(graphs, 2) }}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_numeric_anomalies(ds) -%}
+    {% set cols = ds.details.numericColumns %}
+    {% set graphs = cols | map(attribute="boxPlot") | list %}
+    {% if cols %}
+        <h3>Numeric anomaly analysis</h3>
+
+        {% set headers = (
+            "attribute",
+            "upper quantile",
+            "lower quantile",
+            "no. outlier percentile",
+            "upper z-score",
+            "lower z-score",
+            "no. outlier z-score",
+            "upper iqr",
+            "lower iqr",
+            "iqr",
+            "no. outlier iqr",
+        ) %}
+        {% call(col) utils.print_table(cols, headers) %}
+            <td>{{col.name}}</td>
+            <td>{{col.upperQuantile | round(2)}}</td>
+            <td>{{col.lowerQuantile | round(2)}}</td>
+            <td>{{col.percentileOutlierCount}}</td>
+            <td>{{col.upperZScore | round(2)}}</td>
+            <td>{{col.lowerZScore | round(2)}}</td>
+            <td>{{col.zScoreOutlierCount}}</td>
+            <td>{{col.upperIQR | round(2)}}</td>
+            <td>{{col.lowerIQR | round(2)}}</td>
+            <td>{{col.iqr | round(2)}}</td>
+            <td>{{col.iqrOutlierCount}}</td>
+        {% endcall %}
+
+        {{ utils.print_images(graphs, 5) }}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print_seasonality(ds) -%}
+    {% set cols = ds.details.numericColumns %}
+    {% set graphs = [] %}
+    {% for col in cols %}
+        {% do graphs.extend(col.trends | map(attribute="file")) %}
+        {% do graphs.extend(col.seasonalities | map(attribute="file")) %}
+    {% endfor %}
+
+    {% if graphs %}
+        <h3>Data seasonality</h3>
+        
+        {{ utils.print_images(graphs, 1) }}
+    {% endif %}
+{% endmacro %}
+
+
+{% macro print(ds) -%}
+    {{ print_basics(ds) }}
+    {{ print_attributes(ds) }}
+    {{ print_numeric_value_distribution(ds) }}
+    {{ print_string_value_distribution(ds) }}
+    {{ print_datetime_value_distribution(ds) }}
+    {{ print_numeric_correlations(ds) }}
+    {{ print_numeric_anomalies(ds) }}
+    {{ print_seasonality(ds) }}
+{%- endmacro %}

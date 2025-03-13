@@ -1,0 +1,11 @@
+{%- import "utils.html.jinja" as utils -%}
+
+{% macro print(ds) -%}
+    {{
+        utils.print_dataset_table("Unstructured text", ds, [
+            ("Languages", utils.join(ds.details.languages)),
+            ("Line count", ds.details.lineCount),
+            ("Word count", ds.details.wordCount),
+        ])
+    }}
+{% endmacro %}

@@ -29,6 +29,7 @@ from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size
 from edps.filewriter import write_edp
 from edps.importers import get_importable_types
+from edps.report import PdfReportGenerator, ReportInput
 from edps.taskcontext import TaskContext
 from edps.types import AugmentedColumn, ComputedEdpData, DataSet
 
@@ -47,7 +48,9 @@ class Service:
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
     async def analyse_asset(self, ctx: TaskContext) -> FileReference:
-        """Let the service analyse the assets in ctx.input_path
+        """
+        Let the service analyse the assets in ctx.input_path.
+        The result (EDP JSON, plots and report) is written to ctx.output_path.
 
         Parameters
         ----------
@@ -60,14 +63,16 @@ class Service:
         Returns
         -------
         FileReference
-            File path or URL to the generated edp.service.
+            File path to the generated EDP JSON (relative to ctx.output_path).
         """
         computed_data = await self._compute_asset(ctx)
         user_data = ctx.config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         main_ref = user_data.assetRefs[0]
         json_name = main_ref.assetId + ("_" + main_ref.assetVersion if main_ref.assetVersion else "")
-        return await write_edp(ctx, PurePosixPath(json_name), edp)
+        json_path = await write_edp(ctx, PurePosixPath(json_name), edp)
+        await self._generate_report(ctx, edp)
+        return json_path
 
     async def _compute_asset(self, ctx: TaskContext) -> ComputedEdpData:
         input_files = [path for path in ctx.input_path.iterdir() if path.is_file()]
@@ -193,6 +198,11 @@ class Service:
                 dataframe["differentAbundancies"] = [item.differentAbundancies for item in row.temporalConsistencies]
                 dataframe["numberOfGaps"] = [item.numberOfGaps for item in row.temporalConsistencies]
                 yield dataframe
+
+    async def _generate_report(self, ctx: TaskContext, edp: ExtendedDatasetProfile):
+        input = ReportInput(edp=edp)
+        with (ctx.output_path / "report.pdf").open("wb") as file_io:
+            await PdfReportGenerator().generate(input, ctx.output_path, file_io)
 
 
 def _as_dict(model: BaseModel):

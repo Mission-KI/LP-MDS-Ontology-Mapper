@@ -1,0 +1,10 @@
+{%- import "utils.html.jinja" as utils -%}
+
+{% macro print(ds) -%}
+    {{
+        utils.print_dataset_table("Archive", ds, [
+            ("Extracted size", ds.details.extractedSize | filesizeformat), 
+            ("Algorithm", ds.details.algorithm), 
+        ])
+    }}
+{% endmacro %}
