@@ -63,7 +63,8 @@ class Service:
         computed_data = await self._compute_asset(ctx)
         user_data = ctx.config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
-        json_name = user_data.assetId + ("_" + user_data.version if user_data.version else "")
+        main_ref = user_data.assetRefs[0]
+        json_name = main_ref.assetId + ("_" + main_ref.assetVersion if main_ref.assetVersion else "")
         return await write_edp(ctx, PurePosixPath(json_name), edp)
 
     async def _compute_asset(self, ctx: TaskContext) -> ComputedEdpData:

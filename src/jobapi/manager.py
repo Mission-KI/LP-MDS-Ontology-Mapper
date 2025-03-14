@@ -99,7 +99,8 @@ class AnalysisJobManager:
                     config = Config(userProvidedEdpData=user_data)
                     ctx = TaskContextImpl(config, job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
-                    job_logger.info("Analysing asset '%s' version '%s'...", user_data.assetId, user_data.version)
+                    main_ref = user_data.assetRefs[0]
+                    job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
                     await self._service.analyse_asset(ctx)
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
                     job_logger.info("EDP created successfully")

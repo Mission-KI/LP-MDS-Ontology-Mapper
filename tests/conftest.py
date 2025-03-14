@@ -6,10 +6,12 @@ from pathlib import Path
 
 from easyocr import easyocr
 from extended_dataset_profile.models.v0.edp import (
+    AssetReference,
     DataSpace,
     License,
     Publisher,
 )
+from pydantic import HttpUrl
 from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
@@ -218,16 +220,20 @@ def path_language_deu_eng_wiki_llm_txt():
 @fixture(scope="session")
 def user_provided_data():
     return UserProvidedEdpData(
-        assetId="my-dataset-id",
+        assetRefs=[
+            AssetReference(
+                assetId="my-dataset-id",
+                dataSpace=DataSpace(name="TestDataSpace", url="https://beebucket.ai/en/"),
+                assetUrl=HttpUrl("https://beebucket.ai/en/"),
+                assetVersion="2.3.1",
+                publisher=Publisher(name="beebucket"),
+                publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
+                license=License(url="https://opensource.org/license/mit"),
+            )
+        ],
         name="dataset-dummy-name",
-        url="https://beebucket.ai/en/",
         dataCategory="TestDataCategory",
-        dataSpace=DataSpace(name="TestDataSpace", url="https://beebucket.ai/en/"),
-        publisher=Publisher(name="beebucket"),
-        license=License(url="https://opensource.org/license/mit"),
         description="Our very first test edp",
-        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
-        version="2.3.1",
         tags=["test", "csv"],
         freely_available=True,
     )

@@ -4,7 +4,7 @@ from logging import Logger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from extended_dataset_profile.models.v0.edp import DataSpace, License, Publisher
+from extended_dataset_profile.models.v0.edp import AssetReference, DataSpace, License, Publisher
 from pydantic import HttpUrl, ValidationError
 
 from edps import Service
@@ -29,20 +29,24 @@ def to_user_provided_edp_data(ddo: DDO) -> UserProvidedEdpData:
         license = License(name=ddo.metadata.license)
 
     return UserProvidedEdpData(
-        assetId=ddo.id,
+        assetRefs=[
+            AssetReference(
+                assetId=ddo.id,
+                dataSpace=DataSpace(
+                    name=PONTUSX_DS_NAME,
+                    url=PONTUSX_DS_URL,
+                ),
+                assetUrl=HttpUrl(f"{PONTUSX_ASSET_BASE_URL}/{ddo.id}"),
+                publisher=Publisher(
+                    name=ddo.metadata.author,
+                ),
+                publishDate=publishDate,
+                license=license,
+            )
+        ],
         name=ddo.metadata.name,
         description=ddo.metadata.description,
         tags=ddo.metadata.tags,
-        url=f"{PONTUSX_ASSET_BASE_URL}/{ddo.id}",
-        dataSpace=DataSpace(
-            name=PONTUSX_DS_NAME,
-            url=PONTUSX_DS_URL,
-        ),
-        publisher=Publisher(
-            name=ddo.metadata.author,
-        ),
-        publishDate=publishDate,
-        license=license,
         freely_available=False,
     )
 
@@ -80,5 +84,6 @@ async def run_service(logger: Logger, args: Args):
         await Service().analyse_asset(ctx)
 
         logger.info("Zipping EDP..")
-        target_archive = args.output_dir / f"{sanitize_file_part(user_edp_data.assetId)}.zip"
+        main_ref = user_edp_data.assetRefs[0]
+        target_archive = args.output_dir / f"{sanitize_file_part(main_ref.assetId)}.zip"
         await ZipAlgorithm().compress(ctx.output_path, target_archive)

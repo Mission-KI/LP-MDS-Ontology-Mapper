@@ -6,6 +6,7 @@ from extended_dataset_profile import SchemaVersion
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
     AssetProcessingStatus,
+    AssetReference,
     Augmentation,
     DataSetFrequency,
     DataSetImmutability,
@@ -13,19 +14,16 @@ from extended_dataset_profile.models.v0.edp import (
     DatasetTreeNode,
     DataSetType,
     DataSetVolume,
-    DataSpace,
     DocumentDataSet,
     ExtendedDatasetProfile,
     ImageDataSet,
-    License,
-    Publisher,
     SemiStructuredDataSet,
     StructuredDataSet,
     TemporalCover,
     UnstructuredTextDataSet,
     VideoDataSet,
 )
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AnyUrl, BaseModel, Field, model_validator
 
 
 def _get_edp_field(name: str) -> Any:
@@ -40,19 +38,13 @@ class UserProvidedEdpData(BaseModel):
     This is a subset of the extended dataset profile.
     """
 
-    assetId: str = _get_edp_field("assetId")
     name: str = _get_edp_field("name")
-    url: str = _get_edp_field("url")
+    assetRefs: List[AssetReference] = _get_edp_field("assetRefs")
     dataCategory: str | None = _get_edp_field("dataCategory")
-    dataSpace: DataSpace = _get_edp_field("dataSpace")
-    publisher: Publisher = _get_edp_field("publisher")
-    publishDate: datetime = _get_edp_field("publishDate")
-    license: License = _get_edp_field("license")
     assetProcessingStatus: AssetProcessingStatus | None = _get_edp_field("assetProcessingStatus")
     description: str | None = _get_edp_field("description")
     tags: List[str] = _get_edp_field("tags")
     dataSubCategory: str | None = _get_edp_field("dataSubCategory")
-    version: str | None = _get_edp_field("version")
     transferTypeFlag: DataSetTransfer | None = _get_edp_field("transferTypeFlag")
     immutabilityFlag: DataSetImmutability | None = _get_edp_field("immutabilityFlag")
     growthFlag: DataSetVolume | None = _get_edp_field("growthFlag")
@@ -133,7 +125,7 @@ class Config(BaseModel):
 
 
 def recursively_escape_strings(data: Any) -> Any:
-    if data is None or isinstance(data, (bool, datetime)):
+    if data is None or isinstance(data, (bool, datetime, AnyUrl)):
         return data
     elif isinstance(data, str):
         return html.escape(data)

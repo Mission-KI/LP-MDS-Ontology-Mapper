@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from extended_dataset_profile.models.v0.edp import DataSpace, ExtendedDatasetProfile, License, Publisher
-from pydantic import BaseModel
+from extended_dataset_profile.models.v0.edp import AssetReference, DataSpace, ExtendedDatasetProfile, License, Publisher
+from pydantic import BaseModel, HttpUrl
 
 from edps.types import ComputedEdpData, UserProvidedEdpData
 
@@ -25,23 +25,28 @@ def test_user_provided_and_computed_combines_to_edp():
 
 def test_recursively_escape_strings():
     user_provided_data = UserProvidedEdpData(
-        assetId="my-dataset-id",
+        assetRefs=[
+            AssetReference(
+                assetId="my-dataset-id",
+                dataSpace=DataSpace(name="Hello <script>alert('XSS');</script>", url="https://beebucket.ai/en/"),
+                assetUrl=HttpUrl("https://beebucket.ai/en/"),
+                assetVersion="2.3.1",
+                publisher=Publisher(name="beebucket"),
+                publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
+                license=License(url="https://opensource.org/license/mit"),
+            )
+        ],
         name="Hello <script>alert('XSS');</script>",
-        url="https://beebucket.ai/en/",
         dataCategory="TestDataCategory",
-        dataSpace=DataSpace(name="Hello <script>alert('XSS');</script>", url="https://beebucket.ai/en/"),
-        publisher=Publisher(name="beebucket"),
-        license=License(url="https://opensource.org/license/mit"),
         description="Our very first test edp",
-        publishDate=datetime(year=1995, month=10, day=10, hour=10, tzinfo=timezone.utc),
-        version="2.3.1",
         tags=["test", "Hello <script>alert('XSS');</script>"],
         freely_available=True,
     )
     expected_escaped = "Hello &lt;script&gt;alert(&#x27;XSS&#x27;);&lt;/script&gt;"
 
     assert user_provided_data.name == expected_escaped
-    assert user_provided_data.dataSpace.name == expected_escaped
+    assert user_provided_data.assetRefs is not None
+    assert user_provided_data.assetRefs[0].dataSpace.name == expected_escaped
     assert user_provided_data.tags[1] == expected_escaped
 
 

@@ -30,8 +30,10 @@ class DbJob(SQLModel, Job, table=True):
         self.f_job_base_dir = str(PurePosixPath(job_base_dir))
         self.f_state = JobState.WAITING_FOR_DATA
         self.f_state_detail: Optional[str] = None
-        self.f_asset_id = user_data.assetId
-        self.f_asset_version = user_data.version
+
+        main_ref = user_data.assetRefs[0]
+        self.f_asset_id = main_ref.assetId
+        self.f_asset_version = main_ref.assetVersion
         with self.user_data_file.open("w") as file:
             file.write(user_data.model_dump_json())
 

@@ -16,8 +16,10 @@ class InMemoryJob(Job):
         self._job_base_dir = job_base_dir
         self._state = JobState.WAITING_FOR_DATA
         self._state_detail: Optional[str] = None
-        self._asset_id = user_data.assetId
-        self._asset_version = user_data.version
+
+        main_ref = user_data.assetRefs[0]
+        self._asset_id = main_ref.assetId
+        self._asset_version = main_ref.assetVersion
         self._started: Optional[datetime]
         self._finished: Optional[datetime]
 

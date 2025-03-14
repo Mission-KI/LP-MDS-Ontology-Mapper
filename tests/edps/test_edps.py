@@ -131,7 +131,7 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
 async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, ctx, config_data):
     edp_file = await analyse_asset_fn(path_data_test_csv)
     edp = read_edp_file(ctx.output_path / edp_file)
-    assert edp.assetId == config_data.userProvidedEdpData.assetId
+    assert edp.assetRefs[0].assetId == config_data.userProvidedEdpData.assetRefs[0].assetId
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
 

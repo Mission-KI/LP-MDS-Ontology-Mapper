@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Tuple
 
 from extended_dataset_profile.models.v0.edp import (
+    CorrelationSummary,
     DateTimeColumn,
     FileReference,
     NumericColumn,
@@ -170,6 +171,7 @@ class PandasAnalyzer:
             datetimeColumns=transformed_datetime_columns,
             stringColumns=transformed_string_columns,
             correlationGraph=correlation_graph,
+            correlationSummary=CorrelationSummary(),
         )
 
     async def _compute_common_fields(self, columns: DataFrame) -> DataFrame:
