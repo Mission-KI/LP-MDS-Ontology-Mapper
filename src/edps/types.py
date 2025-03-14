@@ -45,6 +45,7 @@ class UserProvidedEdpData(BaseModel):
     description: str | None = _get_edp_field("description")
     tags: List[str] = _get_edp_field("tags")
     dataSubCategory: str | None = _get_edp_field("dataSubCategory")
+    assetTypeInfo: str | None = _get_edp_field("assetTypeInfo")
     transferTypeFlag: DataSetTransfer | None = _get_edp_field("transferTypeFlag")
     immutabilityFlag: DataSetImmutability | None = _get_edp_field("immutabilityFlag")
     growthFlag: DataSetVolume | None = _get_edp_field("growthFlag")
