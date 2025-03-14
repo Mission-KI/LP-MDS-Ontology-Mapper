@@ -65,6 +65,7 @@ class ComputedEdpData(BaseModel):
 
     generatedBy: str = _get_edp_field("generatedBy")
     dataTypes: Set[DataSetType] = _get_edp_field("dataTypes")
+    assetSha256Hash: str = _get_edp_field("assetSha256Hash")
     archiveDatasets: List[ArchiveDataSet] = _get_edp_field("archiveDatasets")
     structuredDatasets: List[StructuredDataSet] = _get_edp_field("structuredDatasets")
     semiStructuredDatasets: List[SemiStructuredDataSet] = _get_edp_field("semiStructuredDatasets")
