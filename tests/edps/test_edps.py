@@ -103,6 +103,7 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_csv)
 
     assert edp.generatedBy == f"EDP Service @ {__version__}"
+    assert edp.assetSha256Hash == "fe5a587bb2b8add0773a3722c32a47d95e077296dded1d145cf7c596dae5f1fd"
 
     assert len(edp.datasetTree) == 1
     ds_root_node = edp.datasetTree[0]

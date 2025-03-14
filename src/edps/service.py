@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path, PurePosixPath
@@ -84,7 +85,9 @@ class Service:
 
     def _create_computed_edp_data(self, ctx: TaskContext, path: Path) -> ComputedEdpData:
         generated_by = f"EDP Service @ {edps.__version__}"
-        edp = ComputedEdpData(volume=calculate_size(path), generatedBy=generated_by)
+        edp = ComputedEdpData(
+            volume=calculate_size(path), generatedBy=generated_by, assetSha256Hash=compute_sha256(path)
+        )
         augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
         self._insert_datasets_into_edp(ctx, edp, augmenter, None)
         augmenter.warn_unapplied_augmentations()
@@ -249,3 +252,11 @@ class _Augmenter:
 
 def _make_json_reference(text: str) -> JsonReference:
     return JsonReference(reference=text)
+
+
+def compute_sha256(file_path: Path) -> str:
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as file:
+        while chunk := file.read(8192):
+            sha256.update(chunk)
+    return sha256.hexdigest()
