@@ -99,6 +99,15 @@ async def test_analyse_pickle(path_data_test_pickle, context_with_augmented_conf
 @mark.asyncio
 async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_csv)
+
+    assert len(edp.datasetTree) == 1
+    ds_root_node = edp.datasetTree[0]
+    assert ds_root_node.parent is None
+    assert ds_root_node.name == "test_csv"
+    assert ds_root_node.fileProperties.name == "test.csv"
+    assert ds_root_node.fileProperties.fileType == "csv"
+    assert ds_root_node.fileProperties.size == 4307
+
     assert len(edp.archiveDatasets) == 0
     assert len(edp.structuredDatasets) == 1
     structured_dataset = edp.structuredDatasets[0]
@@ -214,6 +223,13 @@ async def test_analyse_zip(path_data_test_zip, compute_asset_fn):
 @mark.asyncio
 async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_multiassets_zip)
+
+    assert len(edp.datasetTree) == 6
+    ds_root_node = edp.datasetTree[0]
+    assert ds_root_node.parent is None
+    assert ds_root_node.name == "test_multiassets_zip"
+    assert ds_root_node.fileProperties.name == "test_multiassets.zip"
+    assert ds_root_node.fileProperties.fileType == "zip"
 
     assert len(edp.archiveDatasets) == 2
     for archive in edp.archiveDatasets:

@@ -165,8 +165,8 @@ class TaskContextImpl(TaskContext):
         if path.is_dir():
             raise RuntimeError("Can not run the import_file_with_results() on directories. Use import_file instead!")
 
-        file_properties = FileProperties(name=path.name, size=path.stat().st_size)
         file_type = determine_file_type(path)
+        file_properties = FileProperties(name=path.name, fileType=file_type, size=path.stat().st_size)
         importer = lookup_importer(file_type)
         if importer is None:
             message = lookup_unsupported_type_message(file_type)
