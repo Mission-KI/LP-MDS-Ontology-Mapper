@@ -26,6 +26,7 @@ from edps.types import (
     ComputedEdpData,
     Config,
 )
+from edps.version import __version__
 from tests.conftest import copy_asset_to_ctx_input_dir
 
 ENCODING = "utf-8"
@@ -99,6 +100,8 @@ async def test_analyse_pickle(path_data_test_pickle, context_with_augmented_conf
 @mark.asyncio
 async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     edp = await compute_asset_fn(path_data_test_csv)
+
+    assert edp.generatedBy == f"EDP Service @ {__version__}"
 
     assert len(edp.datasetTree) == 1
     ds_root_node = edp.datasetTree[0]

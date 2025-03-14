@@ -22,6 +22,7 @@ from extended_dataset_profile.models.v0.edp import (
 from pandas import DataFrame
 from pydantic import BaseModel
 
+import edps
 from edps.analyzers.pandas import determine_periodicity
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size
@@ -82,7 +83,8 @@ class Service:
         return computed_edp_data
 
     def _create_computed_edp_data(self, ctx: TaskContext, path: Path) -> ComputedEdpData:
-        edp = ComputedEdpData(volume=calculate_size(path))
+        generated_by = f"EDP Service @ {edps.__version__}"
+        edp = ComputedEdpData(volume=calculate_size(path), generatedBy=generated_by)
         augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
         self._insert_datasets_into_edp(ctx, edp, augmenter, None)
         augmenter.warn_unapplied_augmentations()

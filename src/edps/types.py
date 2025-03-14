@@ -63,6 +63,7 @@ class UserProvidedEdpData(BaseModel):
 class ComputedEdpData(BaseModel):
     """All fields of the extended dataset profile that get calculated by this service."""
 
+    generatedBy: str = _get_edp_field("generatedBy")
     dataTypes: Set[DataSetType] = _get_edp_field("dataTypes")
     archiveDatasets: List[ArchiveDataSet] = _get_edp_field("archiveDatasets")
     structuredDatasets: List[StructuredDataSet] = _get_edp_field("structuredDatasets")
