@@ -21,6 +21,7 @@ from numpy import linspace, ones_like, triu
 from pandas import (
     DataFrame,
     Index,
+    RangeIndex,
     Series,
     concat,
 )
@@ -300,7 +301,7 @@ class PandasAnalyzer:
                 _Distributions.SingleValue.value,
                 _Distributions.TooSmallDataset.value,
             ]
-            and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_unique
+            and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_unique_numeric
         ):
             column_result.distributionGraph = await _plot_distribution(
                 ctx,
@@ -314,7 +315,7 @@ class PandasAnalyzer:
                 "Too few unique values for distribution analysis on column %s. Have %d unique, need at least %d.",
                 column.name,
                 column_result.numberUnique,
-                ctx.config.structured_config.distribution.minimum_number_unique,
+                ctx.config.structured_config.distribution.minimum_number_unique_numeric,
             )
 
         for datetime_column_name, seasonality in seasonality_results.items():
@@ -367,6 +368,7 @@ class PandasAnalyzer:
             nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
             numberUnique=computed_fields[_COMMON_UNIQUE],
+            distributionGraph=await _get_string_distribution_graph(ctx, column),
         )
 
 
@@ -421,7 +423,7 @@ async def _get_distribution(
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_NON_NULL] < config.minimum_number_unique:
+    if fields[_COMMON_NON_NULL] < config.minimum_number_unique_numeric:
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(ctx, column, fields, workers)
@@ -540,3 +542,28 @@ async def _get_correlation_summary(ctx: TaskContext, correlation: Optional[DataF
 
     ctx.logger.debug("Finished computing correlation summary")
     return summary
+
+
+async def _get_string_distribution_graph(ctx: TaskContext, column: Series) -> Optional[FileReference]:
+    config = ctx.config.structured_config.distribution
+    number_unique = column.nunique()
+    if number_unique < config.minimum_number_unique_string:
+        ctx.logger.debug(
+            'Skipping string distribution of column "%s", having only %d out of %d required unique values',
+            column.name,
+            number_unique,
+            config.minimum_number_unique_string,
+        )
+        return None
+
+    uniques = column.value_counts()
+    uniques.sort_values(ascending=False)
+    if len(uniques.index) > 20:
+        uniques = uniques[:20]
+
+    # Anonymize index
+    uniques.index = RangeIndex(start=0, stop=len(uniques.index))
+    plot_name = ctx.build_output_reference(f"{column.name}_distribution")
+    async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
+        uniques.plot(ax=axes, kind="bar")
+    return reference

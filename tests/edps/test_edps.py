@@ -116,7 +116,9 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     structured_dataset = edp.structuredDatasets[0]
     assert structured_dataset.columnCount == 5
     assert structured_dataset.rowCount == 50
-    assert structured_dataset.stringColumns[0].name == "uuid"
+    string_column = structured_dataset.stringColumns[0]
+    assert string_column.name == "uuid"
+    assert string_column.distributionGraph is not None
     assert structured_dataset.datetimeColumns[0].name == "einfahrt"
     assert structured_dataset.datetimeColumns[0].format == "ISO8601"
     assert structured_dataset.datetimeColumns[1].name == "ausfahrt"

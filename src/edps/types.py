@@ -91,8 +91,11 @@ class AugmentedColumn(BaseModel):
 class DistributionConfig(BaseModel):
     """Configuration parameters specific to the distribution analysis."""
 
-    minimum_number_unique: int = Field(
-        default=16, description="Minimum number of unique values to run distribution analysis"
+    minimum_number_unique_numeric: int = Field(
+        default=16, description="Minimum number of unique values to run numeric distribution analysis"
+    )
+    minimum_number_unique_string: int = Field(
+        default=4, description="Minimum number of unique values to run string distribution analysis"
     )
 
 
