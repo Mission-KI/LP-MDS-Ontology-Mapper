@@ -34,6 +34,7 @@ from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalCon
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
 from edps.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
+    Result,
     parse_types,
 )
 from edps.filewriter import get_pyplot_writer
@@ -41,8 +42,9 @@ from edps.taskcontext import TaskContext
 
 # Labels for fields
 
-_COMMON_NON_NULL = "non-null-count"
 _COMMON_NULL = "null-count"
+_COMMON_INCONSISTENT = "inconsistent-count"
+_COMMON_INTERPRETABLE = "interpretable-count"
 _COMMON_UNIQUE = "unique-count"
 
 _NUMERIC_MIN = "minimum"
@@ -105,7 +107,7 @@ class PandasAnalyzer:
         type_parser_results = parse_types(ctx, self._data)
 
         all_cols = type_parser_results.all_cols
-        common_fields = await self._compute_common_fields(all_cols.data)
+        common_fields = await self._compute_common_fields(all_cols.data, type_parser_results)
 
         datetime_cols = type_parser_results.datetime_cols
         datetime_common_fields = common_fields.loc[Index(datetime_cols.ids)]
@@ -179,10 +181,20 @@ class PandasAnalyzer:
             correlationSummary=correlation_summary,
         )
 
-    async def _compute_common_fields(self, columns: DataFrame) -> DataFrame:
+    async def _compute_common_fields(self, columns: DataFrame, type_parser_results: Result) -> DataFrame:
         common_fields = DataFrame(index=columns.columns)
-        common_fields[_COMMON_NON_NULL] = columns.count()
-        common_fields[_COMMON_NULL] = columns.isna().sum()
+        common_fields[_COMMON_NULL] = Series(
+            {name: info.number_nan_before_conversion for name, info, _ in type_parser_results.all_cols},
+            name=_COMMON_NULL,
+        )
+        common_fields[_COMMON_INCONSISTENT] = Series(
+            {name: info.number_inconsistent for name, info, _ in type_parser_results.all_cols},
+            name=_COMMON_INCONSISTENT,
+        )
+        common_fields[_COMMON_INTERPRETABLE] = Series(
+            {name: info.number_interpretable for name, info, _ in type_parser_results.all_cols},
+            name=_COMMON_INTERPRETABLE,
+        )
         common_fields[_COMMON_UNIQUE] = columns.nunique(dropna=True)
         return common_fields
 
@@ -221,7 +233,7 @@ class PandasAnalyzer:
         # Relative outliers
         fields[_NUMERIC_RELATIVE_OUTLIERS] = (
             fields[[_NUMERIC_PERCENTILE_OUTLIERS, _NUMERIC_Z_OUTLIERS, _NUMERIC_IQR_OUTLIERS]].mean(axis=1, skipna=True)
-            / common_fields[_COMMON_NON_NULL]
+            / common_fields[_COMMON_INTERPRETABLE]
         )
         # Distribution
         fields[_NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_IQR]
@@ -268,8 +280,9 @@ class PandasAnalyzer:
 
         column_result = NumericColumn(
             name=str(column.name),
-            nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
+            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
             numberUnique=computed_fields[_COMMON_UNIQUE],
             min=computed_fields[_NUMERIC_MIN],
             max=computed_fields[_NUMERIC_MAX],
@@ -344,8 +357,9 @@ class PandasAnalyzer:
 
         return DateTimeColumn(
             name=str(column.name),
-            nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
+            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
             numberUnique=computed_fields[_COMMON_UNIQUE],
             temporalCover=TemporalCover(
                 earliest=computed_fields[_DATETIME_EARLIEST],
@@ -356,7 +370,7 @@ class PandasAnalyzer:
             monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
             periodicity=temporal_consistency.main_period.name if temporal_consistency else None,
-            format=info.get_format(),
+            format=info.format,
         )
 
     async def _transform_string_results(
@@ -365,8 +379,9 @@ class PandasAnalyzer:
         ctx.logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
             name=str(column.name),
-            nonNullCount=computed_fields[_COMMON_NON_NULL],
             nullCount=computed_fields[_COMMON_NULL],
+            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
             numberUnique=computed_fields[_COMMON_UNIQUE],
             distributionGraph=await _get_string_distribution_graph(ctx, column),
         )
@@ -423,7 +438,7 @@ async def _get_distribution(
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_NON_NULL] < config.minimum_number_unique_numeric:
+    if fields[_COMMON_INTERPRETABLE] < config.minimum_number_unique_numeric:
         return _Distributions.TooSmallDataset.value, dict()
 
     return await _find_best_distribution(ctx, column, fields, workers)

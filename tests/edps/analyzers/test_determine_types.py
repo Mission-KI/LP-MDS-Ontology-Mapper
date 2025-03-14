@@ -8,11 +8,10 @@ from pytest import fixture, mark
 
 from edps.analyzers.pandas.type_parser import (
     DatetimeColumnInfo,
-    DatetimeIsoColumnInfo,
     DatetimeKind,
-    DatetimePatternColumnInfo,
     NumericColumnInfo,
     StringColumnInfo,
+    _StringColumnConverter,
     parse_types,
 )
 from edps.taskcontext import TaskContext
@@ -28,8 +27,8 @@ def test_determine_datetime_iso_Ymd_HMS(ctx):
             "2045-06-30 13:29:53",
         ],
     )
-    assert info.get_format() == "ISO8601"
-    assert info.get_kind() == DatetimeKind.UNKNOWN  # for ISO we can't determine if it's a DATE or DATETIME
+    assert info.format == "ISO8601"
+    assert info.kind == DatetimeKind.UNKNOWN  # for ISO we can't determine if it's a DATE or DATETIME
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -46,7 +45,7 @@ def test_determine_datetime_iso_Ymd_HMSm(ctx):
             "2045-06-30 13:29:53.000",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, microsecond=123000)
@@ -63,7 +62,7 @@ def test_determine_datetime_iso_Ymd_HM(ctx):
             "2045-06-30 13:29",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
@@ -80,7 +79,7 @@ def test_determine_datetime_iso_Ymd(ctx):
             "2045-06-30",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -97,7 +96,7 @@ def test_determine_datetime_iso_Ymd_short(ctx):
             "20450630",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -114,7 +113,7 @@ def test_determine_datetime_iso_YmdTHMS(ctx):
             "20450630T13:29:53",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -133,7 +132,7 @@ def test_determine_datetime_iso_YmdTHMS_UTC(
             "20450630T13:29:53Z",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC")
@@ -152,7 +151,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ(
             "20450630T13:29:53+0100",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(3))  # original TZ is not preserved
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -173,7 +172,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ_different(
             "20450607T03:30:00+0230",
         ],
     )
-    assert info.get_format() == "ISO8601"
+    assert info.format == "ISO8601"
     assert str(col.dtype) == "datetime64[ns, UTC]"
     assert all(col[i].tz == timezone.utc for i in range(4))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -190,7 +189,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ_partially(
         col, info = expect_datetime_column(
             ctx, ["20160301T00:03:14+0100", "20450630T13:29:53+0300", "20450607T03:30:00", "20450607T04:30:00", "2024"]
         )
-        assert info.get_format() == "ISO8601"
+        assert info.format == "ISO8601"
         assert str(col.dtype) == "datetime64[ns, UTC]"
         assert all(col[i].tz == timezone.utc for i in range(4))
         assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14, tz="UTC+0100")
@@ -210,7 +209,7 @@ def test_determine_datetime_iso_YmdTHMS_TZ_partially(
     )
     assert (
         str(records[2].message)
-        == "Couldn't convert some entries of column 'col' using DatetimeIsoColumnInfo() (1 invalid of 5 non-null entries)."
+        == "Couldn't convert some entries of column 'col' using DatetimeIsoConverter (1 invalid of 5 overall entries)."
     )
 
 
@@ -223,7 +222,7 @@ def test_determine_datetime_de_dmY_HMS(ctx):
             "30.06.2045 13:29:53",
         ],
     )
-    assert info.get_format() == "%d.%m.%Y %H:%M:%S"
+    assert info.format == "%d.%m.%Y %H:%M:%S"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -240,7 +239,7 @@ def test_determine_datetime_de_dmY_HM(ctx):
             "30.06.2045 13:29",
         ],
     )
-    assert info.get_format() == "%d.%m.%Y %H:%M"
+    assert info.format == "%d.%m.%Y %H:%M"
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3)
@@ -258,8 +257,8 @@ def test_determine_datetime_de_dmY(ctx):
                 "30.06.2045",
             ],
         )
-        assert info.get_format() == "%d.%m.%Y"
-        assert info.get_kind() == DatetimeKind.DATE
+        assert info.format == "%d.%m.%Y"
+        assert info.kind == DatetimeKind.DATE
         assert str(col.dtype) == "datetime64[ns]"
         assert all(col[i].tz is None for i in range(3))
         assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -280,8 +279,7 @@ def test_determine_datetime_de_HMS(ctx):
             ],
         )
         # A pure time column is handled as a string column
-        assert info.get_format() == "%H:%M:%S"
-        assert info.get_kind() == DatetimeKind.TIME
+        assert isinstance(info, StringColumnInfo)
         assert isinstance(col.dtype, pd.StringDtype)
         assert col[0] == "00:03:14"
     assert len(records) == 1
@@ -292,7 +290,7 @@ def test_determine_datetime_de_HMS(ctx):
 
 def test_determine_datetime_de_HM(ctx):
     with pytest.warns(UserWarning) as records:
-        col, info = expect_datetime_column(
+        col, info = parse_column(
             ctx,
             [
                 "00:03",
@@ -301,9 +299,7 @@ def test_determine_datetime_de_HM(ctx):
             ],
         )
         # A pure time column is handled as a string column
-        assert info.get_format() == "%H:%M"
-        assert info.get_kind() == DatetimeKind.TIME
-        assert isinstance(col.dtype, pd.StringDtype)
+        assert isinstance(info, StringColumnInfo)
         assert col[0] == "00:03"
     assert len(records) == 1
     assert (
@@ -320,8 +316,8 @@ def test_determine_datetime_us_dmY_HMS(ctx):
             "06/30/2045 13:29:53",
         ],
     )
-    assert info.get_format() == "%m/%d/%Y %H:%M:%S"
-    assert info.get_kind() == DatetimeKind.DATETIME
+    assert info.format == "%m/%d/%Y %H:%M:%S"
+    assert info.kind == DatetimeKind.DATETIME
     assert str(col.dtype) == "datetime64[ns]"
     assert all(col[i].tz is None for i in range(3))
     assert col[0] == Timestamp(year=2016, month=3, day=1, hour=0, minute=3, second=14)
@@ -339,8 +335,8 @@ def test_determine_datetime_us_dmY(ctx):
                 "06-30-2045",
             ],
         )
-        assert info.get_format() == "%m-%d-%Y"
-        assert info.get_kind() == DatetimeKind.DATE
+        assert info.format == "%m-%d-%Y"
+        assert info.kind == DatetimeKind.DATE
         assert str(col.dtype) == "datetime64[ns]"
         assert all(col[i].tz is None for i in range(3))
         assert col[0] == Timestamp(year=2016, month=3, day=1)
@@ -388,7 +384,7 @@ def test_determine_mixed_number_string(ctx):
     assert len(records) == 1
     assert (
         str(records[0].message)
-        == "Couldn't convert some entries of column 'col' using NumericColumnInfo() (2 invalid of 22 non-null entries)."
+        == "Couldn't convert some entries of column 'col' using NumericColumnConverter (2 invalid of 22 overall entries)."
     )
 
 
@@ -401,7 +397,7 @@ def test_determine_number_downcast(ctx):
     assert len(records) == 1
     assert (
         str(records[0].message)
-        == "Couldn't convert some entries of column 'col' using NumericColumnInfo() (3 invalid of 11 non-null entries)."
+        == "Couldn't convert some entries of column 'col' using NumericColumnConverter (3 invalid of 11 overall entries)."
     )
 
 
@@ -410,13 +406,14 @@ def test_determine_mixed_datetimes1(ctx):
         # one datetime type and some invalid values
         data = ["A"] + ["01.03.1979"] * 20 + ["Z"] + [None] * 5
         col, info = expect_datetime_column(ctx, data)
-        assert info.get_format() == "%d.%m.%Y"
+        assert info.format == "%d.%m.%Y"
         assert col.notna().sum() == 20
-    assert len(records) == 2
+    assert len(records) == 3
     assert str(records[0].message) == "Column 'col' contains pure dates without times."
+    assert str(records[1].message) == "Column 'col' contains 5 empty of 27 overall entries."
     assert (
-        str(records[1].message)
-        == "Couldn't convert some entries of column 'col' using DatetimePatternColumnInfo(format='%d.%m.%Y', kind=<DatetimeKind.DATE: 'DATE'>) (2 invalid of 22 non-null entries)."
+        str(records[2].message)
+        == "Couldn't convert some entries of column 'col' using DatetimeColumnConverter(format='%d.%m.%Y', kind=DatetimeKind.DATE) (2 invalid of 27 overall entries)."
     )
 
 
@@ -425,15 +422,16 @@ def test_determine_mixed_datetimes2(ctx):
         # clear majority for one datetime type
         data = ["A"] + ["01.03.1979 03:14", "2016-03-01 00:03:14", "01.03.1979 01:13"] * 25 + [None] * 3 + ["Z"]
         col, info = expect_datetime_column(ctx, data)
-        assert info.get_format() == "%d.%m.%Y %H:%M"
+        assert info.format == "%d.%m.%Y %H:%M"
         assert col.notna().sum() == 50
         assert col.isna().sum() == 30
         assert len(col.index) == 80
         assert (col.index == range(80)).all()
-    assert len(records) == 1
+    assert len(records) == 2
+    assert str(records[0].message) == "Column 'col' contains 3 empty of 80 overall entries."
     assert (
-        str(records[0].message)
-        == "Couldn't convert some entries of column 'col' using DatetimePatternColumnInfo(format='%d.%m.%Y %H:%M', kind=<DatetimeKind.DATETIME: 'DATETIME'>) (27 invalid of 77 non-null entries)."
+        str(records[1].message)
+        == "Couldn't convert some entries of column 'col' using DatetimeColumnConverter(format='%d.%m.%Y %H:%M', kind=DatetimeKind.DATETIME) (27 invalid of 80 overall entries)."
     )
 
 
@@ -443,6 +441,19 @@ def test_determine_mixed_datetimes3(ctx):
     col, info = parse_column(ctx, data)
     assert isinstance(info, StringColumnInfo)
     assert col.notna().sum() == 62
+
+
+def test_determine_string(ctx):
+    data = ["ABC"] * 10 + [None]
+    col, info = parse_column(ctx, data)
+    assert isinstance(info, StringColumnInfo)
+    assert col.notna().sum() == 10
+
+
+def test_string_count_valid_rows(ctx):
+    data = Series(["ABC"] * 10 + [None])
+    converter = _StringColumnConverter()
+    assert converter.count_valid_rows(ctx, data) == 10
 
 
 # 1 million rows
@@ -486,7 +497,8 @@ def datetimes_bigdata():
 def test_determine_datetime_iso_bigdata(ctx, datetimes_bigdata, benchmark):
     data = Series([i.isoformat() for i in datetimes_bigdata], dtype=str)
     col, info = benchmark.pedantic(expect_datetime_column, (ctx, data, None))
-    assert info == DatetimeIsoColumnInfo()
+    assert isinstance(info, DatetimeColumnInfo)
+    assert info.format == "ISO8601"
     assert col[0] == START_OF_EPOCH
 
 
@@ -494,7 +506,8 @@ def test_determine_datetime_iso_bigdata(ctx, datetimes_bigdata, benchmark):
 def test_determine_datetime_de_bigdata(ctx, datetimes_bigdata, benchmark):
     data = Series([i.strftime("%d.%m.%Y %H:%M") for i in datetimes_bigdata], dtype=str)
     col, info = benchmark.pedantic(expect_datetime_column, (ctx, data, None))
-    assert info == DatetimePatternColumnInfo(format="%d.%m.%Y %H:%M", kind=DatetimeKind.DATETIME)
+    assert info.format == "%d.%m.%Y %H:%M"
+    assert info.kind == DatetimeKind.DATETIME
     assert col[0] == START_OF_EPOCH
 
 
@@ -502,7 +515,8 @@ def test_determine_datetime_de_bigdata(ctx, datetimes_bigdata, benchmark):
 def test_determine_datetime_us_bigdata(ctx, datetimes_bigdata, benchmark):
     data = Series([i.strftime("%m/%d/%Y %H:%M:%S") for i in datetimes_bigdata], dtype=str)
     col, info = benchmark.pedantic(expect_datetime_column, (ctx, data, None))
-    assert info == DatetimePatternColumnInfo(format="%m/%d/%Y %H:%M:%S", kind=DatetimeKind.DATETIME)
+    assert info.format == "%m/%d/%Y %H:%M:%S"
+    assert info.kind == DatetimeKind.DATETIME
     assert col[0] == START_OF_EPOCH
 
 
@@ -511,7 +525,7 @@ def test_determine_datetime_unknown_bigdata(ctx, datetimes_bigdata, benchmark):
     data = Series([i.strftime("%Y:%m:%d %H:%M") for i in datetimes_bigdata], dtype=str)
     # col, info = parse_column(data)
     col, info = benchmark.pedantic(parse_column, (ctx, data, None))
-    assert info == StringColumnInfo()
+    assert isinstance(info, StringColumnInfo)
     assert col[0] == "1970:01:01 00:00"
 
 
@@ -570,11 +584,14 @@ def test_get_smallest_down_cast_able_type_int8(ctx, int8_string_series):
 
 def test_get_smallest_down_cast_able_type_bool(ctx, bool_series):
     # Boolean are converted to 0 (False) / 1 (True)
-    col, col_info = expect_numeric_column(ctx, bool_series, pd.UInt8Dtype)
+    with pytest.warns(UserWarning) as records:
+        col, col_info = expect_numeric_column(ctx, bool_series, pd.UInt8Dtype)
     assert col[0] == 0
     assert col[1] == 1
     assert pd.isna(col[2])
     assert pd.isna(col[3])
+    assert len(records) == 1
+    assert str(records[0].message) == "Column 'col' contains 2 empty of 4 overall entries."
 
 
 def test_get_smallest_down_cast_able_type_float32(ctx, float32_string_series):
@@ -586,7 +603,10 @@ def test_get_smallest_down_cast_able_type_float32_german(ctx, float32_german_str
 
 
 def test_get_smallest_down_cast_able_type_complex(ctx, complex_series):
-    expect_numeric_column(ctx, complex_series, numpytype.Complex128DType)
+    with pytest.warns(UserWarning) as records:
+        expect_numeric_column(ctx, complex_series, numpytype.Complex128DType)
+    assert len(records) == 1
+    assert str(records[0].message) == "Column 'col' contains 1 empty of 5 overall entries."
 
 
 def test_get_smallest_down_cast_able_type_datetime(ctx, datetime_string_series):
@@ -654,15 +674,19 @@ def test_pseudo_date_time_columns(ctx):
     assert len(records) == 1
     assert str(records[0].message) == "Column 'day' contains pure dates without times."
 
-    # A column containing times without dates triggers a warning.
+    # A column containing times without dates triggers a warning and is parsed as string.
     with pytest.warns(UserWarning) as records:
         df = DataFrame({"day": 5 * ["12:34"]})
         results = parse_types(ctx, df)
         assert len(results.all_cols.ids) == 1
-        assert len(results.datetime_cols.ids) == 1
-    assert len(records) == 1
+        assert len(results.string_cols.ids) == 1
+    assert len(records) == 2
     assert (
         str(records[0].message) == "Column 'day' contains pure times without dates. This is handled as a string column."
+    )
+    assert (
+        str(records[1].message)
+        == "The column 'day' is maybe intended as a date/time column but the content could not be parsed. Please use ISO datetime format!"
     )
 
     # A column label with one of the magic date/time words is okay if it's identified as datetime.

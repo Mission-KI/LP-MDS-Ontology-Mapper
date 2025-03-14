@@ -29,19 +29,19 @@ class PerTimeBaseSeasonalityGraphs:
 
 async def compute_seasonality(
     ctx: TaskContext,
-    datetime_columns: ColumnsWrapper[DatetimeColumnInfo],
+    datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
     datetime_column_periodicities: Series,
     numeric_columns: DataFrame,
 ) -> DataFrame:
-    datetime_count = len(datetime_columns.ids)
+    datetime_count = len(datetime_column_infos.ids)
     row_count = len(numeric_columns.index)
     ctx.logger.info("Starting seasonality analysis on %d rows over %d time bases", row_count, datetime_count)
 
-    dataframe = DataFrame(index=numeric_columns.columns, columns=datetime_columns.ids, dtype=object)
+    dataframe = DataFrame(index=numeric_columns.columns, columns=datetime_column_infos.ids, dtype=object)
 
     periodicity: DatetimeColumnTemporalConsistency
     for datetime_column_name, periodicity in datetime_column_periodicities.items():
-        datetime_kind = datetime_columns.get_info(str(datetime_column_name)).get_kind()
+        datetime_kind = datetime_column_infos.get_info(str(datetime_column_name)).kind
 
         if datetime_kind == DatetimeKind.DATE:
             message = (

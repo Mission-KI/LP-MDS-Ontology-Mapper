@@ -3,6 +3,7 @@ from math import isclose
 from pathlib import Path
 from typing import Awaitable, Callable, List
 
+import pytest
 from extended_dataset_profile.models.v0.edp import (
     DataSetType,
     ExtendedDatasetProfile,
@@ -139,6 +140,33 @@ async def test_analyse_csv(path_data_test_csv, compute_asset_fn):
     assert parkhaus.zScoreOutlierCount == 0
     assert parkhaus.iqrOutlierCount == 0
     assert isclose(parkhaus.relativeOutlierCount, 0.0)
+
+
+@mark.asyncio
+async def test_analyse_csv_counts(path_data_test_counts_csv, compute_asset_fn):
+    with pytest.warns(UserWarning) as records:
+        edp = await compute_asset_fn(path_data_test_counts_csv)
+    assert len(edp.structuredDatasets) == 1
+    dataset = edp.structuredDatasets[0]
+    assert dataset.rowCount == 7
+    assert len(dataset.stringColumns) == 1
+    assert len(dataset.datetimeColumns) == 0
+    assert len(dataset.numericColumns) == 1
+    string_column = dataset.stringColumns[0]
+    assert string_column.inconsistentCount == 0
+    assert string_column.interpretableCount == 5
+    assert string_column.nullCount == 2
+    numeric_column = dataset.numericColumns[0]
+    assert numeric_column.inconsistentCount == 1
+    assert numeric_column.interpretableCount == 5
+    assert numeric_column.nullCount == 1
+
+    assert len(records) == 2
+    assert str(records[0].message) == "Column 'col001' contains 1 empty of 7 overall entries."
+    assert (
+        str(records[1].message)
+        == "Couldn't convert some entries of column 'col001' using NumericColumnConverter (1 invalid of 7 overall entries)."
+    )
 
 
 @mark.asyncio
@@ -516,7 +544,7 @@ async def test_analyse_semi_structured_json(path_data_test_json, compute_asset_f
     assert table2_ds.stringColumnCount == 1
     assert table2_ds.datetimeColumnCount == 0
     assert table2_ds.stringColumns[0].name == "type"
-    assert table2_ds.stringColumns[0].nonNullCount == 3
+    assert table2_ds.stringColumns[0].interpretableCount == 3
     assert table2_ds.stringColumns[0].numberUnique == 2
 
     table3_ds = edp.structuredDatasets[2]
@@ -528,7 +556,7 @@ async def test_analyse_semi_structured_json(path_data_test_json, compute_asset_f
     assert table3_ds.stringColumnCount == 1
     assert table3_ds.datetimeColumnCount == 0
     assert table3_ds.stringColumns[0].name == "type"
-    assert table3_ds.stringColumns[0].nonNullCount == 4
+    assert table3_ds.stringColumns[0].interpretableCount == 4
     assert table3_ds.stringColumns[0].numberUnique == 3
 
 
@@ -577,14 +605,14 @@ async def test_analyse_json_with_normalization(path_data_test_with_normalization
         "favoriteFruit",
     }
     assert table1_ds.numericColumns[3].name == "geoLocation.latitude"
-    assert table1_ds.numericColumns[3].nonNullCount == 15
+    assert table1_ds.numericColumns[3].interpretableCount == 15
     assert table1_ds.numericColumns[3].numberUnique == 15
     assert abs(table1_ds.numericColumns[3].min - -80.34) < 0.01
     assert abs(table1_ds.numericColumns[3].max - 77.75) < 0.01
     assert abs(table1_ds.numericColumns[3].mean - -1.25) < 0.01
 
     assert table1_ds.numericColumns[4].name == "geoLocation.longitude"
-    assert table1_ds.numericColumns[4].nonNullCount == 15
+    assert table1_ds.numericColumns[4].interpretableCount == 15
     assert table1_ds.numericColumns[4].numberUnique == 15
     assert abs(table1_ds.numericColumns[4].min - -134.89) < 0.01
     assert abs(table1_ds.numericColumns[4].max - 143.67) < 0.01

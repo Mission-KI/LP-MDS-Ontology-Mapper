@@ -47,6 +47,11 @@ def path_data_test_csv():
     return TESTS_ROOT_PATH / "data/test.csv"
 
 
+@fixture(scope="session")
+def path_data_test_counts_csv():
+    return TESTS_ROOT_PATH / "data/test_counts.csv"
+
+
 @fixture
 def path_data_bast_csv():
     return TESTS_ROOT_PATH / "data/bast.csv"
