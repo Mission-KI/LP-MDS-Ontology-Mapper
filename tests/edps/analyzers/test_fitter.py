@@ -14,7 +14,7 @@ async def test_detect_norm(ctx):
     noisy_data = data * (1 + noise)
     series = Series(noisy_data)
 
-    fitter = Fitter(series)
+    fitter = Fitter(series, ctx)
     name, params = await fitter.get_best(ctx)
     assert name == "norm"
     assert list(params.keys()) == ["loc", "scale"]
@@ -31,7 +31,7 @@ async def test_detect_chi_square(ctx):
     noisy_data = data * (1 + noise)
     series = Series(noisy_data)
 
-    fitter = Fitter(series)
+    fitter = Fitter(series, ctx)
     name, params = await fitter.get_best(ctx)
     assert name == "chi2"
     assert list(params.keys()) == ["df", "loc", "scale"]
@@ -49,7 +49,7 @@ async def test_detect_gamma(ctx):
     noisy_data = data * (1 + noise)
     series = Series(noisy_data)
 
-    fitter = Fitter(series)
+    fitter = Fitter(series, ctx)
     name, params = await fitter.get_best(ctx)
     assert name == "gamma"
     assert list(params.keys()) == ["a", "loc", "scale"]
@@ -62,7 +62,7 @@ async def test_same_as_original_fitter(path_data_test_csv, ctx):
     data = await csv_import_dataframe(ctx, path_data_test_csv)
     column = data["aufenthalt"].astype(int)
 
-    fitter = Fitter(column)
+    fitter = Fitter(column, ctx)
     name, params = await fitter.get_best(ctx)
     assert name == "lognorm"
     assert list(params.keys()) == ["s", "loc", "scale"]

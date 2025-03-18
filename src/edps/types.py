@@ -1,5 +1,5 @@
 import html
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List, Optional, Set, Union, get_args
 
 from extended_dataset_profile import SchemaVersion
@@ -97,6 +97,12 @@ class DistributionConfig(BaseModel):
     )
     minimum_number_unique_string: int = Field(
         default=4, description="Minimum number of unique values to run string distribution analysis"
+    )
+    timeout: timedelta = Field(
+        default=timedelta(seconds=30), description="Timeout to use for the distribution fitting."
+    )
+    max_samples: int = Field(
+        default=int(1e6), description="Maximum number of values to use for determining the distribution of values."
     )
 
 

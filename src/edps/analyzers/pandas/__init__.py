@@ -28,7 +28,7 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
-from edps.analyzers.pandas.fitter import Fitter, FittingConfig
+from edps.analyzers.pandas.fitter import Fitter, Limits
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
@@ -447,8 +447,8 @@ async def _get_distribution(
 async def _find_best_distribution(
     ctx: TaskContext, column: Series, column_fields: Series, workers: int
 ) -> Tuple[str, dict]:
-    config = FittingConfig(min=column_fields[_NUMERIC_LOWER_DIST], max=column_fields[_NUMERIC_UPPER_DIST])
-    fitter = Fitter(column, config)
+    limits = Limits(min=column_fields[_NUMERIC_LOWER_DIST], max=column_fields[_NUMERIC_UPPER_DIST])
+    fitter = Fitter(column, ctx, limits)
     return await fitter.get_best(ctx)
 
 

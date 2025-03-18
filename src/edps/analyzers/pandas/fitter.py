@@ -1,6 +1,5 @@
 import asyncio
 import warnings
-from datetime import timedelta
 from typing import AsyncIterator, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -34,25 +33,22 @@ class _FittingError:
         self.message = message
 
 
-class FittingConfig(BaseModel):
-    timeout: timedelta = Field(default=timedelta(seconds=30), description="Timeout to use for the fitting")
+class Limits(BaseModel):
     min: Optional[float] = Field(default=None, description="Minimum value to include in fitting")
     max: Optional[float] = Field(default=None, description="Maximum value to include in fitting")
-    max_samples: int = Field(
-        default=int(1e6), description="Maximum number of values to use for determining the distribution of values."
-    )
 
 
 class Fitter:
-    def __init__(self, data: Series, config: FittingConfig = FittingConfig()):
+    def __init__(self, data: Series, ctx: TaskContext, limits: Limits = Limits()):
+        config = ctx.config.structured_config.distribution
         self.timeout = config.timeout.total_seconds()
 
         self._data = data.replace([np.inf, -np.inf], np.nan)
         self._data = data.dropna()
 
         # Prepare the data array and its limits
-        min: float = data.min() if config.min is None else config.min
-        max: float = data.max() if config.max is None else config.max
+        min: float = data.min() if limits.min is None else limits.min
+        max: float = data.max() if limits.max is None else limits.max
         self._data = self._data[(self._data >= min) & (self._data <= max)]
 
         # Restrict number of value entries
