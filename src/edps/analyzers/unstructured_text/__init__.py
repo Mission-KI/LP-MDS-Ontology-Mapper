@@ -12,7 +12,7 @@ from extended_dataset_profile.models.v0.edp import EmbeddedTable, StructuredData
 from pandas import DataFrame
 
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
-from edps.analyzers.unstructured_text.language import detect_languages
+from edps.analyzers.unstructured_text.language import detect_languages, detect_word_cloud
 from edps.importers.structured import dialect_to_str, get_possible_csv_dialects, pandas_importer
 from edps.taskcontext import TaskContext
 
@@ -45,6 +45,7 @@ class Analyzer:
         return UnstructuredTextDataSet(
             embeddedTables=embedded_tables,
             languages=detect_languages(self._ctx, text),
+            wordCloud=detect_word_cloud(self._ctx, text),
             lineCount=line_count,
             wordCount=word_count,
         )

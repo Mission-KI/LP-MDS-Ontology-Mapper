@@ -1,7 +1,7 @@
 from pytest import raises
 
 from edps.analyzers.unstructured_text.chunk import Chunk
-from edps.analyzers.unstructured_text.language import detect_languages
+from edps.analyzers.unstructured_text.language import detect_languages, detect_word_cloud
 
 
 def test_chunk_init():
@@ -94,3 +94,45 @@ def test_deu_and_eng_language_detection(ctx, path_language_deu_eng_wiki_llm_txt)
     assert len(languages) == 2
     assert "deu" in languages
     assert "eng" in languages
+
+
+def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
+    with open(path_language_deu_wiki_llm_txt, "rt", encoding="utf-8") as file:
+        text = file.read()
+    word_cloud = detect_word_cloud(ctx, text)
+    expected = [
+        ("Sprachmodelle", 10),
+        ("Jahr", 6),
+        ("Informationen", 5),
+        ("Parameter", 5),
+        ("Modalität", 4),
+        ("ChatGPT", 3),
+        ("Fähigkeiten", 3),
+        ("LLMs", 3),
+        ("OpenAI", 3),
+        ("Sprachmodell", 3),
+    ]
+    assert len(word_cloud) == 10
+    for entry in expected:
+        assert entry in word_cloud
+
+
+def test_deu_and_eng_word_cloud_detection(ctx, path_language_deu_eng_wiki_llm_txt):
+    with open(path_language_deu_eng_wiki_llm_txt, "rt", encoding="utf-8") as file:
+        text = file.read()
+    word_cloud = detect_word_cloud(ctx, text)
+    expected = [
+        ("Sprachmodelle", 10),
+        ("learning", 7),
+        ("Jahr", 6),
+        ("language", 6),
+        ("LLMs", 4),
+        ("Informationen", 5),
+        ("Parameter", 5),
+        ("network", 5),
+        ("model", 5),
+        ("Modalität", 4),
+    ]
+    assert len(word_cloud) == 10
+    for entry in expected:
+        assert entry in word_cloud
