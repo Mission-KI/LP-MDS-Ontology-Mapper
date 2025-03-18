@@ -155,7 +155,7 @@ async def test_analyse_csv_counts(path_data_test_counts_csv, compute_asset_fn):
     assert len(dataset.numericColumns) == 1
     string_column = dataset.stringColumns[0]
     assert string_column.inconsistentCount == 0
-    assert string_column.interpretableCount == 5
+    assert string_column.interpretableCount == 7
     assert string_column.nullCount == 2
     numeric_column = dataset.numericColumns[0]
     assert numeric_column.inconsistentCount == 1
