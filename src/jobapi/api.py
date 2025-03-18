@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     BackgroundTasks,
-    HTTPException,
     Request,
     Response,
     UploadFile,
@@ -42,15 +41,11 @@ def get_job_api_router(app_config: AppConfig):
         job_id = await job_manager.create_job(user_data)
         return await job_manager.get_job_view(job_id)
 
-    # TODO mka: Is the filename needed for the analysis? Or the type (File.type) derived only by the content? -> Filename is needed for identifying the type!
-    # TODO mka: We can use an explicit parameter (filename:str or type:str), the mime-type or use multipart/form-data. Or put the type in the userdata.
     @router.post(
         "/analysisjob/{job_id}/data/{filename}",
         summary="Upload data for new analysis job",
         tags=[Tags.AnalysisJob],
-        openapi_extra={
-            "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}
-        },
+        openapi_extra={"requestBody": {"content": {"*/*": {"schema": {"type": "string", "format": "binary"}}}}},
     )
     async def upload_analysis_data(
         job_id: UUID, request: Request, filename: str, background_tasks: BackgroundTasks
@@ -59,9 +54,6 @@ def get_job_api_router(app_config: AppConfig):
 
         Returns infos about the job.
         """
-
-        if request.headers.get("Content-Type") != "application/octet-stream":
-            raise HTTPException(status_code=415, detail="Unsupported Media Type. Expected 'application/octet-stream'.")
 
         with TemporaryFile(mode="w+b") as temp_file:
             # Stream the request into the temp file chunk by chunk.
