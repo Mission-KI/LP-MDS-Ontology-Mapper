@@ -144,7 +144,9 @@ def get_job_api_router(app_config: AppConfig):
     )
     async def get_report(job_id: UUID):
         """If an analysis job has reached state COMPLETED, this call returns the PDF report."""
-        raise NotImplementedError()
+
+        report_file = await job_manager.get_report_file(job_id)
+        return FileResponse(report_file, media_type="application/pdf", filename=report_file.name)
 
     return router
 

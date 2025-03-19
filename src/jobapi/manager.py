@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
+from edps.service import get_report_path
 from edps.taskcontextimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
@@ -70,6 +71,15 @@ class AnalysisJobManager:
             job: Job = await session.get_job(job_id)
             return job.log_file
 
+    async def get_report_file(self, job_id: UUID) -> Path:
+        """If an analysis job has reached state COMPLETED, this call returns the path to the report file."""
+
+        async with self._job_repo.new_session() as session:
+            job: Job = await session.get_job(job_id)
+            if job.state != JobState.COMPLETED:
+                raise RuntimeError(f"There is no report for job {job.job_id}")
+            return job.report_file
+
     async def process_job(self, job_id: UUID):
         """If the job is in state 'QUEUED' process the job.
         During processing it changes to state 'PROCESSING'. When finished it changes to 'COMPLETED' or 'FAILED'.
@@ -103,6 +113,8 @@ class AnalysisJobManager:
                     job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
                     await self._service.analyse_asset(ctx)
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
+                    if get_report_path(ctx).exists():
+                        shutil.copy(get_report_path(ctx), job.report_file)
                     job_logger.info("EDP created successfully")
                     job.update_state(JobState.COMPLETED)
                     job.finished = datetime.now(tz=UTC)

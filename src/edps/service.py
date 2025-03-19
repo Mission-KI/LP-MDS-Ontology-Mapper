@@ -1,4 +1,5 @@
 import hashlib
+import warnings
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path, PurePosixPath
@@ -32,6 +33,8 @@ from edps.importers import get_importable_types
 from edps.report import PdfReportGenerator, ReportInput
 from edps.taskcontext import TaskContext
 from edps.types import AugmentedColumn, ComputedEdpData, DataSet
+
+REPORT_FILENAME = "report.pdf"
 
 
 class UserInputError(RuntimeError):
@@ -200,9 +203,13 @@ class Service:
                 yield dataframe
 
     async def _generate_report(self, ctx: TaskContext, edp: ExtendedDatasetProfile):
-        input = ReportInput(edp=edp)
-        with (ctx.output_path / "report.pdf").open("wb") as file_io:
-            await PdfReportGenerator().generate(input, ctx.output_path, file_io)
+        try:
+            input = ReportInput(edp=edp)
+            with get_report_path(ctx).open("wb") as file_io:
+                await PdfReportGenerator().generate(input, ctx.output_path, file_io)
+        except Exception as exception:
+            ctx.logger.warning("Error generating the report, continuing anyways..", exc_info=exception)
+            warnings.warn(f"Error generating the report. Error: {exception}")
 
 
 def _as_dict(model: BaseModel):
@@ -270,3 +277,7 @@ def compute_sha256(file_path: Path) -> str:
         while chunk := file.read(8192):
             sha256.update(chunk)
     return sha256.hexdigest()
+
+
+def get_report_path(ctx: TaskContext) -> Path:
+    return ctx.output_path / REPORT_FILENAME

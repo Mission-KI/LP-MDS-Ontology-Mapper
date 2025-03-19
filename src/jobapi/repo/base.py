@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
+from edps.service import REPORT_FILENAME
 from edps.types import UserProvidedEdpData
 from jobapi.types import JobState, JobView
 
@@ -69,6 +70,10 @@ class Job(ABC):
     @property
     def zip_archive(self) -> Path:
         return self.job_base_dir / "result.zip"
+
+    @property
+    def report_file(self) -> Path:
+        return self.job_base_dir / REPORT_FILENAME
 
     @property
     def log_file(self) -> Path:
