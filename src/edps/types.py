@@ -92,15 +92,13 @@ class AugmentedColumn(BaseModel):
 class DistributionConfig(BaseModel):
     """Configuration parameters specific to the distribution analysis."""
 
-    minimum_number_unique_numeric: int = Field(
-        default=16, description="Minimum number of unique values to run numeric distribution analysis"
+    minimum_number_numeric_values: int = Field(
+        default=16, description="Minimum number of interpretable values to run numeric distribution analysis"
     )
     minimum_number_unique_string: int = Field(
         default=4, description="Minimum number of unique values to run string distribution analysis"
     )
-    timeout: timedelta = Field(
-        default=timedelta(seconds=30), description="Timeout to use for the distribution fitting."
-    )
+    timeout: timedelta = Field(default=timedelta(minutes=1), description="Timeout to use for the distribution fitting.")
     max_samples: int = Field(
         default=int(1e6), description="Maximum number of values to use for determining the distribution of values."
     )

@@ -1,71 +1,109 @@
-import numpy as np
+import math
+from typing import Dict, Tuple
+
+import pytest
+import scipy
 from pandas import Series
 
-from edps.analyzers.pandas.fitter import Fitter
-from edps.importers.structured import csv_import_dataframe
+from edps.analyzers.pandas.fitter import (
+    COMMON_DISTRIBUTIONS,
+    Distribution,
+    DistributionParameters,
+    Fitter,
+    FittingError,
+)
+
+N_SAMPLES = 25000
+LOC = 10.0
+SCALE = 20.0
+A = 2.0
+B = 5.0
+NOISE_AMPLITUDE = 0.1 * SCALE
+
+REL_TOL = 0.15
 
 
-async def test_detect_norm(ctx):
-    np.random.seed(1)
-    n_samples = 25000
-    data = np.random.normal(loc=10.0, scale=20.0, size=n_samples)
-
-    noise = np.random.uniform(low=-0.05, high=0.05, size=n_samples)
-    noisy_data = data * (1 + noise)
-    series = Series(noisy_data)
-
-    fitter = Fitter(series, ctx)
-    name, params = await fitter.get_best(ctx)
-    assert name == "norm"
-    assert list(params.keys()) == ["loc", "scale"]
-    assert abs(params.get("loc", 0.0) - 10.12) < 0.01
-    assert abs(params.get("scale", 0.0) - 20.01) < 0.01
+@pytest.fixture(scope="session")
+def static_random_seed():
+    return 1
 
 
-async def test_detect_chi_square(ctx):
-    np.random.seed(1)
-    n_samples = 25000
-    data = np.random.chisquare(df=10.0, size=n_samples)
-
-    noise = np.random.uniform(low=-0.05, high=0.05, size=n_samples)
-    noisy_data = data * (1 + noise)
-    series = Series(noisy_data)
-
-    fitter = Fitter(series, ctx)
-    name, params = await fitter.get_best(ctx)
-    assert name == "chi2"
-    assert list(params.keys()) == ["df", "loc", "scale"]
-    assert abs(params.get("df", 0.0) - 9.84) < 0.01
-    assert abs(params.get("loc", 0.0) - 0.03) < 0.01
-    assert abs(params.get("scale", 0.0) - 1.01) < 0.01
+@pytest.fixture(scope="session")
+def noise(static_random_seed):
+    return scipy.stats.distributions.uniform(loc=0.0, scale=NOISE_AMPLITUDE).rvs(N_SAMPLES, static_random_seed)
 
 
-async def test_detect_gamma(ctx):
-    np.random.seed(1)
-    n_samples = 25000
-    data = np.random.gamma(shape=20.0, scale=20.0, size=n_samples)
+TEST_PARAMETERS: Dict[Distribution, DistributionParameters] = {
+    scipy.stats.cauchy: dict(
+        loc=LOC,
+        scale=SCALE,
+    ),
+    scipy.stats.exponpow: dict(loc=LOC, scale=SCALE, b=B),
+    scipy.stats.gamma: dict(loc=LOC, scale=SCALE, a=A),
+    scipy.stats.norm: dict(
+        loc=LOC,
+        scale=SCALE,
+    ),
+    scipy.stats.powerlaw: dict(loc=LOC, scale=SCALE, a=A),
+    scipy.stats.rayleigh: dict(
+        loc=LOC,
+        scale=SCALE,
+    ),
+    scipy.stats.uniform: dict(
+        loc=LOC,
+        scale=SCALE,
+    ),
+    scipy.stats.maxwell: dict(
+        loc=LOC,
+        scale=SCALE,
+    ),
+}
 
-    noise = np.random.uniform(low=-0.05, high=0.05, size=n_samples)
-    noisy_data = data * (1 + noise)
-    series = Series(noisy_data)
 
-    fitter = Fitter(series, ctx)
-    name, params = await fitter.get_best(ctx)
-    assert name == "gamma"
-    assert list(params.keys()) == ["a", "loc", "scale"]
-    assert abs(params.get("a", 0.0) - 19.07) < 0.01
-    assert abs(params.get("loc", 0.0) - 5.05) < 0.01
-    assert abs(params.get("scale", 0.0) - 20.69) < 0.01
+@pytest.fixture
+def noisy_distribution(
+    distribution: Distribution, static_random_seed, noise
+) -> Tuple[Distribution, DistributionParameters, Series]:
+    parameters = TEST_PARAMETERS[distribution]
+    data = distribution.rvs(**parameters, size=N_SAMPLES, random_state=static_random_seed)
+    noisy_data = data + noise
+    return distribution, parameters, Series(noisy_data, name=distribution.name)
 
 
-async def test_same_as_original_fitter(path_data_test_csv, ctx):
-    data = await csv_import_dataframe(ctx, path_data_test_csv)
-    column = data["aufenthalt"].astype(int)
+def test_every_distribution_has_1_to_1_params():
+    assert set(TEST_PARAMETERS.keys()) == set(COMMON_DISTRIBUTIONS)
 
-    fitter = Fitter(column, ctx)
-    name, params = await fitter.get_best(ctx)
-    assert name == "lognorm"
-    assert list(params.keys()) == ["s", "loc", "scale"]
-    assert abs(params.get("s", 0.0) - 0.98) < 0.01
-    assert abs(params.get("loc", 0.0) - -599.22) < 0.01
-    assert abs(params.get("scale", 0.0) - 6846.56) < 0.01
+
+@pytest.mark.parametrize(
+    "distribution", COMMON_DISTRIBUTIONS, ids=[distribution.name for distribution in COMMON_DISTRIBUTIONS]
+)
+def test_fit_distribution(noisy_distribution):
+    distribution, parameters, data = noisy_distribution
+    result = Fitter._fit(distribution, data.to_numpy())
+    assert result.distribution.name == distribution.name
+    for parameter_name, parameter_value in parameters.items():
+        assert math.isclose(result.parameters[parameter_name], parameter_value, rel_tol=REL_TOL)
+
+
+@pytest.mark.parametrize(
+    "distribution", COMMON_DISTRIBUTIONS, ids=[distribution.name for distribution in COMMON_DISTRIBUTIONS]
+)
+async def test_detect_all_distributions(ctx, noisy_distribution):
+    distribution, parameters, data = noisy_distribution
+    fitter = Fitter(data, ctx)
+    name, params = await fitter.get_best()
+    assert name == distribution.name, f'Expected to detect "{distribution.name}", got "{name}".'
+    for parameter_name, parameter_value in parameters.items():
+        assert math.isclose(params[parameter_name], parameter_value, rel_tol=REL_TOL)
+
+
+async def test_no_distribution_fits(ctx, monkeypatch):
+    data = Series([1, 2, 3, 4, 5, 6])
+    fitter = Fitter(data, ctx)
+
+    async def dummy_fit_single_distribution(distribution, data, timeout_s):
+        return FittingError("DummyError")
+
+    monkeypatch.setattr(Fitter, "_fit_single_distribution", dummy_fit_single_distribution)
+    with pytest.raises(FittingError):
+        await fitter.get_best()

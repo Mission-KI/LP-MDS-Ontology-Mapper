@@ -134,6 +134,10 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["pandas.*"]
+ignore_errors = true
+
 [tool.pip-licenses]
 from = "classifier"
 ignore-packages = [

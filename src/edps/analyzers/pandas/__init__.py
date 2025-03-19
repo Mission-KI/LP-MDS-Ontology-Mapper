@@ -2,9 +2,9 @@ import itertools
 from collections.abc import Hashable
 from datetime import timedelta
 from enum import Enum
-from multiprocessing import cpu_count
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Dict, Optional, Tuple, cast
+from warnings import warn
 
 from extended_dataset_profile.models.v0.edp import (
     CorrelationSummary,
@@ -28,7 +28,7 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
-from edps.analyzers.pandas.fitter import Fitter, Limits
+from edps.analyzers.pandas.fitter import DistributionParameters, Fitter, FittingError, Limits
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
@@ -82,12 +82,12 @@ _DATETIME_TEMPORAL_CONSISTENCY = "temporal-consistency"
 class _Distributions(str, Enum):
     SingleValue = "single value"
     TooSmallDataset = "dataset too small to determine distribution"
+    NoMatch = "could not match any distribution"
 
 
 class PandasAnalyzer:
     def __init__(self, data: DataFrame):
         self._data = data
-        self._workers: int = cpu_count() - 1
         self._max_elements_per_column = 100000
         self._intervals = [
             timedelta(seconds=1),
@@ -243,17 +243,8 @@ class PandasAnalyzer:
         upper_equals_lower = fields[_NUMERIC_LOWER_DIST] == fields[_NUMERIC_UPPER_DIST]
         fields.loc[upper_equals_lower, _NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_DIST] * 0.9
         fields.loc[upper_equals_lower, _NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_DIST] * 1.1
-        fields = concat(
-            [
-                fields,
-                await _get_distributions(
-                    ctx,
-                    columns,
-                    concat([common_fields, fields], axis=1),
-                    self._workers,
-                ),
-            ],
-            axis=1,
+        fields[_NUMERIC_DISTRIBUTION], fields[_NUMERIC_DISTRIBUTION_PARAMETERS] = await _get_distributions(
+            ctx, columns, concat([common_fields, fields], axis=1)
         )
         return fields
 
@@ -309,12 +300,8 @@ class PandasAnalyzer:
         )
         distribution = computed_fields[_NUMERIC_DISTRIBUTION]
         if (
-            distribution
-            not in [
-                _Distributions.SingleValue.value,
-                _Distributions.TooSmallDataset.value,
-            ]
-            and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_unique_numeric
+            distribution not in [enum.value for enum in _Distributions]
+            and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_numeric_values
         ):
             column_result.distributionGraph = await _plot_distribution(
                 ctx,
@@ -328,7 +315,7 @@ class PandasAnalyzer:
                 "Too few unique values for distribution analysis on column %s. Have %d unique, need at least %d.",
                 column.name,
                 column_result.numberUnique,
-                ctx.config.structured_config.distribution.minimum_number_unique_numeric,
+                ctx.config.structured_config.distribution.minimum_number_numeric_values,
             )
 
         for datetime_column_name, seasonality in seasonality_results.items():
@@ -401,55 +388,38 @@ def _get_outliers(column: DataFrame, lower_limit: Series, upper_limit: Series) -
     return is_outlier.sum()
 
 
-async def _get_distributions(
-    ctx: TaskContext,
-    columns: DataFrame,
-    fields: DataFrame,
-    workers: int,
-) -> DataFrame:
-    distributions: List[Tuple[str, Dict]] = []
-    for index, values in enumerate(columns.items(), start=1):
-        name, column = values
-        distributions.append(
-            await _get_distribution(
-                ctx,
-                column,
-                _get_single_row(name, fields),
-                workers,
-            )
-        )
+async def _get_distributions(ctx: TaskContext, columns: DataFrame, fields: DataFrame) -> Tuple[Series, Series]:
+    distributions: Dict[str, str] = {}
+    parameters: Dict[str, DistributionParameters] = {}
+
+    for index, column_name_and_data in enumerate(columns.items(), 1):
+        column_name_hash, column_data = column_name_and_data
+        column_name = str(column_name_hash)
+        distribution, params = await _get_distribution(ctx, column_data, _get_single_row(column_name, fields))
+        distributions[column_name] = distribution
+        parameters[column_name] = params
         ctx.logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
-    data_frame = DataFrame(
-        distributions,
-        index=columns.columns,
-        columns=[_NUMERIC_DISTRIBUTION, _NUMERIC_DISTRIBUTION_PARAMETERS],
-    )
-    return data_frame
+    return Series(distributions, name=_NUMERIC_DISTRIBUTION), Series(parameters, name=_NUMERIC_DISTRIBUTION_PARAMETERS)
 
 
-async def _get_distribution(
-    ctx: TaskContext,
-    column: Series,
-    fields: Series,
-    workers: int,
-) -> Tuple[str, Dict]:
+async def _get_distribution(ctx: TaskContext, column: Series, fields: Series) -> Tuple[str, DistributionParameters]:
     config = ctx.config.structured_config.distribution
     if fields[_COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_INTERPRETABLE] < config.minimum_number_unique_numeric:
+    if fields[_COMMON_INTERPRETABLE] < config.minimum_number_numeric_values:
         return _Distributions.TooSmallDataset.value, dict()
 
-    return await _find_best_distribution(ctx, column, fields, workers)
-
-
-async def _find_best_distribution(
-    ctx: TaskContext, column: Series, column_fields: Series, workers: int
-) -> Tuple[str, dict]:
-    limits = Limits(min=column_fields[_NUMERIC_LOWER_DIST], max=column_fields[_NUMERIC_UPPER_DIST])
+    limits = Limits(min=fields[_NUMERIC_LOWER_DIST], max=fields[_NUMERIC_UPPER_DIST])
     fitter = Fitter(column, ctx, limits)
-    return await fitter.get_best(ctx)
+    try:
+        return await fitter.get_best()
+    except FittingError as error:
+        message = f'Distribution fitting for "{column.name}" failed: {error}'
+        warn(message)
+        ctx.logger.warning(message)
+        return _Distributions.NoMatch, dict()
 
 
 async def _plot_distribution(
