@@ -16,6 +16,7 @@ services:
     #   options:
     #     max-size: "10m"
     #     max-file: "3"
+    # Should not be exposed! Only enable this temporarily for debugging!
     # ports:
     #   - "8000:8000"
     volumes:
@@ -65,8 +66,9 @@ services:
     volumes:
       - edps-db-data:/var/lib/postgresql/data:z
     restart: on-failure
-    ports:
-      - "5432:5432"
+    # Should not be exposed! Only enable this temporarily for debugging!
+    # ports:
+    #   - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 10s
