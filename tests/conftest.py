@@ -232,6 +232,24 @@ def path_language_deu_eng_wiki_llm_txt():
     return TESTS_ROOT_PATH / "data/language/deu_eng_wiki_llm.txt"
 
 
+# "asset_path" iterates through multiple assets
+@fixture(
+    params=[
+        "data/bast.csv",
+        "data/test.csv",
+        "data/test.json",
+        "data/test.docx",
+        "data/test.pdf",
+        "data/test.jpg",
+        "data/test.mp4",
+        "data/unstructured_text_with_table.txt",
+        "data/test_multiassets.zip",
+    ]
+)
+def asset_path(request):
+    return TESTS_ROOT_PATH / request.param
+
+
 @fixture(scope="session")
 def user_provided_data():
     return UserProvidedEdpData(
