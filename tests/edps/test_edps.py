@@ -459,6 +459,7 @@ async def test_analyse_wmv(ctx, path_data_test_wmv, user_provided_data):
     assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
     with pytest.warns(MissingSpacyModelWarning):
         edp = await compute_asset_fn(path_data_test_pdf)
