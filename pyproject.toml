@@ -86,7 +86,7 @@ dev = ["edps[test]"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"edps" = ["styles/*.mplstyle"]
+"edps" = ["styles/*.mplstyle", "report/templates/*.jinja"]
 
 [tool.setuptools.dynamic]
 version = { file = "dist/VERSION.txt" }
