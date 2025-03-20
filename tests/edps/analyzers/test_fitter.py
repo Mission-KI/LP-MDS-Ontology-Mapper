@@ -5,12 +5,14 @@ import pytest
 import scipy
 from pandas import Series
 
+from edps.analyzers.pandas import fitter
 from edps.analyzers.pandas.fitter import (
     COMMON_DISTRIBUTIONS,
     Distribution,
     DistributionParameters,
-    Fitter,
     FittingError,
+    _fit,
+    fit_best_distribution,
 )
 
 N_SAMPLES = 25000
@@ -79,7 +81,7 @@ def test_every_distribution_has_1_to_1_params():
 )
 def test_fit_distribution(noisy_distribution):
     distribution, parameters, data = noisy_distribution
-    result = Fitter._fit(distribution, data.to_numpy())
+    result = _fit(distribution, data.to_numpy())
     assert result.distribution.name == distribution.name
     for parameter_name, parameter_value in parameters.items():
         assert math.isclose(result.parameters[parameter_name], parameter_value, rel_tol=REL_TOL)
@@ -90,8 +92,7 @@ def test_fit_distribution(noisy_distribution):
 )
 async def test_detect_all_distributions(ctx, noisy_distribution):
     distribution, parameters, data = noisy_distribution
-    fitter = Fitter(data, ctx)
-    name, params = await fitter.get_best()
+    name, params = await fit_best_distribution(ctx, data)
     assert name == distribution.name, f'Expected to detect "{distribution.name}", got "{name}".'
     for parameter_name, parameter_value in parameters.items():
         assert math.isclose(params[parameter_name], parameter_value, rel_tol=REL_TOL)
@@ -99,11 +100,10 @@ async def test_detect_all_distributions(ctx, noisy_distribution):
 
 async def test_no_distribution_fits(ctx, monkeypatch):
     data = Series([1, 2, 3, 4, 5, 6])
-    fitter = Fitter(data, ctx)
 
     async def dummy_fit_single_distribution(distribution, data, timeout_s):
         return FittingError("DummyError")
 
-    monkeypatch.setattr(Fitter, "_fit_single_distribution", dummy_fit_single_distribution)
+    monkeypatch.setattr(fitter, "_fit_single_distribution", dummy_fit_single_distribution)
     with pytest.raises(FittingError):
-        await fitter.get_best()
+        await fit_best_distribution(ctx, data)

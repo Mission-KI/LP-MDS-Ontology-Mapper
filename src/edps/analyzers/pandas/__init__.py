@@ -28,7 +28,7 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
-from edps.analyzers.pandas.fitter import DistributionParameters, Fitter, FittingError, Limits
+from edps.analyzers.pandas.fitter import DistributionParameters, FittingError, Limits, fit_best_distribution
 from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
 from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
@@ -412,9 +412,8 @@ async def _get_distribution(ctx: TaskContext, column: Series, fields: Series) ->
         return _Distributions.TooSmallDataset.value, dict()
 
     limits = Limits(min=fields[_NUMERIC_LOWER_DIST], max=fields[_NUMERIC_UPPER_DIST])
-    fitter = Fitter(column, ctx, limits)
     try:
-        return await fitter.get_best()
+        return await fit_best_distribution(ctx, column, limits=limits)
     except FittingError as error:
         message = f'Distribution fitting for "{column.name}" failed: {error}'
         warn(message)
