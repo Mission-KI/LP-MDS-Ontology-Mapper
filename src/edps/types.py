@@ -80,6 +80,11 @@ class ComputedEdpData(BaseModel):
 
 
 class AugmentedColumn(BaseModel):
+    """
+    Stores information about a column having been modified before running the service.
+    This information will be attached to each column on service execution.
+    """
+
     name: str = Field(description="Name of the augmented column")
     datasetName: Optional[str] = Field(
         default=None,
@@ -126,6 +131,12 @@ class StructuredConfig(BaseModel):
 
 
 class Config(BaseModel):
+    """Extended dataset profile service configuration
+
+    This configuration contains all customizable variables for the analysis of assets.
+    All analyzer specific configurations are collected here.
+    """
+
     userProvidedEdpData: UserProvidedEdpData = Field(description="User provided EDP meta data")
     augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
     structured_config: StructuredConfig = Field(
