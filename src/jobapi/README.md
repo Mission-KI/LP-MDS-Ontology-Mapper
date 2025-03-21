@@ -1,6 +1,8 @@
 # Job API
 
-The **Dataspace Job API** is the entrypoint for the **EDC Connector** into the **EDPS System**. It allows uploading data, starting the analysis job that is executed by the **EDPS Analysis Backend** and finally downloading the processing results. In this document we show the components involved and the steps to go through for an API user.
+The **Dataspace Job API** is the entrypoint for the **EDC Connector** and **other services** into the **EDP Service**. It allows uploading data, starting the analysis job that is executed by the **EDPS Analysis Backend** and finally downloading the processing results. In this document we show the components involved and the steps to go through for an API user.
+
+For information on how to start the Job REST API refer to [the scripts](./../../scripts/README.md#run-docker-containers).
 
 ## Components
 
