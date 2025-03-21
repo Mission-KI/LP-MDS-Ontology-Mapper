@@ -2,18 +2,17 @@ import html
 from datetime import datetime, timedelta
 from typing import Any, List, Optional, Set, Union, get_args
 
-from extended_dataset_profile import SchemaVersion
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
+    AssetGrowthRate,
+    AssetImmutability,
     AssetProcessingStatus,
     AssetReference,
+    AssetTransferType,
+    AssetUpdatePeriod,
     Augmentation,
-    DataSetFrequency,
-    DataSetImmutability,
-    DataSetTransfer,
     DatasetTreeNode,
     DataSetType,
-    DataSetVolume,
     DocumentDataSet,
     ExtendedDatasetProfile,
     ImageDataSet,
@@ -46,10 +45,10 @@ class UserProvidedEdpData(BaseModel):
     tags: List[str] = _get_edp_field("tags")
     dataSubCategory: str | None = _get_edp_field("dataSubCategory")
     assetTypeInfo: str | None = _get_edp_field("assetTypeInfo")
-    transferTypeFlag: DataSetTransfer | None = _get_edp_field("transferTypeFlag")
-    immutabilityFlag: DataSetImmutability | None = _get_edp_field("immutabilityFlag")
-    growthFlag: DataSetVolume | None = _get_edp_field("growthFlag")
-    transferTypeFrequency: DataSetFrequency | None = _get_edp_field("transferTypeFrequency")
+    transferTypeFlag: AssetTransferType | None = _get_edp_field("transferTypeFlag")
+    transferTypeFrequency: AssetUpdatePeriod | None = _get_edp_field("transferTypeFrequency")
+    growthFlag: AssetGrowthRate | None = _get_edp_field("growthFlag")
+    immutabilityFlag: AssetImmutability | None = _get_edp_field("immutabilityFlag")
     nda: str | None = _get_edp_field("nda")
     dpa: str | None = _get_edp_field("dpa")
     dataLog: str | None = _get_edp_field("dataLog")
@@ -71,7 +70,7 @@ class ComputedEdpData(BaseModel):
     semiStructuredDatasets: List[SemiStructuredDataSet] = _get_edp_field("semiStructuredDatasets")
     unstructuredTextDatasets: List[UnstructuredTextDataSet] = _get_edp_field("unstructuredTextDatasets")
     imageDatasets: List[ImageDataSet] = _get_edp_field("imageDatasets")
-    schema_version: SchemaVersion = _get_edp_field("schema_version")
+    schemaVersion: str = _get_edp_field("schemaVersion")
     volume: int = _get_edp_field("volume")
     videoDatasets: List[VideoDataSet] = _get_edp_field("videoDatasets")
     temporalCover: TemporalCover | None = _get_edp_field("temporalCover")
