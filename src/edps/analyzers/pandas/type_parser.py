@@ -352,8 +352,10 @@ def parse_types(ctx: TaskContext, data: DataFrame) -> Result:
 
 
 def _determine_type(ctx: TaskContext, column: Series) -> tuple[Series, ColumnInfo]:
-    non_null_column = column[column.notna()]
-    column_sample = non_null_column.sample(SAMPLE_SIZE) if len(non_null_column.index) > SAMPLE_SIZE else column
+    non_empty_column = column[column.notna() & (column != "")]
+    column_sample = (
+        non_empty_column.sample(SAMPLE_SIZE) if len(non_empty_column.index) > SAMPLE_SIZE else non_empty_column
+    )
     # determine best type match based on the sample
     preferred_col_converter = _determine_best_type_match(ctx, column_sample)
     new_column, column_info = _do_type_conversion(ctx, column, preferred_col_converter)
