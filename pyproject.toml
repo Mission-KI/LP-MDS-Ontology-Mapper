@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "argparse",
-    "extended_dataset_profile @ git+https://github.com/Beebucket/extended_dataset_profile@0.17.0",
+    "extended-dataset-profile @ git+https://github.com/Beebucket/extended_dataset_profile@0.19.0",
     "boto3",
     "filetype",
     "lingua-language-detector",
@@ -79,7 +79,7 @@ test = [
     "ruff>=0.7.4",
     "pre-commit>=4.0.1",
     "pip-licenses>=5.0.0",
-    "pydantic-markdown",
+    "pydantic-markdown @ git+https://github.com/Beebucket/pydantic_markdown@2.0.1",
 ]
 dev = ["edps[test]"]
 
@@ -164,7 +164,6 @@ torchvision = [
     { index = "pypi", marker = "sys_platform == 'win32'" },
     { index = "pytorch-unix", marker = "sys_platform != 'win32'" },
 ]
-pydantic-markdown = { git = "https://github.com/Beebucket/pydantic_markdown", tag = "1.0.0" }
 
 [[tool.uv.index]]
 name = "pytorch-unix"
