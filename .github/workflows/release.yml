@@ -9,6 +9,7 @@ env:
     IMAGE_PATH: beebucket/edps
     WHEEL_NAME: edps.whl
     LICENSES_ARTIFACT_NAME: licenses.csv
+    CONFIG_README_ARTIFACT_NAME: config_readme.md
     PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
 
 jobs:
@@ -90,7 +91,36 @@ jobs:
             with:
                 name: ${{ env.LICENSES_ARTIFACT_NAME }}
                 path: ${{ env.LICENSES_ARTIFACT_NAME }}
-
+    
+    configuration-readme:
+        runs-on: ubuntu-24.04
+        name: Create Configuration Readme
+        needs:
+        -   build_wheel
+        steps:
+        -   uses: actions/checkout@v4
+        -   uses: actions/setup-python@v5
+            with:
+                python-version-file: '.python-version'
+                cache: 'pip'
+        -   uses: actions/download-artifact@v4
+            id: download_wheel
+            with:
+                name: ${{ env.WHEEL_NAME }}
+                path: ${{ github.workspace }}
+        -   name: Install
+            run: |
+                git config --global url."https://${{ secrets.GIT_HUB_API_KEY }}@github.com/".insteadOf "git@github.com:"
+                git config --global url."https://${{ secrets.GIT_HUB_API_KEY }}@github.com".insteadOf "https://github.com"
+                pip install ${{ steps.download_wheel.outputs.download-path }}[test]
+        -   name: Run pydantic markdown generator
+            run: pydantic_markdown --model edps.Config --output ${{ env.CONFIG_README_ARTIFACT_NAME }}
+        -   name: Upload readme
+            uses: actions/upload-artifact@v4
+            with:
+                name: ${{ env.CONFIG_README_ARTIFACT_NAME }}
+                path: ${{ env.CONFIG_README_ARTIFACT_NAME }}
+            
     build_and_release_docker:
         runs-on: ubuntu-24.04
         name: Build and Push EDPS docker image
@@ -153,6 +183,7 @@ jobs:
         -   generate_schemas
         -   build_and_release_docker
         -   license_report
+        -   configuration-readme
         env:
             ARTIFACTS_DIR: ${{ github.workspace }}/release_artifacts
         steps:
@@ -170,6 +201,10 @@ jobs:
             with:
                 name: ${{ env.LICENSES_ARTIFACT_NAME }}
                 path: ${{ env.ARTIFACTS_DIR }}
+        -   uses: actions/download-artifact@v4
+            with:
+                name: ${{ env.CONFIG_README_ARTIFACT_NAME }}
+                path: ${{ env.ARTIFACTS_DIR }}        
         -   name: Release
             uses: softprops/action-gh-release@v2
             with:
