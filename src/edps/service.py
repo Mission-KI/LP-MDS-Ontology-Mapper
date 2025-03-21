@@ -12,7 +12,6 @@ from extended_dataset_profile.models.v0.edp import (
     DataSetType,
     DocumentDataSet,
     ExtendedDatasetProfile,
-    FileReference,
     ImageDataSet,
     JsonReference,
     SemiStructuredDataSet,
@@ -50,7 +49,7 @@ class Service:
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, ctx: TaskContext) -> FileReference:
+    async def analyse_asset(self, ctx: TaskContext) -> Path:
         """
         Let the service analyse the assets in ctx.input_path.
         The result (EDP JSON, plots and report) is written to ctx.output_path.
@@ -65,7 +64,7 @@ class Service:
 
         Returns
         -------
-        FileReference
+        Path
             File path to the generated EDP JSON (relative to ctx.output_path).
         """
         computed_data = await self._compute_asset(ctx)
