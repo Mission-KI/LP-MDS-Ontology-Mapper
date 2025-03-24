@@ -61,7 +61,7 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job: Job = await session.get_job(job_id)
             if job.state != JobState.COMPLETED:
-                raise RuntimeError(f"There is no result for job {job.job_id}")
+                raise RuntimeError(f"There is no result for job {job.job_id} because it's in state {job.state}.")
             return job.zip_archive
 
     async def get_log_file(self, job_id: UUID) -> Path:
@@ -77,7 +77,7 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job: Job = await session.get_job(job_id)
             if job.state != JobState.COMPLETED:
-                raise RuntimeError(f"There is no report for job {job.job_id}")
+                raise RuntimeError(f"There is no report for job {job.job_id} because it's in state {job.state}.")
             return job.report_file
 
     async def process_job(self, job_id: UUID):
