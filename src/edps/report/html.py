@@ -2,7 +2,7 @@ from dataclasses import asdict
 from datetime import datetime
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
@@ -93,13 +93,13 @@ def _resolve_json_ref(edp: ExtendedDatasetProfile, json_ref: Optional[JsonRefere
     segments = json_ref.reference.split("/")
     if segments[0] != "#":
         raise ValueError(f"JSON reference needs to be document-relative and start with '#/': {json_ref.reference}")
-    obj: Any = edp.model_dump()
+    obj: Any = edp
     for i, segment in enumerate(segments[1:]):
         try:
             if segment.isdigit():
                 obj = obj[int(segment)]
             else:
-                obj = obj[segment]
+                obj = getattr(obj, segment)
         except Exception as exception:
             raise ValueError(f"Can't resolve JSON reference {json_ref.reference}. Error on segment {i}: {exception}")
     return obj
@@ -108,8 +108,8 @@ def _resolve_json_ref(edp: ExtendedDatasetProfile, json_ref: Optional[JsonRefere
 def _resolve_json_ref_typed[T: BaseModel](
     edp: ExtendedDatasetProfile, json_ref: Optional[JsonReference], expected_type: type[T]
 ) -> Optional[T]:
-    dict = _resolve_json_ref(edp, json_ref)
-    return expected_type(**dict) if dict else None
+    obj = _resolve_json_ref(edp, json_ref)
+    return cast(T, obj) if obj else None
 
 
 def _build_qualified_name(edp: ExtendedDatasetProfile, node: DatasetTreeNode) -> str:
