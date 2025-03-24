@@ -5,6 +5,7 @@ from pathlib import Path
 from pydantic.dataclasses import dataclass
 
 from edps import ExtendedDatasetProfile
+from edps.taskcontext import TaskContext
 
 
 @dataclass
@@ -14,6 +15,6 @@ class ReportInput:
 
 class ReportGenerator(ABC):
     @abstractmethod
-    async def generate(self, input: ReportInput, base_dir: Path, output_buffer: BufferedIOBase):
+    async def generate(self, ctx: TaskContext, input: ReportInput, base_dir: Path, output_buffer: BufferedIOBase):
         """Generates a report from the given input and writes it to output_buffer.
         Files references in the EDP (plots) are resolved relative to base_dir."""

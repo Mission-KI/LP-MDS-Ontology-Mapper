@@ -1,3 +1,4 @@
+import os
 from dataclasses import asdict
 from datetime import datetime
 from io import BufferedIOBase
@@ -24,6 +25,7 @@ from pydantic.dataclasses import dataclass
 
 from edps import ExtendedDatasetProfile
 from edps.report.base import ReportGenerator, ReportInput
+from edps.taskcontext import TaskContext
 from edps.types import DataSet
 
 
@@ -33,11 +35,19 @@ class HtmlReportGenerator(ReportGenerator):
     def __init__(self):
         self._env = _init_environment()
 
-    async def generate(self, input: ReportInput, base_dir: Path, output_buffer: BufferedIOBase):
+    async def generate(self, ctx: TaskContext, input: ReportInput, base_dir: Path, output_buffer: BufferedIOBase):
         template = self._env.get_template("report.html.jinja")
         transformed_data = prepare_data(input)
         html = template.render(asdict(transformed_data))
         output_buffer.write(html.encode("utf-8"))
+        self._check_output(ctx, output_buffer)
+
+    def _check_output(self, ctx: TaskContext, output_buffer: BufferedIOBase):
+        output_buffer.seek(0, os.SEEK_END)
+        size = output_buffer.tell()
+        if size == 0:
+            raise RuntimeError("HTML report is empty.")
+        ctx.logger.info("HTML report generated (%d bytes).", size)
 
 
 def _init_environment():

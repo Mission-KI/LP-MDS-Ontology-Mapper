@@ -206,7 +206,7 @@ class Service:
         try:
             input = ReportInput(edp=edp)
             with get_report_path(ctx).open("wb") as file_io:
-                await PdfReportGenerator().generate(input, ctx.output_path, file_io)
+                await PdfReportGenerator().generate(ctx, input, ctx.output_path, file_io)
         except Exception as exception:
             ctx.logger.warning("Error generating the report, continuing anyways..", exc_info=exception)
             warnings.warn(f"Error generating the report. Error: {exception}")
