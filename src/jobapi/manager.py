@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import shutil
 from contextlib import closing, contextmanager
@@ -6,7 +7,7 @@ from logging import Logger, getLogger
 from pathlib import Path
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
-from typing import Iterator, Optional
+from typing import Dict, Iterator, Optional
 from uuid import UUID, uuid4
 
 from edps import Service
@@ -26,6 +27,7 @@ class AnalysisJobManager:
         self._job_repo = job_repo
         self._logger = getLogger(__name__)
         self._service = Service()
+        self._running_tasks: Dict[UUID, asyncio.Task] = {}
 
     async def create_job(self, job_data: JobData) -> UUID:
         """Create a job based on the user provided EDP data.
@@ -110,7 +112,20 @@ class AnalysisJobManager:
                     shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
                     main_ref = job.user_provided_edp_data.assetRefs[0]
                     job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
-                    await self._service.analyse_asset(ctx, job.user_provided_edp_data)
+
+                    task = asyncio.create_task(self._service.analyse_asset(ctx, job.user_provided_edp_data))
+                    self._running_tasks[job_id] = task
+
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        job.update_state(JobState.CANCELLED, "Analysis was cancelled.")
+                        job.finished = datetime.now(tz=UTC)
+                        self._logger.info("Job %s cancelled.", job.job_id)
+                        return
+                    finally:
+                        del self._running_tasks[job_id]
+
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
                     if get_report_path(ctx).exists():
                         shutil.copy(get_report_path(ctx), job.report_file)
@@ -123,6 +138,19 @@ class AnalysisJobManager:
                 job.update_state(JobState.FAILED, f"Processing failed: {exception}")
                 job.finished = datetime.now(tz=UTC)
                 self._logger.error("Job %s has failed", job.job_id, exc_info=exception)
+
+    async def cancel_job(self, job_id: UUID):
+        async with self._job_repo.new_session() as session:
+            job = await session.get_job(job_id)
+            if job.state not in [JobState.PROCESSING, JobState.QUEUED]:
+                raise ApiClientException(f"Job cannot be cancelled because it's in state {job.state.value}.")
+
+            self._logger.info("Job %s marked for cancellation.", job.job_id)
+
+            # Cancel the running task if it exists
+            if job_id in self._running_tasks:
+                self._running_tasks[job_id].cancel()
+                self._logger.info("Job %s cancellation request sent.", job.job_id)
 
     async def store_input_file(self, job_id: UUID, filename: Optional[str], file):
         """Store uploaded job data which will be analyzed later.

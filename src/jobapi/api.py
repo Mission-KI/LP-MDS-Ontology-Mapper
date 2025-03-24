@@ -41,6 +41,23 @@ def get_job_api_router(app_config: AppConfig):
         return await job_manager.get_job_view(job_id)
 
     @router.post(
+        "/analysisjob/{job_id}/cancel",
+        tags=[Tags.AnalysisJob],
+        summary="Cancel analysis job",
+        response_class=PlainTextResponse,
+        responses={
+            204: {
+                "description": "Job cancellation request accepted",
+            },
+        },
+    )
+    async def cancel_analysis_job(job_id: UUID) -> PlainTextResponse:
+        """Cancel an analysis job based on the job ID."""
+
+        await job_manager.cancel_job(job_id)
+        return PlainTextResponse(status_code=204)
+
+    @router.post(
         "/analysisjob/{job_id}/data/{filename}",
         summary="Upload data for new analysis job",
         tags=[Tags.AnalysisJob],
