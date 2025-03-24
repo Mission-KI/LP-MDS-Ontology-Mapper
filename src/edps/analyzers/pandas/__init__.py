@@ -63,6 +63,7 @@ _NUMERIC_LOWER_DIST = "lower-distribution-limit"
 _NUMERIC_UPPER_DIST = "upper-distribution-limit"
 _NUMERIC_LOWER_QUANT = "lower-quantile-limit"
 _NUMERIC_UPPER_QUANT = "upper-quantile-limit"
+_NUMERIC_QUANT_OUTLIERS = "quantile-outlier-count"
 _NUMERIC_LOWER_IQR = "lower-iqr-limit"
 _NUMERIC_UPPER_IQR = "upper-iqr-limit"
 _NUMERIC_IQR = "inter-quartile-range"
@@ -226,6 +227,9 @@ class PandasAnalyzer:
         # Inter Quartile Range
         fields[_NUMERIC_LOWER_QUANT] = columns.quantile(0.25)
         fields[_NUMERIC_UPPER_QUANT] = columns.quantile(0.75)
+        fields[_NUMERIC_QUANT_OUTLIERS] = _get_outliers(
+            columns, fields[_NUMERIC_LOWER_QUANT], fields[_NUMERIC_UPPER_QUANT]
+        )
         fields[_NUMERIC_IQR] = fields[_NUMERIC_UPPER_QUANT] - fields[_NUMERIC_LOWER_QUANT]
         fields[_NUMERIC_LOWER_IQR] = fields[_NUMERIC_LOWER_QUANT] - 1.5 * fields[_NUMERIC_IQR]
         fields[_NUMERIC_UPPER_IQR] = fields[_NUMERIC_UPPER_QUANT] + 1.5 * fields[_NUMERIC_IQR]
@@ -283,9 +287,10 @@ class PandasAnalyzer:
             stddev=computed_fields[_NUMERIC_STD_DEV],
             upperPercentile=computed_fields[_NUMERIC_UPPER_PERCENTILE],
             lowerPercentile=computed_fields[_NUMERIC_LOWER_PERCENTILE],
+            percentileOutlierCount=computed_fields[_NUMERIC_PERCENTILE_OUTLIERS],
             upperQuantile=computed_fields[_NUMERIC_UPPER_QUANT],
             lowerQuantile=computed_fields[_NUMERIC_LOWER_QUANT],
-            percentileOutlierCount=computed_fields[_NUMERIC_PERCENTILE_OUTLIERS],
+            quantileOutlierCount=computed_fields[_NUMERIC_QUANT_OUTLIERS],
             upperZScore=computed_fields[_NUMERIC_UPPER_Z],
             lowerZScore=computed_fields[_NUMERIC_LOWER_Z],
             zScoreOutlierCount=computed_fields[_NUMERIC_Z_OUTLIERS],
