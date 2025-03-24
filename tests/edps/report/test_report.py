@@ -19,17 +19,19 @@ def report_output_path(path_work):
 @mark.slow
 async def test_all_reports(ctx: TaskContext, asset_path, report_output_path):
     json_path = await analyse_asset(ctx, asset_path)
+    # A PDF report should already have been created during normal asset analysis.
+    # In this test we explicitly create another HTML and PDF report anyways.
     edp = read_edp_file(ctx.output_path / json_path)
     report_input = ReportInput(edp=edp)
 
     report_html = report_output_path / f"{asset_path.name}.html"
     with report_html.open("wb") as file_io:
-        await HtmlReportGenerator().generate(report_input, ctx.output_path, file_io)
+        await HtmlReportGenerator().generate(ctx, report_input, ctx.output_path, file_io)
     assert report_html.exists()
 
     report_pdf = report_output_path / f"{asset_path.name}.pdf"
     with report_pdf.open("wb") as file_io:
-        await PdfReportGenerator().generate(report_input, ctx.output_path, file_io)
+        await PdfReportGenerator().generate(ctx, report_input, ctx.output_path, file_io)
     assert report_pdf.exists()
 
     getLogger().info("Report output path: %s", report_output_path)
