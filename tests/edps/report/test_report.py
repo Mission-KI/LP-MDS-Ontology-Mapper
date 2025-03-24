@@ -1,6 +1,7 @@
 from logging import getLogger
 from pathlib import Path
 
+import pytest
 from pytest import fixture, mark
 
 from edps.report import HtmlReportGenerator, PdfReportGenerator, ReportInput
@@ -18,7 +19,8 @@ def report_output_path(path_work):
 # This test generates multiple reports because fixture "asset_path" iterates through multiple assets.
 @mark.slow
 async def test_all_reports(ctx: TaskContext, asset_path, report_output_path):
-    json_path = await analyse_asset(ctx, asset_path)
+    with pytest.warns(UserWarning):
+        json_path = await analyse_asset(ctx, asset_path)
     # A PDF report should already have been created during normal asset analysis.
     # In this test we explicitly create another HTML and PDF report anyways.
     edp = read_edp_file(ctx.output_path / json_path)
