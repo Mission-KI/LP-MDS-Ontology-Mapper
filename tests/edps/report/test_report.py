@@ -1,4 +1,5 @@
 from logging import getLogger
+from pathlib import Path
 
 from pytest import fixture, mark
 
@@ -8,8 +9,10 @@ from tests.edps.test_edps import analyse_asset, read_edp_file
 
 
 @fixture
-def report_output_path(tmp_path):
-    return tmp_path
+def report_output_path(path_work):
+    path: Path = path_work / "report"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 # This test generates multiple reports because fixture "asset_path" iterates through multiple assets.
