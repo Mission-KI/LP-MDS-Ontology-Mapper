@@ -52,7 +52,7 @@ dependencies = [
     "torch",
     "torchvision",
     "easyocr",
-    "python-ffmpeg",
+    "ffmpeg-python",
     "static-ffmpeg",
     "genson",
     "spacy ~= 3.8",
