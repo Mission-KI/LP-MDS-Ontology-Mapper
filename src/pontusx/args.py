@@ -7,8 +7,11 @@ from pydantic.dataclasses import dataclass
 from pydantic_settings import BaseSettings
 
 
-# Raw arguments from ENV variables 'BASEDIR' and 'DIDS'
 class RawArgs(BaseSettings):
+    """
+    These variables are set by Pontus X.
+    """
+
     basedir: Path = Field(description="Data base dir (default: /data)", default=Path("/data"))
     dids: Optional[str] = Field(description='Array of DID identifiers (e.g. ["83274adb"])', default=None)
 
@@ -42,7 +45,7 @@ def get_args() -> Args:
 
     base_dir = raw_args.basedir.resolve()
     if not base_dir.is_dir():
-        raise ValueError(f"Base dir '{base_dir}' is missing. Maybe set ENV varible 'BASEDIR'")
+        raise ValueError(f"Base dir '{base_dir}' is missing. Maybe set ENV variable 'BASEDIR'")
 
     raw_data_file = base_dir / f"inputs/{did}/0"
     if not raw_data_file.is_file():
