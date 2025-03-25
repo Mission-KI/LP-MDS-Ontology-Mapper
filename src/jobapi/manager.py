@@ -106,12 +106,12 @@ class AnalysisJobManager:
                 ):
                     self._logger.debug("Temporary working directory: %s", temp_working_dir)
                     user_data = job.user_data
-                    config = Config(userProvidedEdpData=user_data)
+                    config = Config()
                     ctx = TaskContextImpl(config, job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
                     main_ref = user_data.assetRefs[0]
                     job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
-                    await self._service.analyse_asset(ctx)
+                    await self._service.analyse_asset(ctx, user_data)
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
                     if get_report_path(ctx).exists():
                         shutil.copy(get_report_path(ctx), job.report_file)

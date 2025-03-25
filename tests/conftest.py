@@ -273,8 +273,8 @@ def user_provided_data():
 
 
 @fixture(scope="session")
-def config_data(user_provided_data):
-    return Config(userProvidedEdpData=user_provided_data, augmentedColumns=[])
+def config_data():
+    return Config()
 
 
 @fixture(scope="session")

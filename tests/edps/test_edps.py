@@ -33,14 +33,14 @@ from tests.conftest import copy_asset_to_ctx_input_dir
 
 
 @fixture(scope="session")
-def config_data_with_augmentations(user_provided_data):
+def config_data_with_augmentations():
     augmented_columns = [
         AugmentedColumn(
             name="aufenthalt",
             augmentation=Augmentation(sourceColumns=["einfahrt", "ausfahrt"]),
         )
     ]
-    return Config(userProvidedEdpData=user_provided_data, augmentedColumns=augmented_columns)
+    return Config(augmentedColumns=augmented_columns)
 
 
 @fixture
@@ -49,8 +49,8 @@ def context_with_augmented_config(config_data_with_augmentations, logger, path_w
 
 
 @fixture
-def analyse_asset_fn(ctx) -> Callable[[Path], Awaitable[FileReference]]:
-    return lambda path: analyse_asset(ctx, path)
+def analyse_asset_fn(ctx, user_provided_data) -> Callable[[Path], Awaitable[FileReference]]:
+    return lambda path: analyse_asset(ctx, path, user_provided_data)
 
 
 @fixture
@@ -170,10 +170,10 @@ async def test_analyse_csv_counts(path_data_test_counts_csv, compute_asset_fn):
 
 
 @mark.asyncio
-async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, ctx, config_data):
+async def test_analyse_roundtrip_csv(path_data_test_csv, analyse_asset_fn, ctx, user_provided_data):
     edp_file = await analyse_asset_fn(path_data_test_csv)
     edp = read_edp_file(ctx.output_path / edp_file)
-    assert edp.assetRefs[0].assetId == config_data.userProvidedEdpData.assetRefs[0].assetId
+    assert edp.assetRefs[0].assetId == user_provided_data.assetRefs[0].assetId
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
 
@@ -663,9 +663,9 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
         await analyse_asset_fn(file_path)
 
 
-async def analyse_asset(ctx: TaskContext, asset_path: Path):
+async def analyse_asset(ctx: TaskContext, asset_path: Path, user_provided_data):
     copy_asset_to_ctx_input_dir(asset_path, ctx)
-    return await Service().analyse_asset(ctx)
+    return await Service().analyse_asset(ctx, user_provided_data)
 
 
 async def compute_asset(ctx: TaskContext, asset_path: Path):

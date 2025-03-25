@@ -32,9 +32,7 @@ def _get_edp_field(name: str) -> Any:
 
 class UserProvidedEdpData(BaseModel):
     """
-    The data provided by the caller of the EDP Service.
-
-    This is a subset of the extended dataset profile.
+    All fields of the extended dataset profile which must be supplied by the caller.
     """
 
     name: str = _get_edp_field("name")
@@ -131,13 +129,13 @@ class StructuredConfig(BaseModel):
 
 
 class Config(BaseModel):
-    """Extended dataset profile service configuration
+    """
+    Extended dataset profile service configuration
 
     This configuration contains all customizable variables for the analysis of assets.
-    All analyzer specific configurations are collected here.
+    All analyzer configurations are collected here.
     """
 
-    userProvidedEdpData: UserProvidedEdpData = Field(description="User provided EDP meta data")
     augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
     structured_config: StructuredConfig = Field(
         default_factory=StructuredConfig, description="Configurations for the structured data analysis"

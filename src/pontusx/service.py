@@ -74,14 +74,14 @@ async def run_service(logger: Logger, args: Args):
     input_filename = f"data.{file_extension}"
 
     with TemporaryDirectory() as temp_working_dir_path:
-        edps_config = Config(userProvidedEdpData=user_edp_data)
+        edps_config = Config()
         ctx = TaskContextImpl(edps_config, logger, Path(temp_working_dir_path))
 
         ctx.input_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(args.raw_data_file, ctx.input_path / input_filename)
 
         logger.info("Processing asset..")
-        await Service().analyse_asset(ctx)
+        await Service().analyse_asset(ctx, user_edp_data)
 
         logger.info("Zipping EDP..")
         main_ref = user_edp_data.assetRefs[0]

@@ -31,7 +31,7 @@ from edps.filewriter import write_edp
 from edps.importers import get_importable_types
 from edps.report import PdfReportGenerator, ReportInput
 from edps.taskcontext import TaskContext
-from edps.types import AugmentedColumn, ComputedEdpData, DataSet
+from edps.types import AugmentedColumn, ComputedEdpData, DataSet, UserProvidedEdpData
 
 REPORT_FILENAME = "report.pdf"
 
@@ -49,7 +49,7 @@ class Service:
         implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
         _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, ctx: TaskContext) -> Path:
+    async def analyse_asset(self, ctx: TaskContext, user_data: UserProvidedEdpData) -> Path:
         """
         Let the service analyse the assets in ctx.input_path.
         The result (EDP JSON, plots and report) is written to ctx.output_path.
@@ -68,7 +68,6 @@ class Service:
             File path to the generated EDP JSON (relative to ctx.output_path).
         """
         computed_data = await self._compute_asset(ctx)
-        user_data = ctx.config.userProvidedEdpData
         edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
         main_ref = user_data.assetRefs[0]
         json_name = main_ref.assetId + ("_" + main_ref.assetVersion if main_ref.assetVersion else "")
