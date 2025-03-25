@@ -6,8 +6,8 @@ from typing import AsyncIterator, Optional
 from uuid import UUID
 
 from edps.service import REPORT_FILENAME
-from edps.types import UserProvidedEdpData
-from jobapi.types import JobState, JobView
+from edps.types import Config, UserProvidedEdpData
+from jobapi.types import JobData, JobState, JobView
 
 
 class Job(ABC):
@@ -54,7 +54,7 @@ class Job(ABC):
 
     @property
     @abstractmethod
-    def user_data(self) -> UserProvidedEdpData: ...
+    def job_data(self) -> JobData: ...
 
     @property
     @abstractmethod
@@ -79,12 +79,20 @@ class Job(ABC):
     def log_file(self) -> Path:
         return self.job_base_dir / "job.log"
 
+    @property
+    def configuration(self) -> Config:
+        return self.job_data.config
+
+    @property
+    def user_provided_edp_data(self) -> UserProvidedEdpData:
+        return self.job_data.user_provided_edp_data
+
 
 class JobSession(ABC):
     """Abstract JobSession for creating and finding jobs. It is instantiated by the JobRepository."""
 
     @abstractmethod
-    async def create_job(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path) -> Job:
+    async def create_job(self, job_id: UUID, job_data: JobData, job_base_dir: Path) -> Job:
         """Create a new job."""
         ...
 

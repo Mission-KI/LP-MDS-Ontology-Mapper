@@ -3,6 +3,19 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from edps.types import Config, UserProvidedEdpData
+
+
+class JobData(BaseModel):
+    """Data required for running a job."""
+
+    user_provided_edp_data: UserProvidedEdpData = Field(
+        description="EDP data that can not be computed automatically and must be supplied by the caller."
+    )
+    config: Config = Field(
+        default_factory=lambda: Config(), description="Configuration of the analysis steps. These are optional."
+    )
+
 
 class JobState(str, Enum):
     WAITING_FOR_DATA = "WAITING_FOR_DATA"

@@ -13,10 +13,9 @@ from edps import Service
 from edps.compression.zip import ZipAlgorithm
 from edps.service import get_report_path
 from edps.taskcontextimpl import TaskContextImpl
-from edps.types import Config, UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.repo import Job, JobRepository
-from jobapi.types import JobState, JobView
+from jobapi.types import JobData, JobState, JobView
 
 
 class AnalysisJobManager:
@@ -26,7 +25,7 @@ class AnalysisJobManager:
         self._logger = getLogger(__name__)
         self._service = Service()
 
-    async def create_job(self, user_data: UserProvidedEdpData) -> UUID:
+    async def create_job(self, job_data: JobData) -> UUID:
         """Create a job based on the user provided EDP data.
         The job gets an ID and a job working directory and is initially in state 'WAITING_FOR_DATA'.
         Returns Job-ID.
@@ -41,7 +40,7 @@ class AnalysisJobManager:
 
             await session.create_job(
                 job_id=job_id,
-                user_data=user_data,
+                job_data=job_data,
                 job_base_dir=job_base_dir,
             )
 
@@ -105,13 +104,11 @@ class AnalysisJobManager:
                     init_file_logger(job.log_file) as job_logger,
                 ):
                     self._logger.debug("Temporary working directory: %s", temp_working_dir)
-                    user_data = job.user_data
-                    config = Config()
-                    ctx = TaskContextImpl(config, job_logger, Path(temp_working_dir))
+                    ctx = TaskContextImpl(job.configuration, job_logger, Path(temp_working_dir))
                     shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
-                    main_ref = user_data.assetRefs[0]
+                    main_ref = job.user_provided_edp_data.assetRefs[0]
                     job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
-                    await self._service.analyse_asset(ctx, user_data)
+                    await self._service.analyse_asset(ctx, job.user_provided_edp_data)
                     await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
                     if get_report_path(ctx).exists():
                         shutil.copy(get_report_path(ctx), job.report_file)

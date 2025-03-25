@@ -12,13 +12,12 @@ from fastapi import (
 from fastapi.responses import FileResponse, PlainTextResponse
 from sqlmodel import create_engine
 
-from edps.types import UserProvidedEdpData
 from jobapi.config import AppConfig
 from jobapi.manager import AnalysisJobManager
 from jobapi.repo.base import JobRepository
 from jobapi.repo.inmemory import InMemoryJobRepository
 from jobapi.repo.persistent import DbJobRepository
-from jobapi.types import JobView
+from jobapi.types import JobData, JobView
 
 
 class Tags(str, Enum):
@@ -31,14 +30,14 @@ def get_job_api_router(app_config: AppConfig):
     router = APIRouter()
 
     @router.post("/analysisjob", tags=[Tags.AnalysisJob], summary="Create analysis job")
-    async def create_analysis_job(user_data: UserProvidedEdpData) -> JobView:
+    async def create_analysis_job(job_data: JobData) -> JobView:
         """Create an analysis job based on the user provided EDP data.
         This must be followed by uploading the actual data.
 
         Returns infos about the job including an ID.
         """
 
-        job_id = await job_manager.create_job(user_data)
+        job_id = await job_manager.create_job(job_data)
         return await job_manager.get_job_view(job_id)
 
     @router.post(

@@ -7,9 +7,8 @@ from uuid import UUID
 from sqlalchemy import Engine
 from sqlmodel import Field, Session, SQLModel, select
 
-from edps.types import UserProvidedEdpData
 from jobapi.repo.base import Job, JobRepository, JobSession
-from jobapi.types import JobState
+from jobapi.types import JobData, JobState
 
 
 class DbJob(SQLModel, Job, table=True):
@@ -25,17 +24,16 @@ class DbJob(SQLModel, Job, table=True):
     f_finished: Optional[datetime] = Field(sa_column_kwargs={"name": "finished"})
     # tasks: list["DbTask"] = Relationship(back_populates="job")
 
-    def __init__(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
+    def __init__(self, job_id: UUID, job_data: JobData, job_base_dir: Path):
         self.id = job_id
         self.f_job_base_dir = str(PurePosixPath(job_base_dir))
         self.f_state = JobState.WAITING_FOR_DATA
         self.f_state_detail: Optional[str] = None
 
-        main_ref = user_data.assetRefs[0]
+        main_ref = job_data.user_provided_edp_data.assetRefs[0]
         self.f_asset_id = main_ref.assetId
         self.f_asset_version = main_ref.assetVersion
-        with self.user_data_file.open("w") as file:
-            file.write(user_data.model_dump_json())
+        self.job_data_path.write_text(job_data.model_dump_json(by_alias=True))
 
     @property
     def job_id(self) -> UUID:
@@ -78,17 +76,16 @@ class DbJob(SQLModel, Job, table=True):
         self.f_finished = finished
 
     @property
-    def user_data(self) -> UserProvidedEdpData:
-        with self.user_data_file.open("r") as file:
-            return UserProvidedEdpData.model_validate_json(file.read())
+    def job_data(self) -> JobData:
+        return JobData.model_validate_json(self.job_data_path.read_text())
 
     @property
     def job_base_dir(self) -> Path:
         return Path(self.f_job_base_dir)
 
     @property
-    def user_data_file(self) -> Path:
-        return self.job_base_dir / "userdata.json"
+    def job_data_path(self) -> Path:
+        return self.job_base_dir / "job_data.json"
 
 
 # class DbTask(SQLModel, table=True):
@@ -106,10 +103,10 @@ class DbJobSession(JobSession):
     def __init__(self, session: Session):
         self._session = session
 
-    async def create_job(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
+    async def create_job(self, job_id: UUID, job_data: JobData, job_base_dir: Path):
         job = DbJob(
             job_id=job_id,
-            user_data=user_data,
+            job_data=job_data,
             job_base_dir=job_base_dir,
         )
         self._session.add(job)

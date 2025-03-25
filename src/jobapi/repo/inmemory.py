@@ -4,20 +4,19 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
-from edps.types import UserProvidedEdpData
 from jobapi.repo import Job, JobRepository, JobSession
-from jobapi.types import JobState
+from jobapi.types import JobData, JobState
 
 
 class InMemoryJob(Job):
-    def __init__(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
+    def __init__(self, job_id: UUID, job_data: JobData, job_base_dir: Path):
         self._job_id = job_id
-        self._user_data = user_data
+        self._job_data = job_data
         self._job_base_dir = job_base_dir
         self._state = JobState.WAITING_FOR_DATA
         self._state_detail: Optional[str] = None
 
-        main_ref = user_data.assetRefs[0]
+        main_ref = job_data.user_provided_edp_data.assetRefs[0]
         self._asset_id = main_ref.assetId
         self._asset_version = main_ref.assetVersion
         self._started: Optional[datetime]
@@ -64,8 +63,8 @@ class InMemoryJob(Job):
         self._finished = finished
 
     @property
-    def user_data(self) -> UserProvidedEdpData:
-        return self._user_data
+    def job_data(self) -> JobData:
+        return self._job_data
 
     @property
     def job_base_dir(self) -> Path:
@@ -76,10 +75,10 @@ class InMemoryJobSession(JobSession):
     def __init__(self, jobs: dict[UUID, InMemoryJob]):
         self._jobs = jobs
 
-    async def create_job(self, job_id: UUID, user_data: UserProvidedEdpData, job_base_dir: Path):
+    async def create_job(self, job_id: UUID, job_data: JobData, job_base_dir: Path):
         job = InMemoryJob(
             job_id=job_id,
-            user_data=user_data,
+            job_data=job_data,
             job_base_dir=job_base_dir,
         )
         self._jobs[job_id] = job
