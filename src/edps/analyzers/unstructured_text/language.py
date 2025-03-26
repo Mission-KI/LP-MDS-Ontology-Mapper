@@ -9,15 +9,14 @@ from extended_dataset_profile.models.v0.edp import WordFrequency
 from lingua import Language, LanguageDetector, LanguageDetectorBuilder
 from pandas import DataFrame, RangeIndex, Series
 from spacy.tokens import Token
+from spacy.tokens.doc import Doc
 
 from edps.taskcontext import TaskContext
-
-MINIMUM_NUMBER_CHARACTERS_PER_SENTENCE = 10
 
 _TEXT_BODY_KEY = "text_body"
 _BEST_LANGUAGE_KEY = "best_language"
 
-_SENTENCE_SPLITTER_RE = re.compile(r"[.:?!]\s")
+_SANITIZER_REGEXS = {re.compile(r"\n"): " ", re.compile(r"(\s\s+)"): " "}
 
 
 class MissingSpacyModelWarning(UserWarning):
@@ -33,19 +32,26 @@ def _detect_language_confidences_per_sentence(detector: LanguageDetector, text: 
     return confidence
 
 
-def _split_sentences(text: str) -> List[str]:
-    text = text.replace("\n", " ")
-    sentences: List[str] = _SENTENCE_SPLITTER_RE.split(text)
-    sentences = [sentence.strip() for sentence in sentences]
-    sentences = [sentence for sentence in sentences if (len(sentence) > MINIMUM_NUMBER_CHARACTERS_PER_SENTENCE)]
-    if len(sentences) == 0:
-        # Prevent accidentally filtering out all text.
-        sentences = [text]
-    return sentences
+def _sanitize_sentence(text: str) -> str:
+    for regex, replacement in _SANITIZER_REGEXS.items():
+        text = regex.sub(replacement, text)
+    return text
+
+
+def _split_sentences(text: str) -> Iterator[str]:
+    doc: Doc = spacy.blank("en")(text)
+    sentencizer = spacy.pipeline.Sentencizer()
+    doc = sentencizer(doc)
+    for sentence in doc.sents:
+        yield _sanitize_sentence(str(sentence))
 
 
 def calculate_language_confidences(text: str) -> tuple[DataFrame, set[Language]]:
-    sentences = _split_sentences(text)
+    sentences = list(_split_sentences(text))
+    if len(sentences) == 0:
+        # Prevent accidentally filtering out all text.
+        sentences = [_sanitize_sentence(text)]
+
     language_detector = LanguageDetectorBuilder.from_all_languages().build()
     columns: List[Union[Language, str]] = [
         result.language for result in language_detector.compute_language_confidence_values("")
