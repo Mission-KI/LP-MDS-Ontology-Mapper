@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 from typing import Iterator, Optional
 
 from extended_dataset_profile.models.v0.edp import (
@@ -11,9 +12,16 @@ from pypdf.constants import PageAttributes
 from pypdf.generic import ArrayObject, PdfObject
 
 from edps.analyzers.common import split_keywords
-from edps.importers.images import raster_image_importer_from_pilimage
-from edps.importers.unstructured_text import unstructured_text_importer_from_string
+from edps.analyzers.images.importer import raster_image_importer_from_pilimage
+from edps.analyzers.unstructured_text.importer import unstructured_text_importer_from_string
 from edps.taskcontext import TaskContext
+
+
+async def pdf_importer(ctx: TaskContext, path: Path) -> DocumentDataSet:
+    ctx.logger.info("Analyzing PDF '%s'", ctx.relative_path(path))
+
+    with PdfReader(path) as pdf_reader:
+        return await PdfAnalyzer(pdf_reader).analyze(ctx)
 
 
 class PdfAnalyzer:

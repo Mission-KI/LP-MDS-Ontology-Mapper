@@ -5,8 +5,8 @@ import pytest
 import scipy
 from pandas import Series
 
-from edps.analyzers.pandas import fitter
-from edps.analyzers.pandas.fitter import (
+from edps.analyzers.structured import fitter
+from edps.analyzers.structured.fitter import (
     COMMON_DISTRIBUTIONS,
     Distribution,
     DistributionParameters,

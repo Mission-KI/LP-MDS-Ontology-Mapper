@@ -16,8 +16,9 @@ from clevercsv.potential_dialects import get_dialects as _get_dialects
 from extended_dataset_profile.models.v0.edp import StructuredDataSet
 from pandas import DataFrame, read_csv, read_excel
 
-from edps.analyzers import PandasAnalyzer
 from edps.taskcontext import TaskContext
+
+from ..structured import PandasAnalyzer
 
 
 class HeaderMismatchWarning(UserWarning):

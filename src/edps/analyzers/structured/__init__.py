@@ -28,17 +28,18 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
-from edps.analyzers.pandas.fitter import DistributionParameters, FittingError, Limits, fit_best_distribution
-from edps.analyzers.pandas.seasonality import compute_seasonality, get_seasonality_graphs
-from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
-from edps.analyzers.pandas.temporal_consistency import determine_periodicity as determine_periodicity
-from edps.analyzers.pandas.type_parser import (
+from edps.filewriter import get_pyplot_writer
+from edps.taskcontext import TaskContext
+
+from .fitter import DistributionParameters, FittingError, Limits, fit_best_distribution
+from .seasonality import compute_seasonality, get_seasonality_graphs
+from .temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
+from .temporal_consistency import determine_periodicity as determine_periodicity
+from .type_parser import (
     DatetimeColumnInfo,
     Result,
     parse_types,
 )
-from edps.filewriter import get_pyplot_writer
-from edps.taskcontext import TaskContext
 
 # Labels for fields
 

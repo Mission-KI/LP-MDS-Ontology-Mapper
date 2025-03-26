@@ -5,7 +5,7 @@ from pickle import load
 from extended_dataset_profile.models.v0.edp import StructuredDataSet
 from pandas import DataFrame
 
-from edps.analyzers import PandasAnalyzer
+from edps.analyzers.structured import PandasAnalyzer
 from edps.taskcontext import TaskContext
 
 

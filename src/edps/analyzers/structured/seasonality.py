@@ -7,8 +7,8 @@ from matplotlib.figure import Figure
 from pandas import DataFrame, Series
 from statsmodels.tsa.seasonal import STL, DecomposeResult
 
-from edps.analyzers.pandas.temporal_consistency import DatetimeColumnTemporalConsistency, Granularity
-from edps.analyzers.pandas.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
+from edps.analyzers.structured.temporal_consistency import DatetimeColumnTemporalConsistency, Granularity
+from edps.analyzers.structured.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
 from edps.taskcontext import TaskContext
 

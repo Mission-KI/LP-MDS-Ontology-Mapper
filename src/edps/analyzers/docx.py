@@ -2,6 +2,7 @@ from pathlib import Path, PurePosixPath
 from typing import AsyncIterator
 from zipfile import ZipFile
 
+from docx import Document as read_document
 from docx.document import Document
 from extended_dataset_profile.models.v0.edp import (
     DocumentDataSet,
@@ -11,9 +12,16 @@ from extended_dataset_profile.models.v0.edp import (
 from pandas import DataFrame
 
 from edps.analyzers.common import split_keywords
-from edps.importers.structured import pandas_importer
-from edps.importers.unstructured_text import unstructured_text_importer_from_string
+from edps.analyzers.structured.importer import pandas_importer
+from edps.analyzers.unstructured_text.importer import unstructured_text_importer_from_string
 from edps.taskcontext import TaskContext
+
+
+async def docx_importer(ctx: TaskContext, path: Path) -> DocumentDataSet:
+    ctx.logger.info("Analyzing DOCX '%s'", ctx.relative_path(path))
+
+    doc = read_document(str(path))
+    return await DocxAnalyzer(doc, path).analyze(ctx)
 
 
 class DocxAnalyzer:

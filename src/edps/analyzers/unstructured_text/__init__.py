@@ -11,9 +11,9 @@ from clevercsv.exceptions import Error as CleverCsvError
 from extended_dataset_profile.models.v0.edp import EmbeddedTable, StructuredDataSet, UnstructuredTextDataSet
 from pandas import DataFrame
 
+from edps.analyzers.structured.importer import dialect_to_str, get_possible_csv_dialects, pandas_importer
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
 from edps.analyzers.unstructured_text.language import detect_languages, detect_word_cloud
-from edps.importers.structured import dialect_to_str, get_possible_csv_dialects, pandas_importer
 from edps.taskcontext import TaskContext
 
 

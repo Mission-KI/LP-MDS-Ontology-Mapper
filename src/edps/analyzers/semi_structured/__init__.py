@@ -5,8 +5,9 @@ from extended_dataset_profile.models.v0.edp import SemiStructuredDataSet
 from genson import SchemaBuilder
 from pandas import DataFrame, json_normalize
 
-from edps.importers.structured import pandas_importer
 from edps.taskcontext import TaskContext
+
+from ..structured.importer import pandas_importer
 
 JSONData = Union[Dict[str, Any], List[Any]]
 StructuredDataMatch = Tuple[Dict[str, Any], str]

@@ -26,7 +26,7 @@ from pandas import DataFrame
 from pydantic import BaseModel
 
 import edps
-from edps.analyzers.pandas import determine_periodicity
+from edps.analyzers.structured import determine_periodicity
 from edps.analyzers.unstructured_text.language import download_supported_languages
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size

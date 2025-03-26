@@ -4,7 +4,7 @@ from extended_dataset_profile.models.v0.edp import ImageColorMode, ImageDPI, Res
 from PIL.Image import open as open_image
 
 from edps.analyzers.images import ImageMetadata
-from edps.importers.images import parse_raster_image
+from edps.analyzers.images.importer import parse_raster_image
 
 
 async def test_import_png(path_data_test_png):

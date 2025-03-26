@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 from PIL.Image import open as open_image
 
+from edps.analyzers.images.importer import parse_raster_image
 from edps.analyzers.images.ocr import OCR
-from edps.importers.images import parse_raster_image
 
 
 async def test_ocr_single_line(path_data_test_png, ctx):

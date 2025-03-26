@@ -13,8 +13,8 @@ from extended_dataset_profile.models.v0.edp import (
 from pydantic import HttpUrl
 from pytest import fixture
 
+from edps.analyzers.structured.importer import csv_import_dataframe
 from edps.filewriter import setup_matplotlib
-from edps.importers.structured import csv_import_dataframe
 from edps.service import download_artifacts
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl

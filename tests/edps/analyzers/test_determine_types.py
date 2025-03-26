@@ -6,7 +6,7 @@ import pytest
 from pandas import DataFrame, Series, Timestamp
 from pytest import fixture, mark
 
-from edps.analyzers.pandas.type_parser import (
+from edps.analyzers.structured.type_parser import (
     DatetimeColumnInfo,
     DatetimeKind,
     NumericColumnInfo,

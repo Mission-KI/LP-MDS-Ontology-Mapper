@@ -1,15 +1,15 @@
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
-from edps.importers.archive import archive_importer
-from edps.importers.docx import docx_importer
-from edps.importers.images import raster_image_importer
-from edps.importers.pdf import pdf_importer
-from edps.importers.python import pickle_importer
-from edps.importers.semi_structured import json_importer
-from edps.importers.structured import csv_importer, xls_importer, xlsx_importer
-from edps.importers.unstructured_text import unstructured_text_importer
-from edps.importers.videos import video_importer
+from edps.analyzers.archive import archive_importer
+from edps.analyzers.docx import docx_importer
+from edps.analyzers.images.importer import raster_image_importer
+from edps.analyzers.pdf import pdf_importer
+from edps.analyzers.python import pickle_importer
+from edps.analyzers.semi_structured.importer import json_importer
+from edps.analyzers.structured.importer import csv_importer, xls_importer, xlsx_importer
+from edps.analyzers.unstructured_text.importer import unstructured_text_importer
+from edps.analyzers.videos.importer import video_importer
 from edps.taskcontext import TaskContext
 from edps.types import DataSet
 
