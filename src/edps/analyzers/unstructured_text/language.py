@@ -53,7 +53,7 @@ def calculate_language_confidences(text: str) -> tuple[DataFrame, set[Language]]
         # Prevent accidentally filtering out all text.
         sentences = [_sanitize_sentence(text)]
 
-    language_detector = LanguageDetectorBuilder.from_all_languages().build()
+    language_detector = LanguageDetectorBuilder.from_languages(*LANGUAGE_MODEL_MAP.keys()).build()
     columns: List[Union[Language, str]] = [
         result.language for result in language_detector.compute_language_confidence_values("")
     ]

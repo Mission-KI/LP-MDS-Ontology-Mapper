@@ -19,7 +19,6 @@ from extended_dataset_profile.models.v0.edp import (
 from pytest import fixture, mark, raises
 
 from edps import Service
-from edps.analyzers.unstructured_text.language import MissingSpacyModelWarning
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
 from edps.types import (
@@ -461,8 +460,7 @@ async def test_analyse_wmv(ctx, path_data_test_wmv, user_provided_data):
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 async def test_analyse_pdf(path_data_test_pdf, compute_asset_fn):
-    with pytest.warns(MissingSpacyModelWarning):
-        edp = await compute_asset_fn(path_data_test_pdf)
+    edp = await compute_asset_fn(path_data_test_pdf)
 
     assert len(edp.documentDatasets) == 1
     doc_dataset = edp.documentDatasets[0]
