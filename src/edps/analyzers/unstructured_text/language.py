@@ -141,9 +141,3 @@ def _normalize_token(token: Token, lemma_tags: Set[str] = {"NNS", "NNPS"}):
     - "NNPS": plural proper noun (e.g., "Smiths")
     """
     return token.lemma_ if token.tag_ in lemma_tags else token.text
-
-
-def download_supported_languages():
-    for model in LANGUAGE_MODEL_MAP.values():
-        if not spacy.util.is_package(model):
-            spacy.cli.download(model)

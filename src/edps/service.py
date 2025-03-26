@@ -27,7 +27,6 @@ from pydantic import BaseModel
 
 import edps
 from edps.analyzers.structured import determine_periodicity
-from edps.analyzers.unstructured_text.language import download_supported_languages
 from edps.compression import DECOMPRESSION_ALGORITHMS
 from edps.file import calculate_size
 from edps.filewriter import write_edp
@@ -288,6 +287,5 @@ def download_artifacts():
     """
     Downloads all artifacts needed for the service execution.
     """
-    download_supported_languages()
     static_ffmpeg.add_paths(weak=True)
     easyocr.Reader(["en", "de"], gpu=False, download_enabled=True)

@@ -55,9 +55,12 @@ dependencies = [
     "python-ffmpeg",
     "static-ffmpeg",
     "genson",
-    "spacy",
+    "spacy ~= 3.8",
     "Jinja2",
     "xhtml2pdf",
+    "de-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl",
+    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
+    "fr-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.8.0/fr_core_news_lg-3.8.0-py3-none-any.whl",
 ]
 
 [project.scripts]
