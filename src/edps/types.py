@@ -10,6 +10,7 @@ from extended_dataset_profile.models.v0.edp import (
     AssetReference,
     AssetTransferType,
     AssetUpdatePeriod,
+    AudioDataSet,
     Augmentation,
     DatasetTreeNode,
     DataSetType,
@@ -71,6 +72,7 @@ class ComputedEdpData(BaseModel):
     schemaVersion: str = _get_edp_field("schemaVersion")
     volume: int = _get_edp_field("volume")
     videoDatasets: List[VideoDataSet] = _get_edp_field("videoDatasets")
+    audioDatasets: List[AudioDataSet] = _get_edp_field("audioDatasets")
     temporalCover: TemporalCover | None = _get_edp_field("temporalCover")
     periodicity: str | None = _get_edp_field("periodicity")
     documentDatasets: List[DocumentDataSet] = _get_edp_field("documentDatasets")
@@ -184,6 +186,7 @@ DataSet = Union[
     UnstructuredTextDataSet,
     ImageDataSet,
     VideoDataSet,
+    AudioDataSet,
     DocumentDataSet,
 ]
 

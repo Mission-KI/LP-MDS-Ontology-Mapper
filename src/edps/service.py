@@ -10,6 +10,7 @@ import easyocr
 import static_ffmpeg
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
+    AudioDataSet,
     DatasetTreeNode,
     DataSetType,
     DocumentDataSet,
@@ -153,6 +154,10 @@ class Service:
             edp.videoDatasets.append(dataset)
             edp.dataTypes.add(DataSetType.video)
             return "videoDatasets", (len(edp.videoDatasets) - 1)
+        elif isinstance(dataset, AudioDataSet):
+            edp.audioDatasets.append(dataset)
+            edp.dataTypes.add(DataSetType.audio)
+            return "audioDatasets", (len(edp.audioDatasets) - 1)
         elif isinstance(dataset, DocumentDataSet):
             edp.documentDatasets.append(dataset)
             edp.dataTypes.add(DataSetType.documents)
