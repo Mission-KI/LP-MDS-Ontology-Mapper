@@ -1,10 +1,11 @@
 import re
 import warnings
 from collections import Counter
-from typing import List, Optional, Set, Tuple, Union, cast
+from typing import Iterator, List, Optional, Set, Union, cast
 
 import spacy
 import spacy.cli
+from extended_dataset_profile.models.v0.edp import WordFrequency
 from lingua import Language, LanguageDetector, LanguageDetectorBuilder
 from pandas import DataFrame, RangeIndex, Series
 from spacy.tokens import Token
@@ -82,7 +83,7 @@ def detect_languages(ctx: TaskContext, text: str) -> Set[str]:
     return {language.iso_code_639_3.name.lower() for language in languages}
 
 
-def detect_word_cloud(ctx: TaskContext, text: str, top_n: int = 10) -> List[Tuple[str, int]]:
+def detect_word_cloud(ctx: TaskContext, text: str, top_n: int = 10) -> Iterator[WordFrequency]:
     aggregated_counts: Counter[str] = Counter()
     confidences, _ = calculate_language_confidences(text)
     confidences[_BEST_LANGUAGE_KEY] = confidences.iloc[:, :-1].idxmax(axis=1)
@@ -100,7 +101,8 @@ def detect_word_cloud(ctx: TaskContext, text: str, top_n: int = 10) -> List[Tupl
         )
         aggregated_counts.update(word_counts)
 
-    return aggregated_counts.most_common(top_n)
+    for word, count in aggregated_counts.most_common(top_n):
+        yield WordFrequency(word=word, count=count)
 
 
 LANGUAGE_MODEL_MAP = {

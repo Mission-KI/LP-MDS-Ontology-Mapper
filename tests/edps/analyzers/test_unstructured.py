@@ -1,3 +1,4 @@
+from extended_dataset_profile.models.v0.edp import WordFrequency
 from pytest import raises
 
 from edps.analyzers.unstructured_text.chunk import Chunk
@@ -99,18 +100,18 @@ def test_deu_and_eng_language_detection(ctx, path_language_deu_eng_wiki_llm_txt)
 def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
     with open(path_language_deu_wiki_llm_txt, "rt", encoding="utf-8") as file:
         text = file.read()
-    word_cloud = detect_word_cloud(ctx, text)
+    word_cloud = list(detect_word_cloud(ctx, text))
     expected = [
-        ("Sprachmodelle", 10),
-        ("Jahr", 6),
-        ("Informationen", 5),
-        ("Parameter", 5),
-        ("Modalität", 4),
-        ("ChatGPT", 3),
-        ("Fähigkeiten", 3),
-        ("LLMs", 3),
-        ("OpenAI", 3),
-        ("Sprachmodell", 3),
+        WordFrequency(word="Sprachmodelle", count=10),
+        WordFrequency(word="Jahr", count=6),
+        WordFrequency(word="Informationen", count=5),
+        WordFrequency(word="Parameter", count=5),
+        WordFrequency(word="Modalität", count=4),
+        WordFrequency(word="ChatGPT", count=3),
+        WordFrequency(word="Fähigkeiten", count=3),
+        WordFrequency(word="LLMs", count=3),
+        WordFrequency(word="OpenAI", count=3),
+        WordFrequency(word="Sprachmodell", count=3),
     ]
     assert len(word_cloud) == 10
     for entry in expected:
@@ -120,18 +121,18 @@ def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
 def test_deu_and_eng_word_cloud_detection(ctx, path_language_deu_eng_wiki_llm_txt):
     with open(path_language_deu_eng_wiki_llm_txt, "rt", encoding="utf-8") as file:
         text = file.read()
-    word_cloud = detect_word_cloud(ctx, text)
+    word_cloud = list(detect_word_cloud(ctx, text))
     expected = [
-        ("Sprachmodelle", 10),
-        ("learning", 7),
-        ("Jahr", 6),
-        ("language", 6),
-        ("LLMs", 4),
-        ("Informationen", 5),
-        ("Parameter", 5),
-        ("network", 5),
-        ("model", 5),
-        ("Modalität", 4),
+        WordFrequency(word="Sprachmodelle", count=10),
+        WordFrequency(word="learning", count=7),
+        WordFrequency(word="Jahr", count=6),
+        WordFrequency(word="language", count=6),
+        WordFrequency(word="LLMs", count=4),
+        WordFrequency(word="Informationen", count=5),
+        WordFrequency(word="Parameter", count=5),
+        WordFrequency(word="network", count=5),
+        WordFrequency(word="model", count=5),
+        WordFrequency(word="Modalität", count=4),
     ]
     assert len(word_cloud) == 10
     for entry in expected:

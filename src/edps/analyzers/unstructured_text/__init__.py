@@ -45,7 +45,7 @@ class Analyzer:
         return UnstructuredTextDataSet(
             embeddedTables=embedded_tables,
             languages=detect_languages(self._ctx, text),
-            wordCloud=detect_word_cloud(self._ctx, text),
+            wordCloud=list(detect_word_cloud(self._ctx, text)),
             lineCount=line_count,
             wordCount=word_count,
         )
