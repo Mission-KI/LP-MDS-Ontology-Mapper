@@ -1,6 +1,6 @@
 from logging import getLogger
 
-from extended_dataset_profile.models.v0.edp import Resolution, VideoCodec, VideoDataSet, VideoPixelFormat
+from extended_dataset_profile.models.v0.edp import Resolution, VideoDataSet, VideoPixelFormat
 
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
@@ -63,9 +63,9 @@ async def incompatible_task(ctx: TaskContext) -> int:
 
 def dummy_dataset() -> VideoDataSet:
     return VideoDataSet(
-        codec=VideoCodec.MPEG4,
+        codec="mpeg4",
         resolution=Resolution(width=640, height=480),
         fps=24.0,
         duration=600,
-        pixel_format=VideoPixelFormat.RGB24,
+        pixelFormat=VideoPixelFormat.RGB24,
     )

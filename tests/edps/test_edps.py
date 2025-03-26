@@ -13,7 +13,6 @@ from extended_dataset_profile.models.v0.edp import (
     ModificationState,
     Resolution,
     TemporalConsistency,
-    VideoCodec,
     VideoPixelFormat,
 )
 from pytest import fixture, mark, raises
@@ -188,7 +187,7 @@ async def test_seasonality_bast_csv(path_data_bast_csv, analyse_asset_fn, ctx):
 
 
 @mark.asyncio
-async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx, user_provided_data):
+async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx):
     edp = await compute_asset(ctx, path_data_test_headerless_csv)
     assert len(edp.archiveDatasets) == 0
     assert edp.structuredDatasets[0].columnCount == 5
@@ -273,7 +272,7 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
 
 
 @mark.asyncio
-async def test_analyse_png(ctx, path_data_test_png, user_provided_data):
+async def test_analyse_png(ctx, path_data_test_png):
     edp = await compute_asset(ctx, path_data_test_png)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "PNG"
@@ -285,7 +284,7 @@ async def test_analyse_png(ctx, path_data_test_png, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_jpg(ctx, path_data_test_jpg, user_provided_data):
+async def test_analyse_jpg(ctx, path_data_test_jpg):
     edp = await compute_asset(ctx, path_data_test_jpg)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "JPEG"
@@ -297,7 +296,7 @@ async def test_analyse_jpg(ctx, path_data_test_jpg, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_jpeg(ctx, path_data_test_jpeg, user_provided_data):
+async def test_analyse_jpeg(ctx, path_data_test_jpeg):
     edp = await compute_asset(ctx, path_data_test_jpeg)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "JPEG"
@@ -309,7 +308,7 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_gif(ctx, path_data_test_gif, user_provided_data):
+async def test_analyse_gif(ctx, path_data_test_gif):
     edp = await compute_asset(ctx, path_data_test_gif)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "GIF"
@@ -320,7 +319,7 @@ async def test_analyse_gif(ctx, path_data_test_gif, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_bmp(ctx, path_data_test_bmp, user_provided_data):
+async def test_analyse_bmp(ctx, path_data_test_bmp):
     edp = await compute_asset(ctx, path_data_test_bmp)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "BMP"
@@ -332,7 +331,7 @@ async def test_analyse_bmp(ctx, path_data_test_bmp, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_tiff(ctx, path_data_test_tiff, user_provided_data):
+async def test_analyse_tiff(ctx, path_data_test_tiff):
     edp = await compute_asset(ctx, path_data_test_tiff)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "TIFF"
@@ -344,7 +343,7 @@ async def test_analyse_tiff(ctx, path_data_test_tiff, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_tif(ctx, path_data_test_tif, user_provided_data):
+async def test_analyse_tif(ctx, path_data_test_tif):
     edp = await compute_asset(ctx, path_data_test_tif)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "TIFF"
@@ -356,7 +355,7 @@ async def test_analyse_tif(ctx, path_data_test_tif, user_provided_data):
 
 
 @mark.asyncio
-async def test_analyse_webp(ctx, path_data_test_webp, user_provided_data):
+async def test_analyse_webp(ctx, path_data_test_webp):
     edp = await compute_asset(ctx, path_data_test_webp)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "WEBP"
@@ -387,75 +386,117 @@ def _assert_image_pixel_metrics(image_dataset):
 
 
 @mark.asyncio
-async def test_analyse_mp4(ctx, path_data_test_mp4, user_provided_data):
+async def test_analyse_mp4(ctx, path_data_test_mp4):
     edp = await compute_asset(ctx, path_data_test_mp4)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.codec == "h264"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
-    assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert abs(video_dataset.duration - 30.0) < 0.1
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
 @mark.asyncio
-async def test_analyse_avi(ctx, path_data_test_avi, user_provided_data):
+async def test_analyse_avi(ctx, path_data_test_avi):
     edp = await compute_asset(ctx, path_data_test_avi)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.MPEG4
+    assert video_dataset.codec == "mpeg4"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
-    assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert abs(video_dataset.duration - 30.0) < 0.1
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
 @mark.asyncio
-async def test_analyse_mkv(ctx, path_data_test_mkv, user_provided_data):
+async def test_analyse_mkv(ctx, path_data_test_mkv):
     edp = await compute_asset(ctx, path_data_test_mkv)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.codec == "h264"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
     assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
 @mark.asyncio
-async def test_analyse_mov(ctx, path_data_test_mov, user_provided_data):
+async def test_analyse_mov(ctx, path_data_test_mov):
     edp = await compute_asset(ctx, path_data_test_mov)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.H264
+    assert video_dataset.codec == "h264"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
-    assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert abs(video_dataset.duration - 30.0) < 0.1
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
 @mark.asyncio
-async def test_analyse_flv(ctx, path_data_test_flv, user_provided_data):
+async def test_analyse_flv(ctx, path_data_test_flv):
     edp = await compute_asset(ctx, path_data_test_flv)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.FLV1
+    assert video_dataset.codec == "flv1"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
     assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
 @mark.asyncio
-async def test_analyse_wmv(ctx, path_data_test_wmv, user_provided_data):
+async def test_analyse_wmv(ctx, path_data_test_wmv):
     edp = await compute_asset(ctx, path_data_test_wmv)
+    assert len(edp.videoDatasets) == 1
+    assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
     assert len(edp.archiveDatasets) == 0
-    assert video_dataset.codec == VideoCodec.WMV2
+    assert video_dataset.codec == "wmv2"
     assert video_dataset.resolution == Resolution(width=1280, height=720)
     assert abs(video_dataset.fps - 30) < 0.1
     assert abs(video_dataset.duration - 30.5) < 0.1
-    assert video_dataset.pixel_format == VideoPixelFormat.YUV420P
+    assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
+
+
+# @mark.asyncio
+# async def test_analyse_mp3(ctx, path_data_test_mp3):
+#     edp = await compute_asset(ctx, path_data_test_mp3)
+#     assert len(edp.videoDatasets) == 0
+#     assert len(edp.audioDatasets) == 1
+#     audio_dataset = edp.audioDatasets[0]
+#     assert audio_dataset.codec == "mp3"
+#     assert audio_dataset.channels == 2
+#     assert abs(audio_dataset.duration - 73.1) < 0.1
+#     assert audio_dataset.sampleRate == 44100
+#     assert audio_dataset.bitRate == 256000
+#     assert audio_dataset.bitsPerSample is None
+#     assert audio_dataset.spectrogram == PurePosixPath("test_mp3/fft.png")
+
+
+# @mark.asyncio
+# async def test_analyse_m4a(ctx, path_data_test_m4a):
+#     edp = await compute_asset(ctx, path_data_test_m4a)
+#     assert len(edp.videoDatasets) == 0
+#     assert len(edp.audioDatasets) == 1
+#     audio_dataset = edp.audioDatasets[0]
+#     assert audio_dataset.codec == "aac"
+#     assert audio_dataset.channels == 2
+#     assert abs(audio_dataset.duration - 8.5) < 0.1
+#     assert audio_dataset.sampleRate == 48000
+#     assert audio_dataset.bitRate == 192029
+#     assert audio_dataset.bitsPerSample is None
+#     assert audio_dataset.spectrogram == PurePosixPath("test_m4a/fft.png")
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
