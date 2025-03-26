@@ -4,12 +4,12 @@ from typing import Awaitable, Callable, Optional
 from edps.analyzers.archive import archive_importer
 from edps.analyzers.docx import docx_importer
 from edps.analyzers.images.importer import raster_image_importer
+from edps.analyzers.media import media_importer
 from edps.analyzers.pdf import pdf_importer
 from edps.analyzers.python import pickle_importer
 from edps.analyzers.semi_structured.importer import json_importer
 from edps.analyzers.structured.importer import csv_importer, xls_importer, xlsx_importer
 from edps.analyzers.unstructured_text.importer import unstructured_text_importer
-from edps.analyzers.videos.importer import video_importer
 from edps.taskcontext import TaskContext
 from edps.types import DataSet
 
@@ -34,12 +34,20 @@ _IMPORTERS: dict[str, Importer] = {
     "webp": raster_image_importer,
     "txt": unstructured_text_importer,
     "json": json_importer,
-    "mp4": video_importer,
-    "avi": video_importer,
-    "mkv": video_importer,
-    "mov": video_importer,
-    "flv": video_importer,
-    "wmv": video_importer,
+    "avi": media_importer,
+    "flv": media_importer,
+    "mkv": media_importer,
+    "mov": media_importer,
+    "mp4": media_importer,
+    "wmv": media_importer,
+    "aac": media_importer,
+    "flac": media_importer,
+    "m4a": media_importer,
+    "mp3": media_importer,
+    "ogg": media_importer,
+    "opus": media_importer,
+    "wav": media_importer,
+    "wma": media_importer,
     "zip": archive_importer,
 }
 
