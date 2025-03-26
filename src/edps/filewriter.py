@@ -58,17 +58,18 @@ def _get_default_colormap() -> matplotlib.colors.Colormap:
 
 @asynccontextmanager
 async def get_pyplot_writer(
-    ctx: TaskContext, name: PurePosixPath
+    ctx: TaskContext, name: PurePosixPath, **fig_kw
 ) -> AsyncIterator[Tuple[matplotlib.axes.Axes, PurePosixPath]]:
     """Context manager for a matplotlib `Axes` object.
 
+    `fig_kw` can be used to pass additional parameters to subplots(), e.g. `figsize`.
     The caller should use the yielded `Axes` object to plot her graph.
     This is saved to an image when the context is exited.
     Before using this function `setup_matplotlib()` must be called exactly once."""
 
     save_path = _prepare_save_path(ctx, name.with_suffix(MATPLOTLIB_PLOT_FORMAT))
     relative_save_path = save_path.relative_to(ctx.output_path)
-    figure, axes = matplotlib.pyplot.subplots()
+    figure, axes = matplotlib.pyplot.subplots(**fig_kw)
     axes.autoscale(True)
     yield axes, PurePosixPath(relative_save_path)
     figure.tight_layout()
