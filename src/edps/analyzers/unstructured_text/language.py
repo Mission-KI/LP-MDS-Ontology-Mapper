@@ -5,6 +5,7 @@ from typing import Iterator, List, Optional, Set, Union, cast
 
 import spacy
 import spacy.cli
+import spacy.cli.download
 from extended_dataset_profile.models.v0.edp import WordFrequency
 from lingua import Language, LanguageDetector, LanguageDetectorBuilder
 from pandas import DataFrame, RangeIndex, Series
@@ -126,8 +127,6 @@ def _load_spacy_model(ctx: TaskContext, lang: Language) -> Optional[spacy.langua
         warnings.warn(message, MissingSpacyModelWarning)
         return None
 
-    if not spacy.util.is_package(model_name):
-        spacy.cli.download(model_name)
     nlp = spacy.load(model_name)
     nlp.max_length = 5000000
     return nlp
@@ -142,3 +141,9 @@ def _normalize_token(token: Token, lemma_tags: Set[str] = {"NNS", "NNPS"}):
     - "NNPS": plural proper noun (e.g., "Smiths")
     """
     return token.lemma_ if token.tag_ in lemma_tags else token.text
+
+
+def download_supported_languages():
+    for model in LANGUAGE_MODEL_MAP.values():
+        if not spacy.util.is_package(model):
+            spacy.cli.download(model)

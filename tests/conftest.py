@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
 
-from easyocr import easyocr
 from extended_dataset_profile.models.v0.edp import (
     AssetReference,
     DataSpace,
@@ -16,6 +15,7 @@ from pytest import fixture
 
 from edps.filewriter import setup_matplotlib
 from edps.importers.structured import csv_import_dataframe
+from edps.service import download_artifacts
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
@@ -26,6 +26,7 @@ TESTS_ROOT_PATH = Path(__file__).parent.absolute()
 @fixture(autouse=True, scope="session")
 def setup():
     setup_matplotlib()
+    download_artifacts()
 
 
 @fixture
@@ -285,12 +286,6 @@ def logger():
 @fixture
 def ctx(path_work, config_data, logger) -> TaskContext:
     return TaskContextImpl(config_data, logger, path_work)
-
-
-@fixture(scope="session")
-def download_ocr_models(logger):
-    logger.info("Downloading OCR models.")
-    easyocr.Reader(lang_list=["en", "de"], gpu=False, download_enabled=True)
 
 
 def copy_asset_to_ctx_input_dir(asset_path: Path, ctx: TaskContext):
