@@ -13,7 +13,11 @@ from pandas import DataFrame
 
 from edps.analyzers.structured.importer import dialect_to_str, get_possible_csv_dialects, pandas_importer
 from edps.analyzers.unstructured_text.chunk import Chunk, ChunkInterface
-from edps.analyzers.unstructured_text.language import detect_languages, detect_word_cloud
+from edps.analyzers.unstructured_text.language import (
+    calculate_language_confidences,
+    detect_word_cloud,
+    extract_languages,
+)
 from edps.taskcontext import TaskContext
 
 
@@ -41,11 +45,12 @@ class Analyzer:
         lines = text.splitlines(keepends=False)
         line_count = sum(1 if line.strip() else 0 for line in lines)
         word_count += self._count_words(text)
+        language_confidences = calculate_language_confidences(text)
 
         return UnstructuredTextDataSet(
             embeddedTables=embedded_tables,
-            languages=detect_languages(self._ctx, text),
-            wordCloud=list(detect_word_cloud(self._ctx, text)),
+            languages=extract_languages(self._ctx, confidences=language_confidences),
+            wordCloud=list(detect_word_cloud(self._ctx, confidences=language_confidences)),
             lineCount=line_count,
             wordCount=word_count,
         )

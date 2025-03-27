@@ -3,9 +3,15 @@ from pytest import mark, raises
 
 from edps.analyzers.unstructured_text.chunk import Chunk
 from edps.analyzers.unstructured_text.importer import unstructured_text_importer
-from edps.analyzers.unstructured_text.language import detect_languages, detect_word_cloud
+from edps.analyzers.unstructured_text.language import (
+    calculate_language_confidences,
+    detect_word_cloud,
+    extract_languages,
+)
 from edps.taskcontext import TaskContext
 from tests.conftest import copy_asset_to_ctx_input_dir
+
+_ENCODING = "utf-8"
 
 
 def test_chunk_init():
@@ -84,26 +90,22 @@ def test_chunk_subtract_middle():
 
 
 def test_deu_language_detection(ctx, path_language_deu_wiki_llm_txt):
-    with open(path_language_deu_wiki_llm_txt, "rt", encoding="utf-8") as file:
-        text = file.read()
-    languages = detect_languages(ctx, text)
-    assert len(languages) == 1
-    assert "deu" in languages
+    text = path_language_deu_wiki_llm_txt.read_text(encoding=_ENCODING)
+    confidences = calculate_language_confidences(text)
+    languages = extract_languages(ctx, confidences=confidences)
+    assert languages == set(["deu", "eng"])
 
 
 def test_deu_and_eng_language_detection(ctx, path_language_deu_eng_wiki_llm_txt):
-    with open(path_language_deu_eng_wiki_llm_txt, "rt", encoding="utf-8") as file:
-        text = file.read()
-    languages = detect_languages(ctx, text)
-    assert len(languages) == 2
-    assert "deu" in languages
-    assert "eng" in languages
+    text = path_language_deu_eng_wiki_llm_txt.read_text(encoding=_ENCODING)
+    confidences = calculate_language_confidences(text)
+    languages = extract_languages(ctx, confidences=confidences)
+    assert languages == set(["deu", "eng"])
 
 
 def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
-    with open(path_language_deu_wiki_llm_txt, "rt", encoding="utf-8") as file:
-        text = file.read()
-    word_cloud = list(detect_word_cloud(ctx, text))
+    confidences = calculate_language_confidences(path_language_deu_wiki_llm_txt.read_text(encoding=_ENCODING))
+    word_cloud = list(detect_word_cloud(ctx, confidences=confidences))
     expected = [
         WordFrequency(word="Sprachmodelle", count=10),
         WordFrequency(word="Jahr", count=6),
@@ -122,9 +124,9 @@ def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
 
 
 def test_deu_and_eng_word_cloud_detection(ctx, path_language_deu_eng_wiki_llm_txt):
-    with open(path_language_deu_eng_wiki_llm_txt, "rt", encoding="utf-8") as file:
-        text = file.read()
-    word_cloud = list(detect_word_cloud(ctx, text))
+    text = path_language_deu_eng_wiki_llm_txt.read_text(encoding=_ENCODING)
+    confidences = calculate_language_confidences(text)
+    word_cloud = list(detect_word_cloud(ctx, confidences=confidences))
     expected = [
         WordFrequency(word="Sprachmodelle", count=10),
         WordFrequency(word="learning", count=7),
