@@ -12,6 +12,6 @@ async def test_import_mp4(path_data_test_mp4, ctx):
     assert isinstance(dataset, VideoDataSet)
     assert dataset.codec == "h264"
     assert dataset.resolution == Resolution(width=1280, height=720)
-    assert abs(dataset.fps - 30) < 0.1
-    assert abs(dataset.duration - 30.0) < 0.1
+    assert dataset.fps and abs(dataset.fps - 30) < 0.1
+    assert dataset.duration and abs(dataset.duration - 30.0) < 0.1
     assert dataset.pixelFormat == VideoPixelFormat.YUV420P

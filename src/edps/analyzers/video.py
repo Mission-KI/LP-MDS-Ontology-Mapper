@@ -1,5 +1,5 @@
 import warnings
-from typing import Any
+from typing import Any, Optional
 
 from extended_dataset_profile.models.v0.edp import (
     Resolution,
@@ -10,25 +10,27 @@ from extended_dataset_profile.models.v0.edp import (
 from edps.taskcontext import TaskContext
 
 
-async def analyse_video(ctx: TaskContext, format_info: Any, video_stream: Any) -> VideoDataSet:
-    codec = video_stream.get("codec_name", "UNKNOWN")
-    width = int(video_stream.get("width", 0))
-    height = int(video_stream.get("height", 0))
-    fps = _compute_fps(ctx, video_stream.get("avg_frame_rate", "0/1"))
+async def analyse_video(ctx: TaskContext, format_info: dict[str, Any], stream_info: dict[str, Any]) -> VideoDataSet:
+    codec = stream_info.get("codec_name")
+    width = stream_info.get("width")
+    height = stream_info.get("height")
+    fps = _compute_fps(ctx, stream_info.get("avg_frame_rate"))
     # Not all formats have the duration in the stream, some only in the format data.
-    duration = float(video_stream.get("duration", format_info.get("duration", "0.0")))
-    pixel_format = video_stream.get("pix_fmt", "UNKNOWN")
+    duration = stream_info.get("duration", format_info.get("duration"))
+    pixel_format = stream_info.get("pix_fmt")
 
     return VideoDataSet(
-        codec=codec,
-        resolution=Resolution(width=width, height=height),
+        codec=codec if codec else "UNKNOWN",
+        resolution=Resolution(width=int(width), height=int(height)) if width and height else None,
         fps=fps,
-        duration=duration,
-        pixelFormat=VideoPixelFormat(pixel_format),
+        duration=float(duration) if duration else None,
+        pixelFormat=VideoPixelFormat(pixel_format) if pixel_format else VideoPixelFormat.UNKNOWN,
     )
 
 
-def _compute_fps(ctx: TaskContext, avg_frame_rate: str) -> float:
+def _compute_fps(ctx: TaskContext, avg_frame_rate: Optional[str]) -> Optional[float]:
+    if avg_frame_rate is None:
+        return None
     try:
         num, den = avg_frame_rate.split("/")
         return float(num) / float(den)
@@ -36,4 +38,4 @@ def _compute_fps(ctx: TaskContext, avg_frame_rate: str) -> float:
         message = f"Could not determine video FPS: {error}"
         ctx.logger.warning(message)
         warnings.warn(message)
-        return 0.0
+        return None

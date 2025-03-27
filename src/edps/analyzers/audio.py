@@ -14,25 +14,25 @@ from edps.taskcontext import TaskContext
 
 
 async def analyse_audio(
-    ctx: TaskContext, path: Path, format_info: Any, audio_stream: Any, stream_number: int
+    ctx: TaskContext, path: Path, format_info: dict[str, Any], stream_info: dict[str, Any], stream_number: int
 ) -> AudioDataSet:
-    codec = audio_stream.get("codec_name", "UNKNOWN")
-    channels = audio_stream.get("channels", 0)
+    codec = stream_info.get("codec_name")
+    channels = stream_info.get("channels")
     # Not all formats have the duration in the stream, some only in the format data.
-    duration = float(audio_stream.get("duration", format_info.get("duration", "0.0")))
-    sample_rate = int(audio_stream.get("sample_rate", "0"))
-    bit_rate = int(audio_stream.get("bit_rate", "0"))
-    bits_per_sample = int(audio_stream.get("bits_per_sample", "0"))
+    duration = stream_info.get("duration", format_info.get("duration"))
+    sample_rate = stream_info.get("sample_rate")
+    bit_rate = stream_info.get("bit_rate")
+    bits_per_sample = stream_info.get("bits_per_sample")
 
     spectrogram_ref = await plot_spectrogram(ctx, path, stream_number)
 
     return AudioDataSet(
-        codec=codec,
-        channels=channels,
-        duration=duration,
-        sampleRate=sample_rate,
-        bitRate=bit_rate,
-        bitsPerSample=bits_per_sample if bits_per_sample != 0 else None,
+        codec=codec if codec else "UNKNOWN",
+        channels=int(channels) if channels else 1,
+        duration=float(duration) if duration else None,
+        sampleRate=int(sample_rate) if sample_rate else None,
+        bitRate=int(bit_rate) if bit_rate else None,
+        bitsPerSample=int(bits_per_sample) if bits_per_sample else None,
         spectrogram=spectrogram_ref,
     )
 
@@ -64,9 +64,9 @@ async def plot_spectrogram(ctx: TaskContext, path: Path, stream_number: int) -> 
         return reference
 
 
-def load_audio_samples(path: Path, audio_stream: int) -> tuple[int, ndarray]:
+def load_audio_samples(path: Path, stream_number: int) -> tuple[int, ndarray]:
     # Convert to mono WAV format in memory, take nth audio stream.
-    stream_mapping = f"0:a:{audio_stream}"
+    stream_mapping = f"0:a:{stream_number}"
     wav_data, _ = (
         ffmpeg.input(path)
         .output("pipe:", format="wav", acodec="pcm_s16le", ar=44100, ac=1, map=stream_mapping)
