@@ -1,0 +1,21 @@
+{%- import "utils.html.jinja" as utils -%}
+
+{% macro print(ds) -%}
+    {{
+        utils.print_dataset_table("Audio", ds, [
+            ("Codec", ds.details.codec),
+            ("Channels", ds.details.channels),
+            ("Duration", ds.details.duration),
+            ("Sample rate", ds.details.sampleRate),
+            ("Bit rate", ds.details.bitRate),
+            ("Bits per sample", ds.details.bitsPerSample),
+        ])
+    }}
+
+    {% set graphs = [ds.details.spectrogram] %}
+    {% if graphs %}
+        <h3>Spectrogram</h3>
+        
+        {{ utils.print_images(graphs, 1) }}
+    {% endif %}
+{% endmacro %}

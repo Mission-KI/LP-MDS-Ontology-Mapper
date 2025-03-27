@@ -7,6 +7,7 @@ from typing import Any, List, Optional, cast
 
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
+    AudioDataSet,
     DatasetTreeNode,
     DateTimeColumn,
     DocumentDataSet,
@@ -65,6 +66,7 @@ def _init_environment():
     env.tests["type_DocumentDataSet"] = lambda val: isinstance(val, DocumentDataSet)
     env.tests["type_ImageDataSet"] = lambda val: isinstance(val, ImageDataSet)
     env.tests["type_VideoDataSet"] = lambda val: isinstance(val, VideoDataSet)
+    env.tests["type_AudioDataSet"] = lambda val: isinstance(val, AudioDataSet)
 
     env.tests["type_NumericColumn"] = lambda val: isinstance(val, NumericColumn)
     env.tests["type_StringColumn"] = lambda val: isinstance(val, StringColumn)

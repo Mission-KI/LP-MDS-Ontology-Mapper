@@ -1,5 +1,6 @@
 {%- import "utils.html.jinja" as utils -%}
 {%- import "ds_archive.html.jinja" as ds_archive -%}
+{%- import "ds_audio.html.jinja" as ds_audio -%}
 {%- import "ds_document.html.jinja" as ds_document -%}
 {%- import "ds_image.html.jinja" as ds_image -%}
 {%- import "ds_semistructured.html.jinja" as ds_semistructured -%}
@@ -53,6 +54,9 @@
 
             {% elif ds.details is type_VideoDataSet %}
                 {{ ds_video.print(ds) }}
+
+            {% elif ds.details is type_AudioDataSet %}
+                {{ ds_audio.print(ds) }}
 
             {% else %}
                 <div>Unsupported dataset type</div>
