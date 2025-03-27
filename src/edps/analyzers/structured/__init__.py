@@ -555,5 +555,5 @@ async def _get_string_distribution_graph(ctx: TaskContext, column: Series) -> Op
     uniques.index = RangeIndex(start=0, stop=len(uniques.index))
     plot_name = ctx.build_output_reference(f"{column.name}_distribution")
     async with get_pyplot_writer(ctx, plot_name) as (axes, reference):
-        uniques.plot(ax=axes, kind="bar")
+        uniques.plot(ax=axes, kind="bar", title=f"Abundance of values in {column.name}")
     return reference
