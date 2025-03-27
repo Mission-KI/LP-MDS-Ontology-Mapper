@@ -45,7 +45,7 @@ class Analyzer:
         lines = text.splitlines(keepends=False)
         line_count = sum(1 if line.strip() else 0 for line in lines)
         word_count += self._count_words(text)
-        language_confidences = calculate_language_confidences(text)
+        language_confidences = calculate_language_confidences(self._ctx, text)
 
         return UnstructuredTextDataSet(
             embeddedTables=embedded_tables,

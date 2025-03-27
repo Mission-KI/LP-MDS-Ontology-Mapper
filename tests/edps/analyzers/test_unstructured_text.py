@@ -91,20 +91,20 @@ def test_chunk_subtract_middle():
 
 def test_deu_language_detection(ctx, path_language_deu_wiki_llm_txt):
     text = path_language_deu_wiki_llm_txt.read_text(encoding=_ENCODING)
-    confidences = calculate_language_confidences(text)
+    confidences = calculate_language_confidences(ctx, text)
     languages = extract_languages(ctx, confidences=confidences)
     assert languages == set(["deu", "eng"])
 
 
 def test_deu_and_eng_language_detection(ctx, path_language_deu_eng_wiki_llm_txt):
     text = path_language_deu_eng_wiki_llm_txt.read_text(encoding=_ENCODING)
-    confidences = calculate_language_confidences(text)
+    confidences = calculate_language_confidences(ctx, text)
     languages = extract_languages(ctx, confidences=confidences)
     assert languages == set(["deu", "eng"])
 
 
 def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
-    confidences = calculate_language_confidences(path_language_deu_wiki_llm_txt.read_text(encoding=_ENCODING))
+    confidences = calculate_language_confidences(ctx, path_language_deu_wiki_llm_txt.read_text(encoding=_ENCODING))
     word_cloud = list(detect_word_cloud(ctx, confidences=confidences))
     expected = [
         WordFrequency(word="Sprachmodelle", count=10),
@@ -125,7 +125,7 @@ def test_deu_word_cloud_detection(ctx, path_language_deu_wiki_llm_txt):
 
 def test_deu_and_eng_word_cloud_detection(ctx, path_language_deu_eng_wiki_llm_txt):
     text = path_language_deu_eng_wiki_llm_txt.read_text(encoding=_ENCODING)
-    confidences = calculate_language_confidences(text)
+    confidences = calculate_language_confidences(ctx, text)
     word_cloud = list(detect_word_cloud(ctx, confidences=confidences))
     expected = [
         WordFrequency(word="Sprachmodelle", count=10),

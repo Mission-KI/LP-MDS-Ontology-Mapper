@@ -128,6 +128,20 @@ class StructuredConfig(BaseModel):
     )
 
 
+class UnstructuredTextConfig(BaseModel):
+    """
+    Configuration for the unstructured text analysis.
+    """
+
+    minimum_sentence_length: int = Field(
+        default=14,
+        description="Minimum number of words in sentence for language detection. Shorter sentences will be skipped.",
+    )
+    language_confidence_threshold: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Minimum confidence to count a language as detected."
+    )
+
+
 class Config(BaseModel):
     """
     Extended dataset profile service configuration
@@ -139,6 +153,10 @@ class Config(BaseModel):
     augmentedColumns: List[AugmentedColumn] = Field(default_factory=list, description="List of augmented columns")
     structured_config: StructuredConfig = Field(
         default_factory=StructuredConfig, description="Configurations for the structured data analysis"
+    )
+    unstructured_text_config: UnstructuredTextConfig = Field(
+        default_factory=lambda: UnstructuredTextConfig(),
+        description="Configuration for the unstructured text analysis.",
     )
 
 
