@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -5,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 
+from edps import Service
 from jobapi.__main__ import init_fastapi
 from jobapi.config import AppConfig
 from jobapi.types import JobData, JobState, JobView
@@ -54,6 +56,42 @@ async def test_api_client_error(test_client):
     response = test_client.get(f"/v1/dataspace/analysisjob/{random_uuid}/result")
     assert response.status_code == 400
     assert response.json()["detail"] is not None
+
+
+@pytest.mark.slow
+async def test_api_cancel(test_client, user_provided_data, asset_path: Path, monkeypatch):
+    job_data = JobData(user_provided_edp_data=user_provided_data)
+    response = test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
+    assert response.status_code == 200, response.text
+    job = JobView.model_validate(response.json())
+    assert job.state == JobState.WAITING_FOR_DATA
+
+    # Try canceling before the job has been queued
+    response = test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
+    assert response.status_code == 400, response.text
+
+    async def dummy_analyse_asset(self, *args):
+        while True:
+            await asyncio.sleep(0.1)
+
+    monkeypatch.setattr(Service, "analyse_asset", dummy_analyse_asset)
+    files = {"upload_file": (asset_path.name, asset_path.read_bytes())}
+
+    async with asyncio.TaskGroup() as group:
+        processing_task = group.create_task(
+            asyncio.to_thread(test_client.post, f"/v1/dataspace/analysisjob/{job.job_id}/data", files=files)
+        )
+        await asyncio.sleep(1)
+
+        response = test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
+        assert response.status_code == 204, response.text
+
+        await processing_task
+
+        # Check for status
+        response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/status")
+        job = extract_job_view(response)
+        assert job.state == JobState.CANCELLED
 
 
 def get_status(client: TestClient, job_id: UUID):
