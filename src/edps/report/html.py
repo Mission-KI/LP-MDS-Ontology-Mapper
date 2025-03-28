@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import datetime
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional, Type, cast
 
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
@@ -21,6 +21,8 @@ from extended_dataset_profile.models.v0.edp import (
 )
 from extended_dataset_profile.models.v0.json_reference import JsonReference
 from jinja2 import Environment, PackageLoader, Undefined
+from jinja2.exceptions import TemplateRuntimeError, UndefinedError
+from jinja2.utils import missing
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 
@@ -133,9 +135,18 @@ def _build_qualified_name(edp: ExtendedDatasetProfile, node: DatasetTreeNode) ->
         return f"{parent_name}/{node.name}"
 
 
-# We need to patch Jinja's "Undefined" class and pass it to the environment to allow null-safe multi-level property access,
-# e.g. "edp.abc.xyz[0]"
+# We need to patch Jinja's "Undefined" class and pass it to the environment
+# because we want to detect errors in the Jinja template navigation path.
 class PatchedUndefined(Undefined):
+    def __init__(
+        self,
+        hint: Optional[str] = None,
+        obj: Any = missing,
+        name: Optional[str] = None,
+        exc: Type[TemplateRuntimeError] = UndefinedError,
+    ) -> None:
+        raise ValueError(f"Jinja template refers to undefined attribute '{name}'")
+
     def __getattr__(self, name: str):
         raise AttributeError()
 
