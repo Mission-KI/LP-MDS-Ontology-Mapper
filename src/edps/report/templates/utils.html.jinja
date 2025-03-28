@@ -34,7 +34,7 @@
     {% set file_props = ds.node.fileProperties %}
     {% set list = [
         ("Dataset type", type), 
-        ("File type", file_props.fileType | upper), 
+        ("File type", (file_props.fileType | upper) if file_props else None), 
         ("File size", (file_props.size | filesizeformat) if file_props else None),
     ] %}
     {% do list.extend(key_value_list) %}
