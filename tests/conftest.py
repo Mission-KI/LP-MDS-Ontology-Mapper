@@ -113,6 +113,9 @@ def path_data_test_multiassets_zip():
     return TESTS_ROOT_PATH / "data/test_multiassets.zip"
 
 
+# images
+
+
 @fixture
 def path_data_test_png():
     return TESTS_ROOT_PATH / "data/test.png"
@@ -153,6 +156,9 @@ def path_data_test_webp():
     return TESTS_ROOT_PATH / "data/test.webp"
 
 
+# videos
+
+
 @fixture
 def path_data_test_mp4():
     return TESTS_ROOT_PATH / "data/test.mp4"
@@ -181,6 +187,49 @@ def path_data_test_flv():
 @fixture
 def path_data_test_wmv():
     return TESTS_ROOT_PATH / "data/test.wmv"
+
+
+# audio files
+
+
+@fixture
+def path_data_test_wav():
+    return TESTS_ROOT_PATH / "data/test.wav"
+
+
+@fixture
+def path_data_test_aac():
+    return TESTS_ROOT_PATH / "data/test.aac"
+
+
+@fixture
+def path_data_test_flac():
+    return TESTS_ROOT_PATH / "data/test.flac"
+
+
+@fixture
+def path_data_test_m4a():
+    return TESTS_ROOT_PATH / "data/test.m4a"
+
+
+@fixture
+def path_data_test_mp3():
+    return TESTS_ROOT_PATH / "data/test.mp3"
+
+
+@fixture
+def path_data_test_ogg():
+    return TESTS_ROOT_PATH / "data/test.ogg"
+
+
+@fixture
+def path_data_test_opus():
+    return TESTS_ROOT_PATH / "data/test.opus"
+
+
+@fixture
+def path_data_test_wma():
+    return TESTS_ROOT_PATH / "data/test.wma"
 
 
 @fixture
@@ -223,6 +272,27 @@ def path_data_test_with_normalization():
     return TESTS_ROOT_PATH / "data/test_with_normalization.json"
 
 
+ASSET_FILES = [
+    "data/bast.csv",
+    "data/test.csv",
+    "data/test.json",
+    "data/test.docx",
+    "data/test.pdf",
+    "data/test.jpg",
+    "data/test.mp4",
+    "data/test.mp3",
+    "data/test.m4a",
+    "data/unstructured_text_with_table.txt",
+    "data/test_multiassets.zip",
+]
+
+
+# "asset_path" iterates through multiple assets
+@fixture(params=ASSET_FILES)
+def asset_path(request):
+    return TESTS_ROOT_PATH / request.param
+
+
 @fixture
 def path_language_deu_wiki_llm_txt():
     return TESTS_ROOT_PATH / "data/language/deu_wiki_llm.txt"
@@ -231,24 +301,6 @@ def path_language_deu_wiki_llm_txt():
 @fixture
 def path_language_deu_eng_wiki_llm_txt():
     return TESTS_ROOT_PATH / "data/language/deu_eng_wiki_llm.txt"
-
-
-# "asset_path" iterates through multiple assets
-@fixture(
-    params=[
-        "data/bast.csv",
-        "data/test.csv",
-        "data/test.json",
-        "data/test.docx",
-        "data/test.pdf",
-        "data/test.jpg",
-        "data/test.mp4",
-        "data/unstructured_text_with_table.txt",
-        "data/test_multiassets.zip",
-    ]
-)
-def asset_path(request):
-    return TESTS_ROOT_PATH / request.param
 
 
 @fixture(scope="session")
@@ -285,6 +337,7 @@ def logger():
 
 @fixture
 def ctx(path_work, config_data, logger) -> TaskContext:
+    logger.info("Creating test TaskContext with working directory '%s'", path_work.as_posix())
     return TaskContextImpl(config_data, logger, path_work)
 
 

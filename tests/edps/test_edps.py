@@ -1,10 +1,11 @@
 from datetime import datetime
 from math import isclose
 from pathlib import Path
-from typing import Awaitable, Callable, List
+from typing import Awaitable, Callable, List, Optional
 
 import pytest
 from extended_dataset_profile.models.v0.edp import (
+    AudioDataSet,
     DataSetType,
     ExtendedDatasetProfile,
     FileReference,
@@ -469,34 +470,124 @@ async def test_analyse_wmv(ctx, path_data_test_wmv):
     assert video_dataset.pixelFormat == VideoPixelFormat.YUV420P
 
 
-# @mark.asyncio
-# async def test_analyse_mp3(ctx, path_data_test_mp3):
-#     edp = await compute_asset(ctx, path_data_test_mp3)
-#     assert len(edp.videoDatasets) == 0
-#     assert len(edp.audioDatasets) == 1
-#     audio_dataset = edp.audioDatasets[0]
-#     assert audio_dataset.codec == "mp3"
-#     assert audio_dataset.channels == 2
-#     assert abs(audio_dataset.duration - 73.1) < 0.1
-#     assert audio_dataset.sampleRate == 44100
-#     assert audio_dataset.bitRate == 256000
-#     assert audio_dataset.bitsPerSample is None
-#     assert audio_dataset.spectrogram == PurePosixPath("test_mp3/fft.png")
+# Audio files
 
 
-# @mark.asyncio
-# async def test_analyse_m4a(ctx, path_data_test_m4a):
-#     edp = await compute_asset(ctx, path_data_test_m4a)
-#     assert len(edp.videoDatasets) == 0
-#     assert len(edp.audioDatasets) == 1
-#     audio_dataset = edp.audioDatasets[0]
-#     assert audio_dataset.codec == "aac"
-#     assert audio_dataset.channels == 2
-#     assert abs(audio_dataset.duration - 8.5) < 0.1
-#     assert audio_dataset.sampleRate == 48000
-#     assert audio_dataset.bitRate == 192029
-#     assert audio_dataset.bitsPerSample is None
-#     assert audio_dataset.spectrogram == PurePosixPath("test_m4a/fft.png")
+@mark.asyncio
+async def test_analyse_wav(ctx, path_data_test_wav):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_wav,
+        exp_codec="pcm_s16le",
+        exp_sample_rate=44100,
+        exp_bit_rate=1411200,
+        exp_bits_per_sample=16,
+    )
+
+
+@mark.asyncio
+async def test_analyse_aac(ctx, path_data_test_aac):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_aac,
+        exp_codec="aac",
+        exp_sample_rate=44100,
+        exp_bit_rate=126325,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_flac(ctx, path_data_test_flac):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_flac,
+        exp_codec="flac",
+        exp_sample_rate=44100,
+        exp_bit_rate=None,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_m4a(ctx, path_data_test_m4a):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_m4a,
+        exp_codec="aac",
+        exp_sample_rate=48000,
+        exp_bit_rate=192029,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_mp3(ctx, path_data_test_mp3):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_mp3,
+        exp_codec="mp3",
+        exp_sample_rate=48000,
+        exp_bit_rate=206986,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_ogg(ctx, path_data_test_ogg):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_ogg,
+        exp_codec="vorbis",
+        exp_sample_rate=44100,
+        exp_bit_rate=160000,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_opus(ctx, path_data_test_opus):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_opus,
+        exp_codec="opus",
+        exp_sample_rate=48000,
+        exp_bit_rate=None,
+        exp_bits_per_sample=None,
+    )
+
+
+@mark.asyncio
+async def test_analyse_wma(ctx, path_data_test_wma):
+    await analyse_audio(
+        ctx=ctx,
+        path=path_data_test_wma,
+        exp_codec="wmav2",
+        exp_sample_rate=44100,
+        exp_bit_rate=192000,
+        exp_bits_per_sample=None,
+    )
+
+
+async def analyse_audio(
+    ctx: TaskContext,
+    path: Path,
+    exp_codec: str,
+    exp_sample_rate: int,
+    exp_bit_rate: Optional[int],
+    exp_bits_per_sample: Optional[int],
+):
+    edp = await compute_asset(ctx, path)
+    assert len(edp.videoDatasets) == 0
+    assert len(edp.audioDatasets) == 1
+    audio_dataset: AudioDataSet = edp.audioDatasets[0]
+    assert audio_dataset.channels == 2
+    assert audio_dataset.duration and abs(audio_dataset.duration - 8.5) < 0.5
+    assert audio_dataset.spectrogram.suffix == ".png"
+    assert audio_dataset.codec == exp_codec
+    assert audio_dataset.sampleRate == exp_sample_rate
+    assert audio_dataset.bitRate == exp_bit_rate
+    assert audio_dataset.bitsPerSample == exp_bits_per_sample
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
