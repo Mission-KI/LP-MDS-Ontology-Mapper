@@ -38,18 +38,16 @@ async def analyse_audio(
 
 
 async def plot_spectrogram(ctx: TaskContext, path: Path, stream_number: int) -> PurePosixPath:
+    audio_config = ctx.config.audio_config
+
     sampling_rate, samples = load_audio_samples(path, stream_number)
-
-    LOWEST_FREQ = 20  # 20 Hz
-    MIN_RANGE = 1e-1  # limit range to -10 dB
-
-    window_size = int(2 * sampling_rate / LOWEST_FREQ)
+    window_size = int(2 * sampling_rate / audio_config.lowest_frequency)
     n = len(samples)
 
     window = scipy.signal.windows.gaussian(window_size, 0.25 * window_size, sym=True)
     sfft = scipy.signal.ShortTimeFFT(window, int(0.1 * window_size), fs=sampling_rate, fft_mode="onesided")
     spectrogram = sfft.spectrogram(samples, padding="odd")
-    spectrogram_log = 10 * np.log10(np.fmax(spectrogram, MIN_RANGE))
+    spectrogram_log = 10 * np.log10(np.fmax(spectrogram, audio_config.dynamic_range_min))
 
     plot_name = ctx.build_output_reference("fft")
     async with get_pyplot_writer(ctx, plot_name, figsize=figaspect(0.5)) as (axes, reference):

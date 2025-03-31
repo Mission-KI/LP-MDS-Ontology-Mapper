@@ -144,6 +144,19 @@ class UnstructuredTextConfig(BaseModel):
     )
 
 
+class AudioConfig(BaseModel):
+    """
+    Configuration for the audio analysis.
+    """
+
+    lowest_frequency: int = Field(
+        default=20, description="Lowest frequency which should be considered in the FFT analysis."
+    )
+    dynamic_range_min: float = Field(
+        default=1e-1, description="Lower cutoff for dynamic range, default is -10 dB (1e-1)."
+    )
+
+
 class Config(BaseModel):
     """
     Extended dataset profile service configuration
@@ -157,9 +170,10 @@ class Config(BaseModel):
         default_factory=StructuredConfig, description="Configurations for the structured data analysis"
     )
     unstructured_text_config: UnstructuredTextConfig = Field(
-        default_factory=lambda: UnstructuredTextConfig(),
+        default_factory=UnstructuredTextConfig,
         description="Configuration for the unstructured text analysis.",
     )
+    audio_config: AudioConfig = Field(default_factory=AudioConfig, description="Configuration for audio analysis.")
 
 
 def recursively_escape_strings(data: Any) -> Any:
