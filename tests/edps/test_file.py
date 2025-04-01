@@ -28,3 +28,8 @@ def test_build_real_sub_path():
         build_real_sub_path(base, "dir/../../test.html")
     with raises(ValueError):
         build_real_sub_path(base, "/test.html")
+
+    with raises(ValueError):
+        build_real_sub_path(base, "")
+    with raises(ValueError):
+        build_real_sub_path(base, ".")

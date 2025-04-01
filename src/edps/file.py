@@ -40,6 +40,13 @@ def determine_file_type(path: Path) -> str:
 def build_real_sub_path(base_path: Path, sub_path: Path | str) -> Path:
     """Combine base_path and sub_path, enforcing that the resulting path is a sub path of base_path."""
     full_path = base_path / sub_path
-    if not full_path.resolve().is_relative_to(base_path.resolve()):
+    if not is_real_subpath(full_path, base_path):
         raise ValueError(f"{sub_path} escapes the base path {base_path}")
     return full_path
+
+
+def is_real_subpath(path: Path, base_path: Path):
+    """Check if path is a real subpath of base_path."""
+    path_resolved = path.resolve()
+    base_path_resolved = base_path.resolve()
+    return path_resolved != base_path_resolved and path_resolved.is_relative_to(base_path_resolved)
