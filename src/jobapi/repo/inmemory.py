@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
+from jobapi.exception import ApiClientException
 from jobapi.repo import Job, JobRepository, JobSession
 from jobapi.types import JobData, JobState
 
@@ -86,7 +87,7 @@ class InMemoryJobSession(JobSession):
 
     async def get_job(self, job_id: UUID):
         if job_id not in self._jobs:
-            raise RuntimeError(f"Job {job_id} doesn't exist.")
+            raise ApiClientException(f"Job '{job_id}' doesn't exist.")
         return self._jobs[job_id]
 
 

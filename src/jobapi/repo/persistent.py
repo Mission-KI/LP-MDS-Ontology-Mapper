@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import Engine
 from sqlmodel import Field, Session, SQLModel, select
 
+from jobapi.exception import ApiClientException
 from jobapi.repo.base import Job, JobRepository, JobSession
 from jobapi.types import JobData, JobState
 
@@ -117,7 +118,7 @@ class DbJobSession(JobSession):
         results = self._session.exec(statement)
         job = results.first()
         if job is None:
-            raise RuntimeError(f"Job {job_id} doesn't exist.")
+            raise ApiClientException(f"Job '{job_id}' doesn't exist.")
         return job
 
 

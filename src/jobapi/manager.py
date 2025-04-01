@@ -11,9 +11,11 @@ from uuid import UUID, uuid4
 
 from edps import Service
 from edps.compression.zip import ZipAlgorithm
+from edps.file import build_real_sub_path, sanitize_path
 from edps.service import get_report_path
 from edps.taskcontextimpl import TaskContextImpl
 from jobapi.config import AppConfig
+from jobapi.exception import ApiClientException
 from jobapi.repo import Job, JobRepository
 from jobapi.types import JobData, JobState, JobView
 
@@ -60,7 +62,7 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job: Job = await session.get_job(job_id)
             if job.state != JobState.COMPLETED:
-                raise RuntimeError(f"There is no result for job {job.job_id} because it's in state {job.state}.")
+                raise ApiClientException(f"There is no result because job is in state {job.state.value}.")
             return job.zip_archive
 
     async def get_log_file(self, job_id: UUID) -> Path:
@@ -76,7 +78,7 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job: Job = await session.get_job(job_id)
             if job.state != JobState.COMPLETED:
-                raise RuntimeError(f"There is no report for job {job.job_id} because it's in state {job.state}.")
+                raise ApiClientException(f"There is no report because job is in state {job.state.value}.")
             return job.report_file
 
     async def process_job(self, job_id: UUID):
@@ -89,7 +91,7 @@ class AnalysisJobManager:
         async with self._job_repo.new_session() as session:
             job = await session.get_job(job_id)
             if job.state != JobState.QUEUED:
-                raise RuntimeError(f"Job can't be processed because it's in state {job.state}.")
+                raise ApiClientException(f"Job can't be processed because it's in state {job.state.value}.")
             job.update_state(JobState.PROCESSING)
             job.started = datetime.now(tz=UTC)
 
@@ -133,18 +135,22 @@ class AnalysisJobManager:
             job = await session.get_job(job_id)
 
             if job.state != JobState.WAITING_FOR_DATA:
-                raise RuntimeError(f"Job doesn't accept any file uploads because it's in state {job.state}.")
+                raise ApiClientException(
+                    f"Job doesn't accept any file uploads because it's in state {job.state.value}."
+                )
+
+            filename = sanitize_path(filename or "")
             if not filename:
-                raise RuntimeError("Filename is missing!")
+                raise ApiClientException("Filename is missing!")
 
             job.input_data_dir.mkdir(parents=True, exist_ok=True)
-            data_file_path = job.input_data_dir / filename
+            data_file_path = build_real_sub_path(job.input_data_dir, filename)
 
             try:
                 with data_file_path.open("wb") as dest:
                     copyfileobj(file, dest)
                 if data_file_path.stat().st_size == 0:
-                    raise RuntimeError("Upload was empty!")
+                    raise ApiClientException("Upload was empty!")
             except:
                 # If there is an error delete the file.
                 data_file_path.unlink()
