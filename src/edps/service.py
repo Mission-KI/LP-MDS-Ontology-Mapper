@@ -218,7 +218,7 @@ class Service:
 
 
 def _as_dict(model: BaseModel):
-    field_keys = model.model_fields.keys()
+    field_keys = type(model).model_fields.keys()
     return {key: model.__dict__[key] for key in field_keys}
 
 
