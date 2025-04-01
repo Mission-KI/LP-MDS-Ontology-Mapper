@@ -2,6 +2,7 @@ import warnings
 from logging import getLogger
 from pathlib import Path
 
+import pytest
 from pytest import fixture, mark
 
 from edps.report import HtmlReportGenerator, PdfReportGenerator, ReportInput
@@ -39,3 +40,14 @@ async def test_all_reports(ctx: TaskContext, asset_path, report_output_path, use
     assert report_pdf.exists()
 
     getLogger().info("Report output path: %s", report_output_path)
+
+
+def test_chardet_dependency():
+    """We are testing if we get a meaningful error message if we try to use the only function using "chardet".
+    This is patched by edps.report.pdf.patch_chardet_dependency()."""
+
+    from reportlab.lib.rparsexml import smartDecode  # type: ignore[import-untyped]
+
+    with pytest.raises(RuntimeError) as exc_info:
+        smartDecode("abc")
+    assert str(exc_info.value) == "We have deliberately excluded the 'chardet' dependency of 'reportlab' for license reasons."

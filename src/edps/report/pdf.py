@@ -1,6 +1,7 @@
 import os
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
+from typing import Any
 
 from xhtml2pdf import pisa
 from xhtml2pdf.context import pisaContext as PisaContext
@@ -48,3 +49,18 @@ class PdfReportGenerator(ReportGenerator):
         if size == 0:
             raise RuntimeError("PDF report is empty.")
         ctx.logger.info("PDF report generated (%d bytes).", size)
+
+
+def patch_chardet_dependency():
+    """
+    For license reasons we have removed the "chardet" library which is a dependency of "reportlab" which is a dependency of "xhtml2pdf.
+    For our use-case PDF generation works fine without chardet.
+    We patch the only function using chardet to get a meaningful error message.
+    """
+
+    import reportlab.lib.rparsexml  # type: ignore[import-untyped]
+
+    def fake_smart_decode(s: Any):
+        raise RuntimeError("We have deliberately excluded the 'chardet' dependency of 'reportlab' for license reasons.")
+
+    reportlab.lib.rparsexml.smartDecode = fake_smart_decode
