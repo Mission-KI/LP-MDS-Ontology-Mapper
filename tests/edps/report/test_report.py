@@ -3,6 +3,7 @@ from logging import getLogger
 from pathlib import Path
 
 import pytest
+from pypdf import PdfReader
 from pytest import fixture, mark
 
 from edps.report import HtmlReportGenerator, PdfReportGenerator, ReportInput
@@ -39,7 +40,19 @@ async def test_all_reports(ctx: TaskContext, asset_path, report_output_path, use
         await PdfReportGenerator().generate(ctx, report_input, ctx.output_path, file_io)
     assert report_pdf.exists()
 
+    pdf_text = read_pdf_text(report_pdf)
+    assert "Title\ndataset-dummy-name" in pdf_text
+    # Test if umlauts were encoded correctly
+    assert "Tags\ntest, csv, Äöüß" in pdf_text
+
     getLogger().info("Report output path: %s", report_output_path)
+
+
+def read_pdf_text(report_pdf: Path) -> str:
+    with PdfReader(report_pdf) as pdf_reader:
+        pages = pdf_reader.pages
+        page_text = [p.extract_text(extraction_mode="plain") for p in pages]
+        return "\n\n".join(page_text)
 
 
 def test_chardet_dependency():
@@ -50,4 +63,7 @@ def test_chardet_dependency():
 
     with pytest.raises(RuntimeError) as exc_info:
         smartDecode("abc")
-    assert str(exc_info.value) == "We have deliberately excluded the 'chardet' dependency of 'reportlab' for license reasons."
+    assert (
+        str(exc_info.value)
+        == "We have deliberately excluded the 'chardet' dependency of 'reportlab' for license reasons."
+    )

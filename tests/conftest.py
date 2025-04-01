@@ -320,7 +320,7 @@ def user_provided_data():
         name="dataset-dummy-name",
         dataCategory="TestDataCategory",
         description="Our very first test edp",
-        tags=["test", "csv"],
+        tags=["test", "csv", "Äöüß"],
         freely_available=True,
     )
 

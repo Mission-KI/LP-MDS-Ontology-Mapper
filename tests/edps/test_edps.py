@@ -882,6 +882,6 @@ def _assert_pickle_temporal_consistencies(
 
 
 def read_edp_file(json_file: Path):
-    with open(json_file, "r") as file:
+    with open(json_file, "r", encoding="utf-8") as file:
         json_data = file.read()
     return ExtendedDatasetProfile.model_validate_json(json_data)

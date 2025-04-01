@@ -21,6 +21,7 @@ class PdfReportGenerator(ReportGenerator):
 
         pisa_context: PisaContext = pisa.CreatePDF(
             html_buffer,
+            encoding="utf-8",
             dest=output_buffer,
             link_callback=lambda url, origin: build_real_sub_path(base_dir, str(url)).as_posix(),
         )
