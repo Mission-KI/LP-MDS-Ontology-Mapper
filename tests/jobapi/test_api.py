@@ -1,5 +1,5 @@
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,6 +47,13 @@ async def test_api(test_client, user_provided_data, asset_path: Path):
     # Check for log
     response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/log")
     assert response.status_code == 200, response.text
+
+
+async def test_api_client_error(test_client):
+    random_uuid = uuid4()
+    response = test_client.get(f"/v1/dataspace/analysisjob/{random_uuid}/result")
+    assert response.status_code == 400
+    assert response.json()["detail"] is not None
 
 
 def get_status(client: TestClient, job_id: UUID):
