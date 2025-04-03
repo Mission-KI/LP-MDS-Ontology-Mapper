@@ -49,6 +49,7 @@ class UserProvidedEdpData(BaseModel):
     transferTypeFrequency: AssetUpdatePeriod | None = _get_edp_field("transferTypeFrequency")
     growthFlag: AssetGrowthRate | None = _get_edp_field("growthFlag")
     immutabilityFlag: AssetImmutability | None = _get_edp_field("immutabilityFlag")
+    allowedForAiTraining: bool | None = _get_edp_field("allowedForAiTraining")
     nda: str | None = _get_edp_field("nda")
     dpa: str | None = _get_edp_field("dpa")
     dataLog: str | None = _get_edp_field("dataLog")
