@@ -23,6 +23,7 @@ from extended_dataset_profile.models.v0.edp import (
     UnstructuredTextDataSet,
     VideoDataSet,
 )
+from extended_dataset_profile.version import Version
 from pydantic import AnyUrl, BaseModel, Field, model_validator
 
 
@@ -69,7 +70,7 @@ class ComputedEdpData(BaseModel):
     semiStructuredDatasets: List[SemiStructuredDataSet] = _get_edp_field("semiStructuredDatasets")
     unstructuredTextDatasets: List[UnstructuredTextDataSet] = _get_edp_field("unstructuredTextDatasets")
     imageDatasets: List[ImageDataSet] = _get_edp_field("imageDatasets")
-    schemaVersion: str = _get_edp_field("schemaVersion")
+    schemaVersion: Version = _get_edp_field("schemaVersion")
     volume: int = _get_edp_field("volume")
     videoDatasets: List[VideoDataSet] = _get_edp_field("videoDatasets")
     audioDatasets: List[AudioDataSet] = _get_edp_field("audioDatasets")

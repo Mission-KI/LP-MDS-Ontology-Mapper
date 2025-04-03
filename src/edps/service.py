@@ -8,6 +8,7 @@ from warnings import warn
 
 import easyocr
 import static_ffmpeg
+from extended_dataset_profile import CURRENT_VERSION
 from extended_dataset_profile.models.v0.edp import (
     ArchiveDataSet,
     AudioDataSet,
@@ -95,7 +96,10 @@ class Service:
     def _create_computed_edp_data(self, ctx: TaskContext, path: Path) -> ComputedEdpData:
         generated_by = f"EDP Service @ {edps.__version__}"
         edp = ComputedEdpData(
-            volume=calculate_size(path), generatedBy=generated_by, assetSha256Hash=compute_sha256(path)
+            schemaVersion=CURRENT_VERSION,
+            volume=calculate_size(path),
+            generatedBy=generated_by,
+            assetSha256Hash=compute_sha256(path),
         )
         augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
         self._insert_datasets_into_edp(ctx, edp, augmenter, None)
