@@ -3,7 +3,7 @@ import warnings
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path, PurePosixPath
-from typing import Iterator, List, Optional, Tuple, cast
+from typing import Dict, Iterator, List, Optional, Tuple, Type, cast
 from warnings import warn
 
 import easyocr
@@ -116,11 +116,16 @@ class Service:
         childrens_parent_node_reference: Optional[JsonReference]
         if ctx.dataset:
             augmenter.apply(ctx.dataset, ctx.dataset_name)
-            list_name, index = self._insert_dataset_into_edp(edp, ctx.dataset)
+            list_name, dataset_type = _DATASET_TYPE_TABLE[type(ctx.dataset)]
+            edp.dataTypes.add(dataset_type)
+            dataset_list: List = getattr(edp, list_name)
+            index = len(dataset_list)
+            dataset_list.append(ctx.dataset)
             reference = _make_json_reference(f"#/{list_name}/{index}")
             edp.datasetTree.append(
                 DatasetTreeNode(
                     dataset=reference,
+                    datasetType=dataset_type,
                     parent=parent_node_reference,
                     name=ctx.dataset_name,
                     fileProperties=ctx.file_properties,
@@ -132,42 +137,6 @@ class Service:
 
         for child in ctx.children:
             self._insert_datasets_into_edp(child, edp, augmenter, childrens_parent_node_reference)
-
-    def _insert_dataset_into_edp(self, edp: ComputedEdpData, dataset: DataSet) -> Tuple[str, int]:
-        if isinstance(dataset, ArchiveDataSet):
-            edp.archiveDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.archive)
-            return "archiveDatasets", (len(edp.archiveDatasets) - 1)
-        elif isinstance(dataset, StructuredDataSet):
-            edp.structuredDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.structured)
-            return "structuredDatasets", (len(edp.structuredDatasets) - 1)
-        elif isinstance(dataset, SemiStructuredDataSet):
-            edp.semiStructuredDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.semiStructured)
-            return "semiStructuredDatasets", (len(edp.semiStructuredDatasets) - 1)
-        elif isinstance(dataset, UnstructuredTextDataSet):
-            edp.unstructuredTextDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.unstructuredText)
-            return "unstructuredTextDatasets", (len(edp.unstructuredTextDatasets) - 1)
-        elif isinstance(dataset, ImageDataSet):
-            edp.imageDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.image)
-            return "imageDatasets", (len(edp.imageDatasets) - 1)
-        elif isinstance(dataset, VideoDataSet):
-            edp.videoDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.video)
-            return "videoDatasets", (len(edp.videoDatasets) - 1)
-        elif isinstance(dataset, AudioDataSet):
-            edp.audioDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.audio)
-            return "audioDatasets", (len(edp.audioDatasets) - 1)
-        elif isinstance(dataset, DocumentDataSet):
-            edp.documentDatasets.append(dataset)
-            edp.dataTypes.add(DataSetType.documents)
-            return "documentDatasets", (len(edp.documentDatasets) - 1)
-
-        raise NotImplementedError(f'Did not expect dataset type "{type(dataset)}"')
 
     def _has_temporal_columns(self, edp: ComputedEdpData) -> bool:
         for structured in edp.structuredDatasets:
@@ -278,6 +247,18 @@ class _Augmenter:
 
 def _make_json_reference(text: str) -> JsonReference:
     return JsonReference(reference=text)
+
+
+_DATASET_TYPE_TABLE: Dict[Type[DataSet], Tuple[str, DataSetType]] = {
+    ArchiveDataSet: ("archiveDatasets", DataSetType.archive),
+    StructuredDataSet: ("structuredDatasets", DataSetType.structured),
+    SemiStructuredDataSet: ("semiStructuredDatasets", DataSetType.semiStructured),
+    UnstructuredTextDataSet: ("unstructuredTextDatasets", DataSetType.unstructuredText),
+    ImageDataSet: ("imageDatasets", DataSetType.image),
+    VideoDataSet: ("videoDatasets", DataSetType.video),
+    AudioDataSet: ("audioDatasets", DataSetType.audio),
+    DocumentDataSet: ("documentDatasets", DataSetType.documents),
+}
 
 
 def compute_sha256(file_path: Path) -> str:
