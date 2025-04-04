@@ -1,4 +1,4 @@
-from asyncio import get_running_loop
+import asyncio
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -7,7 +7,7 @@ from edps.compression.base import CompressionAlgorithm, DecompressionAlgorithm
 
 class ZipAlgorithm(CompressionAlgorithm, DecompressionAlgorithm):
     async def compress(self, source_directory: Path, target_archive: Path) -> None:
-        await get_running_loop().run_in_executor(None, self._compress, source_directory, target_archive)
+        await asyncio.to_thread(self._compress, source_directory, target_archive)
 
     def _compress(self, source_directory: Path, target_archive: Path) -> None:
         # Create a ZipFile object in write mode
@@ -23,7 +23,7 @@ class ZipAlgorithm(CompressionAlgorithm, DecompressionAlgorithm):
                     zip_file.write(file_path, arcname)
 
     async def extract(self, source_archive: Path, target_directory: Path) -> None:
-        await get_running_loop().run_in_executor(None, self._extract, source_archive, target_directory)
+        await asyncio.to_thread(self._extract, source_archive, target_directory)
 
     def _extract(self, source_archive: Path, target_directory: Path) -> None:
         with ZipFile(source_archive, "r") as zip_file:

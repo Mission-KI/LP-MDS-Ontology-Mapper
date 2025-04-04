@@ -122,6 +122,9 @@ class TaskContextImpl(TaskContext):
     ):
         """Execute a subtask, store the dataset and return the results."""
 
+        # Short sleep allows the task to be cancelled
+        await asyncio.sleep(0.001)
+
         # Replace dot with underscore. Keep slash as they are needed in archives.
         dataset_name = sanitize_path(dataset_name.replace(".", "_"))
         child_context = self._prepare_sub_context(dataset_name)

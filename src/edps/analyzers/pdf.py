@@ -1,3 +1,4 @@
+import asyncio
 import warnings
 from pathlib import Path
 from typing import Iterator, Optional
@@ -37,11 +38,11 @@ class PdfAnalyzer:
         keywords = split_keywords(metadata.keywords if metadata else None)
         modified = _calc_modified(self.pdf_reader._ID, metadata)
 
-        extracted_text = self._extract_text(ctx)
+        extracted_text = await asyncio.to_thread(lambda: self._extract_text(ctx))
         await ctx.exec("text", unstructured_text_importer_from_string, extracted_text)
 
         num_images = 0
-        for image in self._extract_images(ctx):
+        for image in await asyncio.to_thread(lambda: self._extract_images(ctx)):
             num_images += 1
             await ctx.exec(f"image_{num_images:03}", raster_image_importer_from_pilimage, image)
 

@@ -1,4 +1,4 @@
-from asyncio import get_running_loop
+import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +17,7 @@ async def raster_image_importer(ctx: TaskContext, path: Path) -> ImageDataSet:
         with open_image(path) as img:
             return parse_raster_image(img)
 
-    img_metadata, img_array = await get_running_loop().run_in_executor(None, runner)
+    img_metadata, img_array = await asyncio.to_thread(runner)
     analyzer = ImageAnalyzer(img_metadata, img_array)
     return await analyzer.analyze(ctx)
 

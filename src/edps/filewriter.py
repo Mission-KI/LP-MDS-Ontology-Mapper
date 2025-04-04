@@ -1,4 +1,4 @@
-from asyncio import get_running_loop
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Tuple
@@ -32,8 +32,7 @@ async def write_edp(ctx: TaskContext, name: PurePosixPath, edp: ExtendedDatasetP
     relative_save_path: Path = save_path.relative_to(ctx.output_path)
     with open(save_path, "wt", encoding=TEXT_ENCODING) as io_wrapper:
         json: str = edp.model_dump_json(by_alias=True)
-        loop = get_running_loop()
-        await loop.run_in_executor(None, io_wrapper.write, json)
+        await asyncio.to_thread(io_wrapper.write, json)
     ctx.logger.debug('Generated EDP file "%s"', relative_save_path)
     return relative_save_path
 

@@ -1,3 +1,4 @@
+import asyncio
 import warnings
 from io import StringIO, TextIOBase
 from itertools import permutations, tee
@@ -32,10 +33,14 @@ class Analyzer:
         with StringIO() as unstructured_only_file:
             # unstructured_only_file the lines which where not handled by the CSV parsers.
             embedded_tables: List[EmbeddedTable] = []
-            async for embbeded_table in self._analyze_embedded_csv(self._content, unstructured_only_file):
+            async for embbeded_table in await asyncio.to_thread(
+                lambda: self._analyze_embedded_csv(self._content, unstructured_only_file)
+            ):
                 embedded_tables.append(embbeded_table)
             unstructured_only_file.seek(0)
-            return self._analyze_unstructured_text(unstructured_only_file, embedded_tables)
+            return await asyncio.to_thread(
+                lambda: self._analyze_unstructured_text(unstructured_only_file, embedded_tables)
+            )
 
     def _analyze_unstructured_text(
         self, opened_file: TextIOBase, embedded_tables: List[EmbeddedTable]
@@ -188,8 +193,12 @@ class _CsvAnalyzer:
 
     async def analyze(self) -> AsyncIterator[EmbeddedTable]:
         chunks = [chunk async for chunk in self._walk_file()]
-        grouped_chunks = list(self._group_overlapping_chunks(chunks))
-        chunks = [chunk for group in grouped_chunks for chunk in self._resolve_overlaps(self._ctx, group)]
+        grouped_chunks = list(await asyncio.to_thread(lambda: self._group_overlapping_chunks(chunks)))
+        chunks = [
+            chunk
+            for group in grouped_chunks
+            for chunk in await asyncio.to_thread(lambda: self._resolve_overlaps(self._ctx, group))
+        ]
         number_lines = self._count_lines()
         unstructured_text_chunks = [Chunk(0, number_lines + 1)]
         count = 0

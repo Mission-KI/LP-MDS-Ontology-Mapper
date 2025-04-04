@@ -1,6 +1,6 @@
+import asyncio
 import csv
 import io
-from asyncio import get_running_loop
 from csv import Dialect
 from io import TextIOBase
 from pathlib import Path
@@ -96,17 +96,14 @@ async def excel_import_dataframes(
 ) -> dict[str, DataFrame]:
     """Import XLS/XLSX files. The engine must be passed explicitly to ensure the required libraries are installed."""
 
-    def runner() -> dict[str, DataFrame]:
-        return read_excel(
+    return await asyncio.to_thread(
+        lambda: read_excel(
             path,
             engine=engine,
             sheet_name=None,  # imports all sheets as dictionary
             header=0,  # assume header in row 0
         )
-
-    loop = get_running_loop()
-    dataframes_map = await loop.run_in_executor(None, runner)
-    return dataframes_map
+    )
 
 
 async def xlsx_importer(ctx: TaskContext, path: Path) -> StructuredDataSet:

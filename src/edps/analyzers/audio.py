@@ -1,3 +1,4 @@
+import asyncio
 import io
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -46,7 +47,7 @@ async def plot_spectrogram(ctx: TaskContext, path: Path, stream_number: int) -> 
 
     window = scipy.signal.windows.gaussian(window_size, 0.25 * window_size, sym=True)
     sfft = scipy.signal.ShortTimeFFT(window, int(0.1 * window_size), fs=sampling_rate, fft_mode="onesided")
-    spectrogram = sfft.spectrogram(samples, padding="odd")
+    spectrogram = await asyncio.to_thread(lambda: sfft.spectrogram(samples, padding="odd"))
     spectrogram_log = 10 * np.log10(np.fmax(spectrogram, audio_config.dynamic_range_min))
 
     plot_name = ctx.build_output_reference("fft")

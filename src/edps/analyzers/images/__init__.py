@@ -1,3 +1,4 @@
+import asyncio
 import io
 import threading
 from typing import Optional
@@ -88,7 +89,7 @@ class ImageAnalyzer:
         return bool(is_low_contrast(gray))
 
     async def _detect_texts(self, img: np.ndarray) -> DataFrame:
-        return get_ocr_model().read(img)
+        return await asyncio.to_thread(lambda: get_ocr_model().read(img))
 
     async def _compute_ela_score(self, img: np.ndarray, metadata: ImageMetadata, ref_quality: int = 90):
         if metadata.codec not in ("JPG", "JPEG"):
