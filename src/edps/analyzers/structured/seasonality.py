@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Optional
 from warnings import warn
 
@@ -7,10 +8,11 @@ from matplotlib.figure import Figure
 from pandas import DataFrame, Series
 from statsmodels.tsa.seasonal import STL, DecomposeResult
 
-from edps.analyzers.structured.temporal_consistency import DatetimeColumnTemporalConsistency, Granularity
+from edps.analyzers.structured.temporal_consistency import DatetimeColumnTemporalConsistency, Granularities, Granularity
 from edps.analyzers.structured.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
 from edps.taskcontext import TaskContext
+from edps.types import SeasonalityConfig
 
 
 class PerTimeBaseSeasonalityGraphs:
@@ -30,7 +32,7 @@ class PerTimeBaseSeasonalityGraphs:
 async def compute_seasonality(
     ctx: TaskContext,
     datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
-    datetime_column_periodicities: Series,
+    datetime_column_fields: DataFrame,
     numeric_columns: DataFrame,
 ) -> DataFrame:
     datetime_count = len(datetime_column_infos.ids)
@@ -39,8 +41,9 @@ async def compute_seasonality(
 
     dataframe = DataFrame(index=numeric_columns.columns, columns=datetime_column_infos.ids, dtype=object)
 
-    periodicity: DatetimeColumnTemporalConsistency
-    for datetime_column_name, periodicity in datetime_column_periodicities.items():
+    for datetime_column_name, datetime_fields in datetime_column_fields.T.items():
+        temporal_consistency: DatetimeColumnTemporalConsistency = datetime_fields["temporal-consistency"]
+        datetime_column_duration: timedelta = datetime_fields["latest"] - datetime_fields["earliest"]
         datetime_kind = datetime_column_infos.get_info(str(datetime_column_name)).kind
 
         if datetime_kind == DatetimeKind.DATE:
@@ -58,13 +61,20 @@ async def compute_seasonality(
             ctx.logger.warning(message)
             continue
 
-        filtered_numeric_columns = numeric_columns.loc[periodicity.cleaned_series.index].set_index(
-            periodicity.cleaned_series, inplace=False
+        filtered_numeric_columns = numeric_columns.loc[temporal_consistency.cleaned_series.index].set_index(
+            temporal_consistency.cleaned_series, inplace=False
         )
 
         for numeric_column_name, numeric_column in filtered_numeric_columns.items():
+            resample_period = _get_biggest_fitting_period(
+                datetime_column_duration,
+                numeric_column.count(),
+                temporal_consistency,
+                ctx.config.structured_config.seasonality,
+            )
+
             dataframe.loc[str(numeric_column_name), str(datetime_column_name)] = _seasonal_decompose_column(
-                ctx, numeric_column, periodicity.main_period, str(datetime_column_name)
+                ctx, numeric_column, resample_period, str(datetime_column_name)
             )
 
     ctx.logger.info("Finished seasonality analysis.")
@@ -74,17 +84,15 @@ async def compute_seasonality(
 def _seasonal_decompose_column(
     ctx: TaskContext, column: Series, resample_period: Granularity, datetime_column_name: str
 ) -> Optional[DecomposeResult]:
-    config = ctx.config.structured_config.seasonality
     non_null_column: Series = column[column.notnull()]
     number_non_null = len(non_null_column)
-    if number_non_null > config.max_samples:
-        ctx.logger.info(
-            'Column "%s" contains too many entries. Running seasonality on the first %d entries only.',
-            column.name,
-            config.max_samples,
+    non_null_column = (
+        non_null_column.resample(
+            resample_period.timedelta,
         )
-        non_null_column = non_null_column[: config.max_samples]
-    non_null_column = non_null_column.resample(resample_period.timedelta).mean().interpolate()
+        .mean()
+        .interpolate()
+    )
     resample_period_samples = resample_period.samples_per_period
     number_non_null = len(non_null_column.index)
 
@@ -99,16 +107,6 @@ def _seasonal_decompose_column(
             2 * resample_period_samples,
         )
         return None
-
-    if number_periods > config.max_periods:
-        ctx.logger.debug(
-            'Column "%s" contains %d periods of data. Will be capped to %d periods.',
-            column.name,
-            number_periods,
-            config.max_periods,
-        )
-        number_non_null = config.max_periods * resample_period_samples
-        non_null_column = non_null_column[:number_non_null]
 
     try:
         stl = STL(non_null_column, period=resample_period_samples, robust=True)
@@ -160,3 +158,25 @@ async def get_seasonality_graphs(
         seasonality=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=seasonal_reference),
         residual=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=residual_reference),
     )
+
+
+_LARGEST_TO_LOWEST_GRANULARITY = sorted(
+    (granularity.value for granularity in Granularities),
+    reverse=True,
+    key=lambda granularity: granularity.timedelta,
+)
+
+
+def _get_biggest_fitting_period(
+    duration: timedelta,
+    number_non_null: int,
+    temporal_consistency: DatetimeColumnTemporalConsistency,
+    config: SeasonalityConfig,
+) -> Granularity:
+    target_count = min(number_non_null, config.target_samples)
+    for granularity in _LARGEST_TO_LOWEST_GRANULARITY:
+        number_of_samples_after_resample = duration / granularity.timedelta
+        if number_of_samples_after_resample >= target_count:
+            return granularity
+
+    return temporal_consistency.main_period

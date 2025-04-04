@@ -113,10 +113,8 @@ class DistributionConfig(BaseModel):
 class SeasonalityConfig(BaseModel):
     """Configuration for the seasonality analysis step."""
 
-    max_samples: int = Field(default=int(1e6), description="Maximum number of samples to use for seasonality analysis.")
-    max_periods: int = Field(
-        default=10,
-        description="Maximum number of periods to use in seasonality analysis. If this is too hight, the seasonality graphs become none readable.",
+    target_samples: int = Field(
+        default=500, description="Number of samples to resample to before running seasonality analysis."
     )
 
 

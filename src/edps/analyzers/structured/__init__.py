@@ -124,8 +124,7 @@ class PandasAnalyzer:
         string_cols = type_parser_results.string_cols
         string_fields = common_fields.loc[Index(string_cols.ids)]
 
-        timebase_periodicities = datetime_fields[_DATETIME_TEMPORAL_CONSISTENCY]
-        seasonality_results = await compute_seasonality(ctx, datetime_cols, timebase_periodicities, numeric_cols.data)
+        seasonality_results = await compute_seasonality(ctx, datetime_cols, datetime_fields, numeric_cols.data)
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
