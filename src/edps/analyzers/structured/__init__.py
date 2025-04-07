@@ -28,6 +28,42 @@ from pandas import (
 from scipy.stats import distributions
 from seaborn import heatmap
 
+from edps.analyzers.structured.result_keys import (
+    COMMON_INCONSISTENT,
+    COMMON_INTERPRETABLE,
+    COMMON_NULL,
+    COMMON_UNIQUE,
+    DATETIME_ALL_ENTRIES_UNIQUE,
+    DATETIME_EARLIEST,
+    DATETIME_LATEST,
+    DATETIME_MONOTONIC_DECREASING,
+    DATETIME_MONOTONIC_INCREASING,
+    DATETIME_TEMPORAL_CONSISTENCY,
+    NUMERIC_DISTRIBUTION,
+    NUMERIC_DISTRIBUTION_PARAMETERS,
+    NUMERIC_IQR,
+    NUMERIC_IQR_OUTLIERS,
+    NUMERIC_LOWER_DIST,
+    NUMERIC_LOWER_IQR,
+    NUMERIC_LOWER_PERCENTILE,
+    NUMERIC_LOWER_QUANT,
+    NUMERIC_LOWER_Z,
+    NUMERIC_MAX,
+    NUMERIC_MEAN,
+    NUMERIC_MEDIAN,
+    NUMERIC_MIN,
+    NUMERIC_PERCENTILE_OUTLIERS,
+    NUMERIC_QUANT_OUTLIERS,
+    NUMERIC_RELATIVE_OUTLIERS,
+    NUMERIC_STD_DEV,
+    NUMERIC_UPPER_DIST,
+    NUMERIC_UPPER_IQR,
+    NUMERIC_UPPER_PERCENTILE,
+    NUMERIC_UPPER_QUANT,
+    NUMERIC_UPPER_Z,
+    NUMERIC_VARIANCE,
+    NUMERIC_Z_OUTLIERS,
+)
 from edps.filewriter import get_pyplot_writer
 from edps.taskcontext import TaskContext
 
@@ -40,45 +76,6 @@ from .type_parser import (
     Result,
     parse_types,
 )
-
-# Labels for fields
-
-_COMMON_NULL = "null-count"
-_COMMON_INCONSISTENT = "inconsistent-count"
-_COMMON_INTERPRETABLE = "interpretable-count"
-_COMMON_UNIQUE = "unique-count"
-
-_NUMERIC_MIN = "minimum"
-_NUMERIC_MAX = "maximum"
-_NUMERIC_LOWER_PERCENTILE = "lower-percentile"
-_NUMERIC_UPPER_PERCENTILE = "upper-percentile"
-_NUMERIC_PERCENTILE_OUTLIERS = "percentile-outliers"
-_NUMERIC_MEAN = "mean"
-_NUMERIC_MEDIAN = "median"
-_NUMERIC_VARIANCE = "variance"
-_NUMERIC_STD_DEV = "std-dev"
-_NUMERIC_LOWER_Z = "lower-z-limit"
-_NUMERIC_UPPER_Z = "upper-z-limit"
-_NUMERIC_Z_OUTLIERS = "z-outlier-count"
-_NUMERIC_LOWER_DIST = "lower-distribution-limit"
-_NUMERIC_UPPER_DIST = "upper-distribution-limit"
-_NUMERIC_LOWER_QUANT = "lower-quantile-limit"
-_NUMERIC_UPPER_QUANT = "upper-quantile-limit"
-_NUMERIC_QUANT_OUTLIERS = "quantile-outlier-count"
-_NUMERIC_LOWER_IQR = "lower-iqr-limit"
-_NUMERIC_UPPER_IQR = "upper-iqr-limit"
-_NUMERIC_IQR = "inter-quartile-range"
-_NUMERIC_IQR_OUTLIERS = "iqr-outlier-count"
-_NUMERIC_RELATIVE_OUTLIERS = "relative-outliers"
-_NUMERIC_DISTRIBUTION = "distribution"
-_NUMERIC_DISTRIBUTION_PARAMETERS = "distribution-parameters"
-
-_DATETIME_EARLIEST = "earliest"
-_DATETIME_LATEST = "latest"
-_DATETIME_ALL_ENTRIES_UNIQUE = "all-entries-are-unique"
-_DATETIME_MONOTONIC_INCREASING = "monotonically-increasing"
-_DATETIME_MONOTONIC_DECREASING = "monotonically-decreasing"
-_DATETIME_TEMPORAL_CONSISTENCY = "temporal-consistency"
 
 
 class _Distributions(str, Enum):
@@ -184,19 +181,19 @@ class PandasAnalyzer:
 
     async def _compute_common_fields(self, columns: DataFrame, type_parser_results: Result) -> DataFrame:
         common_fields = DataFrame(index=columns.columns)
-        common_fields[_COMMON_NULL] = Series(
+        common_fields[COMMON_NULL] = Series(
             {name: info.number_nan_before_conversion for name, info, _ in type_parser_results.all_cols},
-            name=_COMMON_NULL,
+            name=COMMON_NULL,
         )
-        common_fields[_COMMON_INCONSISTENT] = Series(
+        common_fields[COMMON_INCONSISTENT] = Series(
             {name: info.number_inconsistent for name, info, _ in type_parser_results.all_cols},
-            name=_COMMON_INCONSISTENT,
+            name=COMMON_INCONSISTENT,
         )
-        common_fields[_COMMON_INTERPRETABLE] = Series(
+        common_fields[COMMON_INTERPRETABLE] = Series(
             {name: info.number_interpretable for name, info, _ in type_parser_results.all_cols},
-            name=_COMMON_INTERPRETABLE,
+            name=COMMON_INTERPRETABLE,
         )
-        common_fields[_COMMON_UNIQUE] = columns.nunique(dropna=True)
+        common_fields[COMMON_UNIQUE] = columns.nunique(dropna=True)
         return common_fields
 
     async def _compute_numeric_fields(
@@ -207,64 +204,64 @@ class PandasAnalyzer:
     ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
-        fields[_NUMERIC_MIN] = columns.min()
-        fields[_NUMERIC_MAX] = columns.max()
-        fields[_NUMERIC_LOWER_PERCENTILE] = columns.quantile(0.01)
-        fields[_NUMERIC_UPPER_PERCENTILE] = columns.quantile(0.99)
-        fields[_NUMERIC_PERCENTILE_OUTLIERS] = _get_outliers(
+        fields[NUMERIC_MIN] = columns.min()
+        fields[NUMERIC_MAX] = columns.max()
+        fields[NUMERIC_LOWER_PERCENTILE] = columns.quantile(0.01)
+        fields[NUMERIC_UPPER_PERCENTILE] = columns.quantile(0.99)
+        fields[NUMERIC_PERCENTILE_OUTLIERS] = _get_outliers(
             columns,
-            fields[_NUMERIC_LOWER_PERCENTILE],
-            fields[_NUMERIC_UPPER_PERCENTILE],
+            fields[NUMERIC_LOWER_PERCENTILE],
+            fields[NUMERIC_UPPER_PERCENTILE],
         )
         # Standard Distribution
-        fields[_NUMERIC_MEAN] = columns.mean()
-        fields[_NUMERIC_MEDIAN] = columns.median()
-        fields[_NUMERIC_VARIANCE] = columns.var()
-        fields[_NUMERIC_STD_DEV] = columns.std()
-        fields[_NUMERIC_LOWER_Z] = fields[_NUMERIC_MEAN] - 3.0 * fields[_NUMERIC_STD_DEV]
-        fields[_NUMERIC_UPPER_Z] = fields[_NUMERIC_MEAN] + 3.0 * fields[_NUMERIC_STD_DEV]
-        fields[_NUMERIC_Z_OUTLIERS] = _get_outliers(columns, fields[_NUMERIC_LOWER_Z], fields[_NUMERIC_UPPER_Z])
+        fields[NUMERIC_MEAN] = columns.mean()
+        fields[NUMERIC_MEDIAN] = columns.median()
+        fields[NUMERIC_VARIANCE] = columns.var()
+        fields[NUMERIC_STD_DEV] = columns.std()
+        fields[NUMERIC_LOWER_Z] = fields[NUMERIC_MEAN] - 3.0 * fields[NUMERIC_STD_DEV]
+        fields[NUMERIC_UPPER_Z] = fields[NUMERIC_MEAN] + 3.0 * fields[NUMERIC_STD_DEV]
+        fields[NUMERIC_Z_OUTLIERS] = _get_outliers(columns, fields[NUMERIC_LOWER_Z], fields[NUMERIC_UPPER_Z])
         # Inter Quartile Range
-        fields[_NUMERIC_LOWER_QUANT] = columns.quantile(0.25)
-        fields[_NUMERIC_UPPER_QUANT] = columns.quantile(0.75)
-        fields[_NUMERIC_QUANT_OUTLIERS] = _get_outliers(
-            columns, fields[_NUMERIC_LOWER_QUANT], fields[_NUMERIC_UPPER_QUANT]
+        fields[NUMERIC_LOWER_QUANT] = columns.quantile(0.25)
+        fields[NUMERIC_UPPER_QUANT] = columns.quantile(0.75)
+        fields[NUMERIC_QUANT_OUTLIERS] = _get_outliers(
+            columns, fields[NUMERIC_LOWER_QUANT], fields[NUMERIC_UPPER_QUANT]
         )
-        fields[_NUMERIC_IQR] = fields[_NUMERIC_UPPER_QUANT] - fields[_NUMERIC_LOWER_QUANT]
-        fields[_NUMERIC_LOWER_IQR] = fields[_NUMERIC_LOWER_QUANT] - 1.5 * fields[_NUMERIC_IQR]
-        fields[_NUMERIC_UPPER_IQR] = fields[_NUMERIC_UPPER_QUANT] + 1.5 * fields[_NUMERIC_IQR]
-        fields[_NUMERIC_IQR_OUTLIERS] = _get_outliers(columns, fields[_NUMERIC_LOWER_IQR], fields[_NUMERIC_UPPER_IQR])
+        fields[NUMERIC_IQR] = fields[NUMERIC_UPPER_QUANT] - fields[NUMERIC_LOWER_QUANT]
+        fields[NUMERIC_LOWER_IQR] = fields[NUMERIC_LOWER_QUANT] - 1.5 * fields[NUMERIC_IQR]
+        fields[NUMERIC_UPPER_IQR] = fields[NUMERIC_UPPER_QUANT] + 1.5 * fields[NUMERIC_IQR]
+        fields[NUMERIC_IQR_OUTLIERS] = _get_outliers(columns, fields[NUMERIC_LOWER_IQR], fields[NUMERIC_UPPER_IQR])
         # Relative outliers
-        fields[_NUMERIC_RELATIVE_OUTLIERS] = (
-            fields[[_NUMERIC_PERCENTILE_OUTLIERS, _NUMERIC_Z_OUTLIERS, _NUMERIC_IQR_OUTLIERS]].mean(axis=1, skipna=True)
-            / common_fields[_COMMON_INTERPRETABLE]
+        fields[NUMERIC_RELATIVE_OUTLIERS] = (
+            fields[[NUMERIC_PERCENTILE_OUTLIERS, NUMERIC_Z_OUTLIERS, NUMERIC_IQR_OUTLIERS]].mean(axis=1, skipna=True)
+            / common_fields[COMMON_INTERPRETABLE]
         )
         # Distribution
-        fields[_NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_IQR]
-        fields.loc[fields[_NUMERIC_LOWER_IQR] < fields[_NUMERIC_MIN], _NUMERIC_LOWER_DIST] = fields[_NUMERIC_MIN]
-        fields[_NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_IQR]
-        fields.loc[fields[_NUMERIC_UPPER_IQR] > fields[_NUMERIC_MAX], _NUMERIC_UPPER_DIST] = fields[_NUMERIC_MAX]
-        upper_equals_lower = fields[_NUMERIC_LOWER_DIST] == fields[_NUMERIC_UPPER_DIST]
-        fields.loc[upper_equals_lower, _NUMERIC_LOWER_DIST] = fields[_NUMERIC_LOWER_DIST] * 0.9
-        fields.loc[upper_equals_lower, _NUMERIC_UPPER_DIST] = fields[_NUMERIC_UPPER_DIST] * 1.1
-        fields[_NUMERIC_DISTRIBUTION], fields[_NUMERIC_DISTRIBUTION_PARAMETERS] = await _get_distributions(
+        fields[NUMERIC_LOWER_DIST] = fields[NUMERIC_LOWER_IQR]
+        fields.loc[fields[NUMERIC_LOWER_IQR] < fields[NUMERIC_MIN], NUMERIC_LOWER_DIST] = fields[NUMERIC_MIN]
+        fields[NUMERIC_UPPER_DIST] = fields[NUMERIC_UPPER_IQR]
+        fields.loc[fields[NUMERIC_UPPER_IQR] > fields[NUMERIC_MAX], NUMERIC_UPPER_DIST] = fields[NUMERIC_MAX]
+        upper_equals_lower = fields[NUMERIC_LOWER_DIST] == fields[NUMERIC_UPPER_DIST]
+        fields.loc[upper_equals_lower, NUMERIC_LOWER_DIST] = fields[NUMERIC_LOWER_DIST] * 0.9
+        fields.loc[upper_equals_lower, NUMERIC_UPPER_DIST] = fields[NUMERIC_UPPER_DIST] * 1.1
+        fields[NUMERIC_DISTRIBUTION], fields[NUMERIC_DISTRIBUTION_PARAMETERS] = await _get_distributions(
             ctx, columns, concat([common_fields, fields], axis=1)
         )
         return fields
 
     async def _compute_datetime_fields(self, ctx: TaskContext, columns: DataFrame) -> DataFrame:
         computed = DataFrame(index=columns.columns)
-        computed[_DATETIME_EARLIEST] = columns.min()
-        computed[_DATETIME_LATEST] = columns.max()
+        computed[DATETIME_EARLIEST] = columns.min()
+        computed[DATETIME_LATEST] = columns.max()
         # TODO: Vectorize these
-        computed[_DATETIME_ALL_ENTRIES_UNIQUE] = Series({name: column.is_unique for name, column in columns.items()})
-        computed[_DATETIME_MONOTONIC_INCREASING] = Series(
+        computed[DATETIME_ALL_ENTRIES_UNIQUE] = Series({name: column.is_unique for name, column in columns.items()})
+        computed[DATETIME_MONOTONIC_INCREASING] = Series(
             {name: column.is_monotonic_increasing for name, column in columns.items()}
         )
-        computed[_DATETIME_MONOTONIC_DECREASING] = Series(
+        computed[DATETIME_MONOTONIC_DECREASING] = Series(
             {name: column.is_monotonic_decreasing for name, column in columns.items()}
         )
-        computed[_DATETIME_TEMPORAL_CONSISTENCY] = await compute_temporal_consistency(ctx, columns)
+        computed[DATETIME_TEMPORAL_CONSISTENCY] = await compute_temporal_consistency(ctx, columns)
         return computed
 
     async def _transform_numeric_results(
@@ -275,35 +272,35 @@ class PandasAnalyzer:
 
         column_result = NumericColumn(
             name=str(column.name),
-            nullCount=computed_fields[_COMMON_NULL],
-            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
-            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
-            numberUnique=computed_fields[_COMMON_UNIQUE],
-            min=computed_fields[_NUMERIC_MIN],
-            max=computed_fields[_NUMERIC_MAX],
-            mean=computed_fields[_NUMERIC_MEAN],
-            median=computed_fields[_NUMERIC_MEDIAN],
-            variance=computed_fields[_NUMERIC_VARIANCE],
-            stddev=computed_fields[_NUMERIC_STD_DEV],
-            upperPercentile=computed_fields[_NUMERIC_UPPER_PERCENTILE],
-            lowerPercentile=computed_fields[_NUMERIC_LOWER_PERCENTILE],
-            percentileOutlierCount=computed_fields[_NUMERIC_PERCENTILE_OUTLIERS],
-            upperQuantile=computed_fields[_NUMERIC_UPPER_QUANT],
-            lowerQuantile=computed_fields[_NUMERIC_LOWER_QUANT],
-            quantileOutlierCount=computed_fields[_NUMERIC_QUANT_OUTLIERS],
-            upperZScore=computed_fields[_NUMERIC_UPPER_Z],
-            lowerZScore=computed_fields[_NUMERIC_LOWER_Z],
-            zScoreOutlierCount=computed_fields[_NUMERIC_Z_OUTLIERS],
-            upperIQR=computed_fields[_NUMERIC_UPPER_IQR],
-            lowerIQR=computed_fields[_NUMERIC_LOWER_IQR],
-            iqr=computed_fields[_NUMERIC_IQR],
-            iqrOutlierCount=computed_fields[_NUMERIC_IQR_OUTLIERS],
-            relativeOutlierCount=computed_fields[_NUMERIC_RELATIVE_OUTLIERS],
-            distribution=computed_fields[_NUMERIC_DISTRIBUTION],
+            nullCount=computed_fields[COMMON_NULL],
+            inconsistentCount=computed_fields[COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[COMMON_INTERPRETABLE],
+            numberUnique=computed_fields[COMMON_UNIQUE],
+            min=computed_fields[NUMERIC_MIN],
+            max=computed_fields[NUMERIC_MAX],
+            mean=computed_fields[NUMERIC_MEAN],
+            median=computed_fields[NUMERIC_MEDIAN],
+            variance=computed_fields[NUMERIC_VARIANCE],
+            stddev=computed_fields[NUMERIC_STD_DEV],
+            upperPercentile=computed_fields[NUMERIC_UPPER_PERCENTILE],
+            lowerPercentile=computed_fields[NUMERIC_LOWER_PERCENTILE],
+            percentileOutlierCount=computed_fields[NUMERIC_PERCENTILE_OUTLIERS],
+            upperQuantile=computed_fields[NUMERIC_UPPER_QUANT],
+            lowerQuantile=computed_fields[NUMERIC_LOWER_QUANT],
+            quantileOutlierCount=computed_fields[NUMERIC_QUANT_OUTLIERS],
+            upperZScore=computed_fields[NUMERIC_UPPER_Z],
+            lowerZScore=computed_fields[NUMERIC_LOWER_Z],
+            zScoreOutlierCount=computed_fields[NUMERIC_Z_OUTLIERS],
+            upperIQR=computed_fields[NUMERIC_UPPER_IQR],
+            lowerIQR=computed_fields[NUMERIC_LOWER_IQR],
+            iqr=computed_fields[NUMERIC_IQR],
+            iqrOutlierCount=computed_fields[NUMERIC_IQR_OUTLIERS],
+            relativeOutlierCount=computed_fields[NUMERIC_RELATIVE_OUTLIERS],
+            distribution=computed_fields[NUMERIC_DISTRIBUTION],
             dataType=str(column.dtype),
             boxPlot=box_plot,
         )
-        distribution = computed_fields[_NUMERIC_DISTRIBUTION]
+        distribution = computed_fields[NUMERIC_DISTRIBUTION]
         if (
             distribution not in [enum.value for enum in _Distributions]
             and column_result.numberUnique > ctx.config.structured_config.distribution.minimum_number_numeric_values
@@ -312,8 +309,8 @@ class PandasAnalyzer:
                 ctx,
                 column,
                 computed_fields,
-                computed_fields[_NUMERIC_DISTRIBUTION],
-                computed_fields[_NUMERIC_DISTRIBUTION_PARAMETERS],
+                computed_fields[NUMERIC_DISTRIBUTION],
+                computed_fields[NUMERIC_DISTRIBUTION_PARAMETERS],
             )
         else:
             ctx.logger.debug(
@@ -344,22 +341,22 @@ class PandasAnalyzer:
     ) -> DateTimeColumn:
         ctx.logger.debug('Transforming datetime column "%s" results to EDP', column.name)
         temporal_consistency: Optional[DatetimeColumnTemporalConsistency] = computed_fields[
-            _DATETIME_TEMPORAL_CONSISTENCY
+            DATETIME_TEMPORAL_CONSISTENCY
         ]
 
         return DateTimeColumn(
             name=str(column.name),
-            nullCount=computed_fields[_COMMON_NULL],
-            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
-            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
-            numberUnique=computed_fields[_COMMON_UNIQUE],
+            nullCount=computed_fields[COMMON_NULL],
+            inconsistentCount=computed_fields[COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[COMMON_INTERPRETABLE],
+            numberUnique=computed_fields[COMMON_UNIQUE],
             temporalCover=TemporalCover(
-                earliest=computed_fields[_DATETIME_EARLIEST],
-                latest=computed_fields[_DATETIME_LATEST],
+                earliest=computed_fields[DATETIME_EARLIEST],
+                latest=computed_fields[DATETIME_LATEST],
             ),
-            all_entries_are_unique=computed_fields[_DATETIME_ALL_ENTRIES_UNIQUE],
-            monotonically_increasing=computed_fields[_DATETIME_MONOTONIC_INCREASING],
-            monotonically_decreasing=computed_fields[_DATETIME_MONOTONIC_DECREASING],
+            all_entries_are_unique=computed_fields[DATETIME_ALL_ENTRIES_UNIQUE],
+            monotonically_increasing=computed_fields[DATETIME_MONOTONIC_INCREASING],
+            monotonically_decreasing=computed_fields[DATETIME_MONOTONIC_DECREASING],
             temporalConsistencies=(temporal_consistency.temporal_consistencies if temporal_consistency else []),
             periodicity=temporal_consistency.main_period.name if temporal_consistency else None,
             format=info.format,
@@ -371,10 +368,10 @@ class PandasAnalyzer:
         ctx.logger.debug('Transforming string column "%s" results to EDP', column.name)
         return StringColumn(
             name=str(column.name),
-            nullCount=computed_fields[_COMMON_NULL],
-            inconsistentCount=computed_fields[_COMMON_INCONSISTENT],
-            interpretableCount=computed_fields[_COMMON_INTERPRETABLE],
-            numberUnique=computed_fields[_COMMON_UNIQUE],
+            nullCount=computed_fields[COMMON_NULL],
+            inconsistentCount=computed_fields[COMMON_INCONSISTENT],
+            interpretableCount=computed_fields[COMMON_INTERPRETABLE],
+            numberUnique=computed_fields[COMMON_UNIQUE],
             distributionGraph=await _get_string_distribution_graph(ctx, column),
         )
 
@@ -405,18 +402,18 @@ async def _get_distributions(ctx: TaskContext, columns: DataFrame, fields: DataF
         parameters[column_name] = params
         ctx.logger.debug("Computed %d/%d distributions", index, len(columns.columns))
 
-    return Series(distributions, name=_NUMERIC_DISTRIBUTION), Series(parameters, name=_NUMERIC_DISTRIBUTION_PARAMETERS)
+    return Series(distributions, name=NUMERIC_DISTRIBUTION), Series(parameters, name=NUMERIC_DISTRIBUTION_PARAMETERS)
 
 
 async def _get_distribution(ctx: TaskContext, column: Series, fields: Series) -> Tuple[str, DistributionParameters]:
     config = ctx.config.structured_config.distribution
-    if fields[_COMMON_UNIQUE] <= 1:
+    if fields[COMMON_UNIQUE] <= 1:
         return _Distributions.SingleValue.value, dict()
 
-    if fields[_COMMON_INTERPRETABLE] < config.minimum_number_numeric_values:
+    if fields[COMMON_INTERPRETABLE] < config.minimum_number_numeric_values:
         return _Distributions.TooSmallDataset.value, dict()
 
-    limits = Limits(min=fields[_NUMERIC_LOWER_DIST], max=fields[_NUMERIC_UPPER_DIST])
+    limits = Limits(min=fields[NUMERIC_LOWER_DIST], max=fields[NUMERIC_UPPER_DIST])
     try:
         return await fit_best_distribution(ctx, column, limits=limits)
     except FittingError as error:
@@ -433,8 +430,8 @@ async def _plot_distribution(
     distribution_name: str,
     distribution_parameters: dict,
 ):
-    x_min = column_fields[_NUMERIC_LOWER_DIST]
-    x_max = column_fields[_NUMERIC_UPPER_DIST]
+    x_min = column_fields[NUMERIC_LOWER_DIST]
+    x_max = column_fields[NUMERIC_UPPER_DIST]
     if x_min > x_max:
         x_min, x_max = x_max, x_min
     x_limits = (x_min, x_max)
@@ -469,7 +466,7 @@ async def _get_correlation_matrix(
     columns: DataFrame,
     fields: DataFrame,
 ) -> Optional[DataFrame]:
-    filtered_column_names = fields.loc[fields[_COMMON_UNIQUE] > 1].index
+    filtered_column_names = fields.loc[fields[COMMON_UNIQUE] > 1].index
 
     if len(filtered_column_names) < 2:
         return None
