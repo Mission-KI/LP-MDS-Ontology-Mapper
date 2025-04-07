@@ -1,11 +1,14 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import Optional
+from typing import AsyncGenerator, Optional, Tuple
 from warnings import warn
 
-from extended_dataset_profile.models.v0.edp import TimeBasedGraph
+import numpy as np
+from extended_dataset_profile.models.v0.edp import TimeBasedGraph, Trend
 from matplotlib.figure import Figure
 from pandas import DataFrame, Series
+from scipy.stats import linregress
 from statsmodels.tsa.seasonal import STL, DecomposeResult
 
 from edps.analyzers.structured.result_keys import (
@@ -13,6 +16,7 @@ from edps.analyzers.structured.result_keys import (
     NUMERIC_GRAPH_RESIDUAL,
     NUMERIC_GRAPH_SEASONALITY,
     NUMERIC_GRAPH_TREND,
+    NUMERIC_TREND,
 )
 from edps.analyzers.structured.temporal_consistency import DatetimeColumnTemporalConsistency, Granularities, Granularity
 from edps.analyzers.structured.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
@@ -40,11 +44,13 @@ async def seasonal_decompose(
     datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
     datetime_column_fields: DataFrame,
     numeric_columns: DataFrame,
+    numeric_columns_iqr: Series,
 ) -> DataFrame:
     decompose_results = await _seasonal_decompose_numeric_over_datetime(
         ctx, datetime_column_infos, datetime_column_fields, numeric_columns
     )
     column_fields = await _get_seasonality_graphs(ctx, decompose_results)
+    column_fields[NUMERIC_TREND] = await _compute_trends(ctx, decompose_results, numeric_columns_iqr)
     return column_fields
 
 
@@ -233,3 +239,48 @@ def _get_biggest_fitting_period(
             return granularity
 
     return temporal_consistency.main_period
+
+
+async def _compute_trends(ctx: TaskContext, decompose_results: DataFrame, numeric_columns_iqr: Series) -> Series:
+    return Series(
+        {
+            numeric_column_name: trend
+            async for numeric_column_name, trend in _iterate_trend(
+                ctx.config.structured_config.seasonality, decompose_results, numeric_columns_iqr
+            )
+        },
+        name=NUMERIC_TREND,
+    )
+
+
+async def _iterate_trend(
+    config: SeasonalityConfig, decompose_results: DataFrame, numeric_columns_iqr: Series
+) -> AsyncGenerator[Tuple[str, Trend], None]:
+    for numeric_column_name, decompose_results_for_column in decompose_results.T.items():
+        numeric_column_name = str(numeric_column_name)
+        trends = [
+            await calculate_trend(config, decompose_result.trend, numeric_columns_iqr[numeric_column_name])
+            for decompose_result in decompose_results_for_column
+        ]
+        if len(trends) == 0 or all(trend == Trend.NoTrend for trend in trends):
+            yield numeric_column_name, Trend.NoTrend
+        elif all(trend == Trend.Increasing or trend == Trend.NoTrend for trend in trends):
+            yield numeric_column_name, Trend.Increasing
+        elif all(trend == Trend.Decreasing or trend == Trend.NoTrend for trend in trends):
+            yield numeric_column_name, Trend.Decreasing
+        else:
+            # Detected multiple different trends, depending on time base.
+            yield numeric_column_name, Trend.NoTrend
+
+
+async def calculate_trend(config: SeasonalityConfig, series: Series, iqr: float) -> Trend:
+    result = await asyncio.to_thread(linregress, np.arange(0, len(series)), series.to_numpy())
+    if iqr == 0.0:
+        return Trend.NoTrend
+    normalized_slope = result.slope / iqr
+    if normalized_slope >= config.trend_threshold:
+        return Trend.Increasing
+    elif normalized_slope <= -config.trend_threshold:
+        return Trend.Decreasing
+    else:
+        return Trend.NoTrend

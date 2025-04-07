@@ -61,6 +61,7 @@ from edps.analyzers.structured.result_keys import (
     NUMERIC_QUANT_OUTLIERS,
     NUMERIC_RELATIVE_OUTLIERS,
     NUMERIC_STD_DEV,
+    NUMERIC_TREND,
     NUMERIC_UPPER_DIST,
     NUMERIC_UPPER_IQR,
     NUMERIC_UPPER_PERCENTILE,
@@ -122,7 +123,7 @@ class PandasAnalyzer:
         numeric_cols = type_parser_results.numeric_cols
         numeric_common_fields = common_fields.loc[Index(numeric_cols.ids)]
         numeric_fields = await self._compute_numeric_fields(
-            ctx, numeric_cols.data, numeric_common_fields, type_parser_results.datetime_cols, datetime_fields
+            ctx, numeric_cols.data, numeric_common_fields, datetime_cols, datetime_fields
         )
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
@@ -207,7 +208,7 @@ class PandasAnalyzer:
         columns: DataFrame,
         common_fields: DataFrame,
         datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
-        datetime_column_fields: DataFrame,
+        datetime_fields: DataFrame,
     ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
@@ -254,7 +255,9 @@ class PandasAnalyzer:
         fields[NUMERIC_DISTRIBUTION], fields[NUMERIC_DISTRIBUTION_PARAMETERS] = await _get_distributions(
             ctx, columns, concat([common_fields, fields], axis=1)
         )
-        seasonality_fields = await seasonal_decompose(ctx, datetime_column_infos, datetime_column_fields, columns)
+        seasonality_fields = await seasonal_decompose(
+            ctx, datetime_column_infos, datetime_fields, columns, fields[NUMERIC_IQR]
+        )
         fields = pd.concat([fields, seasonality_fields], axis=1)
         return fields
 
@@ -312,6 +315,7 @@ class PandasAnalyzer:
             seasonalities=computed_fields[NUMERIC_GRAPH_SEASONALITY],
             trends=computed_fields[NUMERIC_GRAPH_TREND],
             residuals=computed_fields[NUMERIC_GRAPH_RESIDUAL],
+            trend=computed_fields[NUMERIC_TREND],
         )
         distribution = computed_fields[NUMERIC_DISTRIBUTION]
         if (

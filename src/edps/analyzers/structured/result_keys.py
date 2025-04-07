@@ -31,6 +31,7 @@ NUMERIC_GRAPH_ORIGINAL = "graph-original"
 NUMERIC_GRAPH_SEASONALITY = "graph-seasonality"
 NUMERIC_GRAPH_TREND = "graph-trend"
 NUMERIC_GRAPH_RESIDUAL = "graph-residual"
+NUMERIC_TREND = "trend"
 
 DATETIME_EARLIEST = "earliest"
 DATETIME_LATEST = "latest"

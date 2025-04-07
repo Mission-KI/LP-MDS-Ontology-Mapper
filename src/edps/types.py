@@ -116,6 +116,12 @@ class SeasonalityConfig(BaseModel):
     target_samples: int = Field(
         default=500, description="Number of samples to resample to before running seasonality analysis."
     )
+    trend_threshold: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Threshold for evaluating a normalized trend as increasing or decreasing.",
+    )
 
 
 class StructuredConfig(BaseModel):
