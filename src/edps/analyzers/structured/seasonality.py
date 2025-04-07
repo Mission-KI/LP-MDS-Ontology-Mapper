@@ -8,6 +8,12 @@ from matplotlib.figure import Figure
 from pandas import DataFrame, Series
 from statsmodels.tsa.seasonal import STL, DecomposeResult
 
+from edps.analyzers.structured.result_keys import (
+    NUMERIC_GRAPH_ORIGINAL,
+    NUMERIC_GRAPH_RESIDUAL,
+    NUMERIC_GRAPH_SEASONALITY,
+    NUMERIC_GRAPH_TREND,
+)
 from edps.analyzers.structured.temporal_consistency import DatetimeColumnTemporalConsistency, Granularities, Granularity
 from edps.analyzers.structured.type_parser import ColumnsWrapper, DatetimeColumnInfo, DatetimeKind
 from edps.filewriter import get_pyplot_writer
@@ -29,7 +35,20 @@ class PerTimeBaseSeasonalityGraphs:
         self.residual = residual
 
 
-async def compute_seasonality(
+async def seasonal_decompose(
+    ctx: TaskContext,
+    datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
+    datetime_column_fields: DataFrame,
+    numeric_columns: DataFrame,
+) -> DataFrame:
+    decompose_results = await _seasonal_decompose_numeric_over_datetime(
+        ctx, datetime_column_infos, datetime_column_fields, numeric_columns
+    )
+    column_fields = await _get_seasonality_graphs(ctx, decompose_results)
+    return column_fields
+
+
+async def _seasonal_decompose_numeric_over_datetime(
     ctx: TaskContext,
     datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
     datetime_column_fields: DataFrame,
@@ -81,44 +100,41 @@ async def compute_seasonality(
     return dataframe
 
 
-def _seasonal_decompose_column(
-    ctx: TaskContext, column: Series, resample_period: Granularity, datetime_column_name: str
-) -> Optional[DecomposeResult]:
-    non_null_column: Series = column[column.notnull()]
-    number_non_null = len(non_null_column)
-    non_null_column = (
-        non_null_column.resample(
-            resample_period.timedelta,
-        )
-        .mean()
-        .interpolate()
+async def _get_seasonality_graphs(ctx: TaskContext, decompose_results: DataFrame) -> DataFrame:
+    dataframe = DataFrame(
+        None,
+        index=decompose_results.index,
+        columns=[NUMERIC_GRAPH_ORIGINAL, NUMERIC_GRAPH_SEASONALITY, NUMERIC_GRAPH_TREND, NUMERIC_GRAPH_RESIDUAL],
     )
-    resample_period_samples = resample_period.samples_per_period
-    number_non_null = len(non_null_column.index)
+    for numeric_column_name, decompose_results_for_numeric_column in decompose_results.T.items():
+        numeric_column_name = str(numeric_column_name)
+        graphs = [
+            await _get_seasonality_graphs_single_cell(
+                ctx,
+                numeric_column_name,
+                str(datetime_column_name),
+                decompose_result_for_cell,
+            )
+            for datetime_column_name, decompose_result_for_cell in decompose_results_for_numeric_column.items()
+            if decompose_result_for_cell is not None
+        ]
+        dataframe.loc[numeric_column_name, NUMERIC_GRAPH_ORIGINAL] = [
+            single_cell_graphs.original for single_cell_graphs in graphs
+        ]
+        dataframe.loc[numeric_column_name, NUMERIC_GRAPH_SEASONALITY] = [
+            single_cell_graphs.seasonality for single_cell_graphs in graphs
+        ]
+        dataframe.loc[numeric_column_name, NUMERIC_GRAPH_TREND] = [
+            single_cell_graphs.trend for single_cell_graphs in graphs
+        ]
+        dataframe.loc[numeric_column_name, NUMERIC_GRAPH_RESIDUAL] = [
+            single_cell_graphs.residual for single_cell_graphs in graphs
+        ]
 
-    number_periods = number_non_null / resample_period_samples
-    # Check if we have enough samples to run seasonal decompose.
-    if number_periods < 2.0:
-        ctx.logger.info(
-            'Column "%s" contains only %d samples when resampled to %s for running seasonality analysis. Need at least %d samples.',
-            column.name,
-            number_non_null,
-            resample_period,
-            2 * resample_period_samples,
-        )
-        return None
-
-    try:
-        stl = STL(non_null_column, period=resample_period_samples, robust=True)
-        return stl.fit()
-    except ValueError as error:
-        message = f"Seasonal decompose of {column.name} over {datetime_column_name} failed: {error}"
-        ctx.logger.warning(message)
-        warn(message)
-        return None
+    return dataframe
 
 
-async def get_seasonality_graphs(
+async def _get_seasonality_graphs_single_cell(
     ctx: TaskContext,
     column_name: str,
     time_base_column_name: str,
@@ -158,6 +174,43 @@ async def get_seasonality_graphs(
         seasonality=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=seasonal_reference),
         residual=TimeBasedGraph(timeBaseColumn=time_base_column_name, file=residual_reference),
     )
+
+
+def _seasonal_decompose_column(
+    ctx: TaskContext, column: Series, resample_period: Granularity, datetime_column_name: str
+) -> Optional[DecomposeResult]:
+    non_null_column: Series = column[column.notnull()]
+    number_non_null = len(non_null_column)
+    non_null_column = (
+        non_null_column.resample(
+            resample_period.timedelta,
+        )
+        .mean()
+        .interpolate()
+    )
+    resample_period_samples = resample_period.samples_per_period
+    number_non_null = len(non_null_column.index)
+
+    number_periods = number_non_null / resample_period_samples
+    # Check if we have enough samples to run seasonal decompose.
+    if number_periods < 2.0:
+        ctx.logger.info(
+            'Column "%s" contains only %d samples when resampled to %s for running seasonality analysis. Need at least %d samples.',
+            column.name,
+            number_non_null,
+            resample_period,
+            2 * resample_period_samples,
+        )
+        return None
+
+    try:
+        stl = STL(non_null_column, period=resample_period_samples, robust=True)
+        return stl.fit()
+    except ValueError as error:
+        message = f"Seasonal decompose of {column.name} over {datetime_column_name} failed: {error}"
+        ctx.logger.warning(message)
+        warn(message)
+        return None
 
 
 _LARGEST_TO_LOWEST_GRANULARITY = sorted(

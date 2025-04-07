@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from typing import Dict, Optional, Tuple, cast
 from warnings import warn
 
+import pandas as pd
 from extended_dataset_profile.models.v0.edp import (
     CorrelationSummary,
     DateTimeColumn,
@@ -41,6 +42,10 @@ from edps.analyzers.structured.result_keys import (
     DATETIME_TEMPORAL_CONSISTENCY,
     NUMERIC_DISTRIBUTION,
     NUMERIC_DISTRIBUTION_PARAMETERS,
+    NUMERIC_GRAPH_ORIGINAL,
+    NUMERIC_GRAPH_RESIDUAL,
+    NUMERIC_GRAPH_SEASONALITY,
+    NUMERIC_GRAPH_TREND,
     NUMERIC_IQR,
     NUMERIC_IQR_OUTLIERS,
     NUMERIC_LOWER_DIST,
@@ -64,14 +69,15 @@ from edps.analyzers.structured.result_keys import (
     NUMERIC_VARIANCE,
     NUMERIC_Z_OUTLIERS,
 )
+from edps.analyzers.structured.seasonality import seasonal_decompose
 from edps.filewriter import get_pyplot_writer
 from edps.taskcontext import TaskContext
 
 from .fitter import DistributionParameters, FittingError, Limits, fit_best_distribution
-from .seasonality import compute_seasonality, get_seasonality_graphs
 from .temporal_consistency import DatetimeColumnTemporalConsistency, compute_temporal_consistency
 from .temporal_consistency import determine_periodicity as determine_periodicity
 from .type_parser import (
+    ColumnsWrapper,
     DatetimeColumnInfo,
     Result,
     parse_types,
@@ -115,20 +121,19 @@ class PandasAnalyzer:
 
         numeric_cols = type_parser_results.numeric_cols
         numeric_common_fields = common_fields.loc[Index(numeric_cols.ids)]
-        numeric_fields = await self._compute_numeric_fields(ctx, numeric_cols.data, numeric_common_fields)
+        numeric_fields = await self._compute_numeric_fields(
+            ctx, numeric_cols.data, numeric_common_fields, type_parser_results.datetime_cols, datetime_fields
+        )
         numeric_fields = concat([numeric_fields, numeric_common_fields], axis=1)
 
         string_cols = type_parser_results.string_cols
         string_fields = common_fields.loc[Index(string_cols.ids)]
-
-        seasonality_results = await compute_seasonality(ctx, datetime_cols, datetime_fields, numeric_cols.data)
 
         transformed_numeric_columns = [
             await self._transform_numeric_results(
                 ctx,
                 numeric_cols.get_col(id),
                 _get_single_row(id, numeric_fields),
-                _get_single_row(id, seasonality_results),
             )
             for id in numeric_cols.ids
         ]
@@ -201,6 +206,8 @@ class PandasAnalyzer:
         ctx: TaskContext,
         columns: DataFrame,
         common_fields: DataFrame,
+        datetime_column_infos: ColumnsWrapper[DatetimeColumnInfo],
+        datetime_column_fields: DataFrame,
     ) -> DataFrame:
         fields = DataFrame(index=columns.columns)
 
@@ -247,6 +254,8 @@ class PandasAnalyzer:
         fields[NUMERIC_DISTRIBUTION], fields[NUMERIC_DISTRIBUTION_PARAMETERS] = await _get_distributions(
             ctx, columns, concat([common_fields, fields], axis=1)
         )
+        seasonality_fields = await seasonal_decompose(ctx, datetime_column_infos, datetime_column_fields, columns)
+        fields = pd.concat([fields, seasonality_fields], axis=1)
         return fields
 
     async def _compute_datetime_fields(self, ctx: TaskContext, columns: DataFrame) -> DataFrame:
@@ -265,7 +274,7 @@ class PandasAnalyzer:
         return computed
 
     async def _transform_numeric_results(
-        self, ctx: TaskContext, column: Series, computed_fields: Series, seasonality_results: Series
+        self, ctx: TaskContext, column: Series, computed_fields: Series
     ) -> NumericColumn:
         ctx.logger.debug('Transforming numeric column "%s" results to EDP', column.name)
         box_plot = await _generate_box_plot(ctx, column)
@@ -299,6 +308,10 @@ class PandasAnalyzer:
             distribution=computed_fields[NUMERIC_DISTRIBUTION],
             dataType=str(column.dtype),
             boxPlot=box_plot,
+            original_series=computed_fields[NUMERIC_GRAPH_ORIGINAL],
+            seasonalities=computed_fields[NUMERIC_GRAPH_SEASONALITY],
+            trends=computed_fields[NUMERIC_GRAPH_TREND],
+            residuals=computed_fields[NUMERIC_GRAPH_RESIDUAL],
         )
         distribution = computed_fields[NUMERIC_DISTRIBUTION]
         if (
@@ -320,20 +333,6 @@ class PandasAnalyzer:
                 ctx.config.structured_config.distribution.minimum_number_numeric_values,
             )
 
-        for datetime_column_name, seasonality in seasonality_results.items():
-            if seasonality is None:
-                continue
-
-            seasonality_graphs = await get_seasonality_graphs(
-                ctx,
-                str(column.name),
-                str(datetime_column_name),
-                seasonality,
-            )
-            column_result.original_series.append(seasonality_graphs.original)
-            column_result.trends.append(seasonality_graphs.trend)
-            column_result.seasonalities.append(seasonality_graphs.seasonality)
-            column_result.residuals.append(seasonality_graphs.residual)
         return column_result
 
     async def _transform_datetime_results(
