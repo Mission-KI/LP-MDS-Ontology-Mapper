@@ -21,6 +21,16 @@ class AppConfig(BaseSettings):
         examples=["postgresql://user:pass@localhost:5432/edps"],
         default=None,
     )
+    workers: int = Field(
+        default=0,
+        description="""
+            Number of workers for job processing in Process/Thread-Pool.
+            Depending on 'db_url' and 'workers' either use no pool or ProcessPoolExecutor or ThreadPoolExecutor:
+            - workers==0: no pool
+            - workers and !db_url: use ThreadPoolExecutor
+            - workers and db_url: use ProcessPoolExecutor
+        """,
+    )
 
     model_config = SettingsConfigDict(env_file=ENV_FILE)
 

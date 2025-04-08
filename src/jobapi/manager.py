@@ -167,13 +167,17 @@ def init_file_logger(log_path: Path) -> Iterator[Logger]:
 
 
 def create_executor(app_config: AppConfig) -> Optional[Executor]:
+    workers = app_config.workers
     db_url = app_config.db_url
-    if db_url is None:
-        logger.info("ThreadPoolExecutor(10) is used for job processing.")
-        return ThreadPoolExecutor(10)
+    if workers == 0:
+        logger.info("No executor pool is used for job processing.")
+        return None
+    elif db_url is None:
+        logger.info("ThreadPoolExecutor(%d) is used for job processing.", workers)
+        return ThreadPoolExecutor(workers)
     else:
-        logger.info("ProcessPoolExecutor(10) is used for job processing.")
-        return ProcessPoolExecutor(10)
+        logger.info("ProcessPoolExecutor(%d) is used for job processing.", workers)
+        return ProcessPoolExecutor(workers)
 
 
 def create_job_repository_factory(app_config: AppConfig) -> JobRepositoryFactory:
