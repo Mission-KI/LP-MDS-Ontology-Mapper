@@ -10,13 +10,9 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import FileResponse, PlainTextResponse
-from sqlmodel import create_engine
 
 from jobapi.config import AppConfig
 from jobapi.manager import AnalysisJobManager
-from jobapi.repo.base import JobRepository
-from jobapi.repo.inmemory import InMemoryJobRepository
-from jobapi.repo.persistent import DbJobRepository
 from jobapi.types import JobData, JobView
 
 
@@ -25,8 +21,7 @@ class Tags(str, Enum):
 
 
 def get_job_api_router(app_config: AppConfig):
-    job_repo = create_job_repository(app_config)
-    job_manager = AnalysisJobManager(app_config, job_repo)
+    job_manager = AnalysisJobManager(app_config)
     router = APIRouter()
 
     @router.post("/analysisjob", tags=[Tags.AnalysisJob], summary="Create analysis job")
@@ -165,12 +160,3 @@ def get_job_api_router(app_config: AppConfig):
         return FileResponse(report_file, media_type="application/pdf", filename=report_file.name)
 
     return router
-
-
-def create_job_repository(app_config: AppConfig) -> JobRepository:
-    db_url = app_config.db_url
-    if db_url is None:
-        return InMemoryJobRepository()
-    else:
-        db_engine = create_engine(str(db_url))
-        return DbJobRepository(db_engine)

@@ -110,3 +110,12 @@ class JobRepository(ABC):
     def new_session(self) -> AsyncIterator[JobSession]:
         """Start a new session in a context. When the context is closed, it gets automatically committed."""
         ...
+
+
+class JobRepositoryFactory(ABC):
+    """Abstract JobRepositoryFactory for creating JobRepositories."""
+
+    @abstractmethod
+    def create(self) -> JobRepository:
+        """Create a new JobRepository."""
+        ...

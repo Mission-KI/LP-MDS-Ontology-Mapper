@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import shutil
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import closing, contextmanager
 from datetime import UTC, datetime
 from logging import Logger, getLogger
@@ -18,15 +19,20 @@ from edps.taskcontextimpl import TaskContextImpl
 from jobapi.config import AppConfig
 from jobapi.exception import ApiClientException
 from jobapi.repo import Job, JobRepository
+from jobapi.repo.base import JobRepositoryFactory
+from jobapi.repo.inmemory import InMemoryJobRepositoryFactory
+from jobapi.repo.persistent import DbJobRepositoryFactory
 from jobapi.types import JobData, JobState, JobView
 
 logger = getLogger(__name__)
 
 
 class AnalysisJobManager:
-    def __init__(self, app_config: AppConfig, job_repo: JobRepository):
+    def __init__(self, app_config: AppConfig):
         self._app_config = app_config
-        self._job_repo = job_repo
+        self._executor = create_executor(app_config)
+        self._job_repo_factory = create_job_repository_factory(app_config)
+        self._job_repo = self._job_repo_factory.create()
         dump_service_info()
 
     async def create_job(self, job_data: JobData) -> UUID:
@@ -89,8 +95,12 @@ class AnalysisJobManager:
         Processing involves analyzing the asset and zipping the result.
         """
 
-        processor = AnalysisJobProcessor(self._job_repo, job_id)
-        await processor.run_async()
+        processor = AnalysisJobProcessor(self._job_repo_factory, job_id)
+        if self._executor is None:
+            await processor.run_async()
+        else:
+            logger.info("Launching job %s with executor.", job_id)
+            self._executor.submit(processor.run)
 
     async def cancel_job(self, job_id: UUID):
         async with self._job_repo.new_session() as session:
@@ -156,10 +166,33 @@ def init_file_logger(log_path: Path) -> Iterator[Logger]:
         yield logger
 
 
+def create_executor(app_config: AppConfig) -> Optional[Executor]:
+    db_url = app_config.db_url
+    if db_url is None:
+        logger.info("ThreadPoolExecutor(10) is used for job processing.")
+        return ThreadPoolExecutor(10)
+    else:
+        logger.info("ProcessPoolExecutor(10) is used for job processing.")
+        return ProcessPoolExecutor(10)
+
+
+def create_job_repository_factory(app_config: AppConfig) -> JobRepositoryFactory:
+    db_url = app_config.db_url
+    if db_url is None:
+        logger.info("Using InMemoryJobRepositoryFactory")
+        return InMemoryJobRepositoryFactory()
+    else:
+        logger.info("Using DbJobRepositoryFactory")
+        return DbJobRepositoryFactory(str(db_url))
+
+
 class AnalysisJobProcessor:
-    def __init__(self, job_repo: JobRepository, job_id: UUID):
-        self._job_repo = job_repo
+    def __init__(self, job_repo_factory: JobRepositoryFactory, job_id: UUID):
+        self._job_repo_factory = job_repo_factory
         self._job_id = job_id
+
+    def run(self):
+        asyncio.run(self.run_async())
 
     async def run_async(self):
         """If the job is in state 'QUEUED' process the job.
@@ -167,7 +200,7 @@ class AnalysisJobProcessor:
         Processing involves analyzing the asset and zipping the result.
         """
 
-        job_repo = self._job_repo
+        job_repo = self._job_repo_factory.create()
         job_id = self._job_id
 
         # First check the job and put it in PROCESSING state.

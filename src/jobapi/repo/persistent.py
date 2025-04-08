@@ -4,11 +4,12 @@ from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, Optional
 from uuid import UUID
 
+import sqlmodel
 from sqlalchemy import Engine
 from sqlmodel import Field, Session, SQLModel, select
 
 from jobapi.exception import ApiClientException
-from jobapi.repo.base import Job, JobRepository, JobSession
+from jobapi.repo.base import Job, JobRepository, JobRepositoryFactory, JobSession
 from jobapi.types import JobData, JobState
 
 
@@ -132,3 +133,12 @@ class DbJobRepository(JobRepository):
         with Session(self._engine) as session:
             yield DbJobSession(session)
             session.commit()
+
+
+class DbJobRepositoryFactory(JobRepositoryFactory):
+    def __init__(self, db_url: str):
+        self._db_url = db_url
+
+    def create(self) -> DbJobRepository:
+        db_engine = sqlmodel.create_engine(str(self._db_url))
+        return DbJobRepository(db_engine)

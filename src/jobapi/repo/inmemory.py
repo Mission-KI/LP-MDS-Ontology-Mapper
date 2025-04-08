@@ -6,6 +6,7 @@ from uuid import UUID
 
 from jobapi.exception import ApiClientException
 from jobapi.repo import Job, JobRepository, JobSession
+from jobapi.repo.base import JobRepositoryFactory
 from jobapi.types import JobData, JobState
 
 
@@ -92,9 +93,17 @@ class InMemoryJobSession(JobSession):
 
 
 class InMemoryJobRepository(JobRepository):
-    def __init__(self):
-        self._jobs = dict[UUID, InMemoryJob]()
+    def __init__(self, job_dictionary: dict[UUID, InMemoryJob]):
+        self._jobs = job_dictionary
 
     @asynccontextmanager
     async def new_session(self) -> AsyncIterator[JobSession]:
         yield InMemoryJobSession(self._jobs)
+
+
+class InMemoryJobRepositoryFactory(JobRepositoryFactory):
+    def __init__(self):
+        self._jobs = dict[UUID, InMemoryJob]()
+
+    def create(self) -> InMemoryJobRepository:
+        return InMemoryJobRepository(self._jobs)
