@@ -8,9 +8,10 @@ from typing import Tuple
 from extended_dataset_profile.models.v0.edp import AssetReference, DataSpace, License, Publisher
 from pydantic import HttpUrl, ValidationError
 
-from edps import Service
+from edps import analyse_asset
 from edps.compression.zip import ZipAlgorithm
 from edps.file import sanitize_file_part
+from edps.service import dump_service_info
 from edps.taskcontextimpl import TaskContextImpl
 from edps.types import Config, UserProvidedEdpData
 from pontusx.args import Args
@@ -82,8 +83,9 @@ async def run_service(logger: Logger, args: Args):
         ctx.input_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(args.raw_data_file, ctx.input_path / input_filename)
 
+        dump_service_info()
         logger.info("Processing asset..")
-        await Service().analyse_asset(ctx, user_provided_edp_data)
+        await analyse_asset(ctx, user_provided_edp_data)
 
         logger.info("Zipping EDP..")
         main_ref = user_provided_edp_data.assetRefs[0]

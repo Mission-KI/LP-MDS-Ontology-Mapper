@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from typing import Iterator, Optional
 from uuid import UUID, uuid4
 
-from edps import Service
+from edps import analyse_asset, dump_service_info
 from edps.compression.zip import ZipAlgorithm
 from edps.file import build_real_sub_path, sanitize_path
 from edps.service import get_report_path
@@ -27,6 +27,7 @@ class AnalysisJobManager:
     def __init__(self, app_config: AppConfig, job_repo: JobRepository):
         self._app_config = app_config
         self._job_repo = job_repo
+        dump_service_info()
 
     async def create_job(self, job_data: JobData) -> UUID:
         """Create a job based on the user provided EDP data.
@@ -222,7 +223,7 @@ class AnalysisJobProcessor:
             shutil.copytree(job.input_data_dir, ctx.input_path, dirs_exist_ok=True)
             main_ref = job.user_provided_edp_data.assetRefs[0]
             job_logger.info("Analysing asset '%s' version '%s'...", main_ref.assetId, main_ref.assetVersion)
-            await Service().analyse_asset(ctx, job.user_provided_edp_data)
+            await analyse_asset(ctx, job.user_provided_edp_data)
             await ZipAlgorithm().compress(ctx.output_path, job.zip_archive)
             if get_report_path(ctx).exists():
                 shutil.copy(get_report_path(ctx), job.report_file)

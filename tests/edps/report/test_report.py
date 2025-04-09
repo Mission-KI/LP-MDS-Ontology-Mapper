@@ -8,7 +8,7 @@ from pytest import fixture, mark
 
 from edps.report import HtmlReportGenerator, PdfReportGenerator, ReportInput
 from edps.taskcontext import TaskContext
-from tests.edps.test_edps import analyse_asset, read_edp_file
+from tests.edps.test_edps import copy_and_analyse_asset, read_edp_file
 
 
 @fixture
@@ -24,7 +24,7 @@ async def test_all_reports(ctx: TaskContext, asset_path, report_output_path, use
     # Ignore warnings which occur for some of the assets.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        json_path = await analyse_asset(ctx, asset_path, user_provided_data)
+        json_path = await copy_and_analyse_asset(ctx, asset_path, user_provided_data)
     # A PDF report should already have been created during normal asset analysis.
     # In this test we explicitly create another HTML and PDF report anyways.
     edp = read_edp_file(ctx.output_path / json_path)

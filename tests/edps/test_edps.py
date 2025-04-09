@@ -18,7 +18,8 @@ from extended_dataset_profile.models.v0.edp import (
 )
 from pytest import fixture, mark, raises
 
-from edps import Service
+from edps import analyse_asset
+from edps.service import _compute_asset
 from edps.taskcontext import TaskContext
 from edps.taskcontextimpl import TaskContextImpl
 from edps.types import (
@@ -49,12 +50,12 @@ def context_with_augmented_config(config_data_with_augmentations, logger, path_w
 
 @fixture
 def analyse_asset_fn(ctx, user_provided_data) -> Callable[[Path], Awaitable[FileReference]]:
-    return lambda path: analyse_asset(ctx, path, user_provided_data)
+    return lambda path: copy_and_analyse_asset(ctx, path, user_provided_data)
 
 
 @fixture
 def compute_asset_fn(ctx) -> Callable[[Path], Awaitable[ComputedEdpData]]:
-    return lambda path: compute_asset(ctx, path)
+    return lambda path: copy_and_compute_asset(ctx, path)
 
 
 @mark.asyncio
@@ -65,7 +66,7 @@ async def test_load_unknown_dir(analyse_asset_fn):
 
 async def test_analyse_pickle(path_data_test_pickle, context_with_augmented_config, config_data_with_augmentations):
     # Use config with augmentations in this test
-    computed_data = await compute_asset(context_with_augmented_config, path_data_test_pickle)
+    computed_data = await copy_and_compute_asset(context_with_augmented_config, path_data_test_pickle)
 
     assert len(computed_data.structuredDatasets) == 1
     assert computed_data.periodicity == "hours"
@@ -189,7 +190,7 @@ async def test_seasonality_bast_csv(path_data_bast_csv, analyse_asset_fn, ctx):
 
 @mark.asyncio
 async def test_analyse_csv_no_headers(path_data_test_headerless_csv, ctx):
-    edp = await compute_asset(ctx, path_data_test_headerless_csv)
+    edp = await copy_and_compute_asset(ctx, path_data_test_headerless_csv)
     assert len(edp.archiveDatasets) == 0
     assert edp.structuredDatasets[0].columnCount == 5
     assert edp.structuredDatasets[0].rowCount == 50
@@ -274,7 +275,7 @@ async def test_analyse_multiassets_zip(path_data_test_multiassets_zip, compute_a
 
 @mark.asyncio
 async def test_analyse_png(ctx, path_data_test_png):
-    edp = await compute_asset(ctx, path_data_test_png)
+    edp = await copy_and_compute_asset(ctx, path_data_test_png)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "PNG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
@@ -286,7 +287,7 @@ async def test_analyse_png(ctx, path_data_test_png):
 
 @mark.asyncio
 async def test_analyse_jpg(ctx, path_data_test_jpg):
-    edp = await compute_asset(ctx, path_data_test_jpg)
+    edp = await copy_and_compute_asset(ctx, path_data_test_jpg)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
@@ -298,7 +299,7 @@ async def test_analyse_jpg(ctx, path_data_test_jpg):
 
 @mark.asyncio
 async def test_analyse_jpeg(ctx, path_data_test_jpeg):
-    edp = await compute_asset(ctx, path_data_test_jpeg)
+    edp = await copy_and_compute_asset(ctx, path_data_test_jpeg)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "JPEG"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
@@ -310,7 +311,7 @@ async def test_analyse_jpeg(ctx, path_data_test_jpeg):
 
 @mark.asyncio
 async def test_analyse_gif(ctx, path_data_test_gif):
-    edp = await compute_asset(ctx, path_data_test_gif)
+    edp = await copy_and_compute_asset(ctx, path_data_test_gif)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "GIF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
@@ -321,7 +322,7 @@ async def test_analyse_gif(ctx, path_data_test_gif):
 
 @mark.asyncio
 async def test_analyse_bmp(ctx, path_data_test_bmp):
-    edp = await compute_asset(ctx, path_data_test_bmp)
+    edp = await copy_and_compute_asset(ctx, path_data_test_bmp)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "BMP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
@@ -333,7 +334,7 @@ async def test_analyse_bmp(ctx, path_data_test_bmp):
 
 @mark.asyncio
 async def test_analyse_tiff(ctx, path_data_test_tiff):
-    edp = await compute_asset(ctx, path_data_test_tiff)
+    edp = await copy_and_compute_asset(ctx, path_data_test_tiff)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.GRAYSCALE
@@ -345,7 +346,7 @@ async def test_analyse_tiff(ctx, path_data_test_tiff):
 
 @mark.asyncio
 async def test_analyse_tif(ctx, path_data_test_tif):
-    edp = await compute_asset(ctx, path_data_test_tif)
+    edp = await copy_and_compute_asset(ctx, path_data_test_tif)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "TIFF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
@@ -357,7 +358,7 @@ async def test_analyse_tif(ctx, path_data_test_tif):
 
 @mark.asyncio
 async def test_analyse_webp(ctx, path_data_test_webp):
-    edp = await compute_asset(ctx, path_data_test_webp)
+    edp = await copy_and_compute_asset(ctx, path_data_test_webp)
     assert len(edp.archiveDatasets) == 0
     assert edp.imageDatasets[0].codec == "WEBP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
@@ -391,7 +392,7 @@ def _assert_image_pixel_metrics(image_dataset):
 
 @mark.asyncio
 async def test_analyse_mp4(ctx, path_data_test_mp4):
-    edp = await compute_asset(ctx, path_data_test_mp4)
+    edp = await copy_and_compute_asset(ctx, path_data_test_mp4)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 2
     video_dataset = edp.videoDatasets[0]
@@ -413,7 +414,7 @@ async def test_analyse_mp4(ctx, path_data_test_mp4):
 
 @mark.asyncio
 async def test_analyse_avi(ctx, path_data_test_avi):
-    edp = await compute_asset(ctx, path_data_test_avi)
+    edp = await copy_and_compute_asset(ctx, path_data_test_avi)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 2
     video_dataset = edp.videoDatasets[0]
@@ -429,7 +430,7 @@ async def test_analyse_avi(ctx, path_data_test_avi):
 
 @mark.asyncio
 async def test_analyse_mkv(ctx, path_data_test_mkv):
-    edp = await compute_asset(ctx, path_data_test_mkv)
+    edp = await copy_and_compute_asset(ctx, path_data_test_mkv)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 2
     video_dataset = edp.videoDatasets[0]
@@ -445,7 +446,7 @@ async def test_analyse_mkv(ctx, path_data_test_mkv):
 
 @mark.asyncio
 async def test_analyse_mov(ctx, path_data_test_mov):
-    edp = await compute_asset(ctx, path_data_test_mov)
+    edp = await copy_and_compute_asset(ctx, path_data_test_mov)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 2
     video_dataset = edp.videoDatasets[0]
@@ -461,7 +462,7 @@ async def test_analyse_mov(ctx, path_data_test_mov):
 
 @mark.asyncio
 async def test_analyse_flv(ctx, path_data_test_flv):
-    edp = await compute_asset(ctx, path_data_test_flv)
+    edp = await copy_and_compute_asset(ctx, path_data_test_flv)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 1
     video_dataset = edp.videoDatasets[0]
@@ -476,7 +477,7 @@ async def test_analyse_flv(ctx, path_data_test_flv):
 
 @mark.asyncio
 async def test_analyse_wmv(ctx, path_data_test_wmv):
-    edp = await compute_asset(ctx, path_data_test_wmv)
+    edp = await copy_and_compute_asset(ctx, path_data_test_wmv)
     assert len(edp.videoDatasets) == 1
     assert len(edp.audioDatasets) == 2
     video_dataset = edp.videoDatasets[0]
@@ -597,7 +598,7 @@ async def analyse_audio(
     exp_bit_rate: Optional[int],
     exp_bits_per_sample: Optional[int],
 ):
-    edp = await compute_asset(ctx, path)
+    edp = await copy_and_compute_asset(ctx, path)
     assert len(edp.videoDatasets) == 0
     assert len(edp.audioDatasets) == 1
     audio_dataset: AudioDataSet = edp.audioDatasets[0]
@@ -813,14 +814,14 @@ async def test_raise_on_only_unknown_datasets(analyse_asset_fn, tmp_path):
         await analyse_asset_fn(file_path)
 
 
-async def analyse_asset(ctx: TaskContext, asset_path: Path, user_provided_data):
+async def copy_and_analyse_asset(ctx: TaskContext, asset_path: Path, user_provided_data):
     copy_asset_to_ctx_input_dir(asset_path, ctx)
-    return await Service().analyse_asset(ctx, user_provided_data)
+    return await analyse_asset(ctx, user_provided_data)
 
 
-async def compute_asset(ctx: TaskContext, asset_path: Path):
+async def copy_and_compute_asset(ctx: TaskContext, asset_path: Path):
     copy_asset_to_ctx_input_dir(asset_path, ctx)
-    return await Service()._compute_asset(ctx)
+    return await _compute_asset(ctx)
 
 
 def _assert_pickle_temporal_consistencies(

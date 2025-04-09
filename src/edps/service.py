@@ -44,150 +44,151 @@ class UserInputError(RuntimeError):
     pass
 
 
-class Service:
-    def __init__(self):
-        _logger = getLogger(__name__)
-        _logger.info("Initializing")
+def dump_service_info():
+    logger = getLogger(__name__)
+    logger.info("The following data types are supported: [%s]", get_importable_types())
+    implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
+    logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-        _logger.info("The following data types are supported: [%s]", get_importable_types())
-        implemented_decompressions = [key for key, value in DECOMPRESSION_ALGORITHMS.items() if value is not None]
-        _logger.info("The following compressions are supported: [%s]", ", ".join(implemented_decompressions))
 
-    async def analyse_asset(self, ctx: TaskContext, user_data: UserProvidedEdpData) -> Path:
-        """
-        Let the service analyse the assets in ctx.input_path.
-        The result (EDP JSON, plots and report) is written to ctx.output_path.
+async def analyse_asset(ctx: TaskContext, user_data: UserProvidedEdpData) -> Path:
+    """
+    Let the service analyse the assets in ctx.input_path.
+    The result (EDP JSON, plots and report) is written to ctx.output_path.
 
-        Parameters
-        ----------
-        ctx : TaskContext
-            Gives access to the appropriate logger and output_context and allows executing sub-tasks.
-        config_data : Config
-            The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
-            by the user.
+    Parameters
+    ----------
+    ctx : TaskContext
+        Gives access to the appropriate logger and output_context and allows executing sub-tasks.
+    config_data : Config
+        The meta and config information about the asset supplied by the data space. These can not get calculated and must be supplied
+        by the user.
 
-        Returns
-        -------
-        Path
-            File path to the generated EDP JSON (relative to ctx.output_path).
-        """
-        computed_data = await self._compute_asset(ctx)
-        edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
-        main_ref = user_data.assetRefs[0]
-        json_name = main_ref.assetId + ("_" + main_ref.assetVersion if main_ref.assetVersion else "")
-        json_path = await write_edp(ctx, PurePosixPath(json_name), edp)
-        await self._generate_report(ctx, edp)
-        return json_path
+    Returns
+    -------
+    Path
+        File path to the generated EDP JSON (relative to ctx.output_path).
+    """
+    computed_data = await _compute_asset(ctx)
+    edp = ExtendedDatasetProfile(**_as_dict(computed_data), **_as_dict(user_data))
+    main_ref = user_data.assetRefs[0]
+    json_name = main_ref.assetId + ("_" + main_ref.assetVersion if main_ref.assetVersion else "")
+    json_path = await write_edp(ctx, PurePosixPath(json_name), edp)
+    await _generate_report(ctx, edp)
+    return json_path
 
-    async def _compute_asset(self, ctx: TaskContext) -> ComputedEdpData:
-        input_files = [path for path in ctx.input_path.iterdir() if path.is_file()]
-        number_input_files = len(input_files)
-        if number_input_files != 1:
-            raise UserInputError(f"Expected exactly one input file in input_path. Got {number_input_files}.")
-        file = input_files[0]
 
-        await ctx.import_file_with_result(file, file.name)
-        computed_edp_data = self._create_computed_edp_data(ctx, file)
-        if self._has_temporal_columns(computed_edp_data):
-            computed_edp_data.temporalCover = self._get_overall_temporal_cover(computed_edp_data)
-        computed_edp_data.periodicity = self._get_overall_temporal_consistency(computed_edp_data)
-        return computed_edp_data
+async def _compute_asset(ctx: TaskContext) -> ComputedEdpData:
+    input_files = [path for path in ctx.input_path.iterdir() if path.is_file()]
+    number_input_files = len(input_files)
+    if number_input_files != 1:
+        raise UserInputError(f"Expected exactly one input file in input_path. Got {number_input_files}.")
+    file = input_files[0]
 
-    def _create_computed_edp_data(self, ctx: TaskContext, path: Path) -> ComputedEdpData:
-        generated_by = f"EDP Service @ {edps.__version__}"
-        edp = ComputedEdpData(
-            schemaVersion=CURRENT_VERSION,
-            volume=calculate_size(path),
-            generatedBy=generated_by,
-            assetSha256Hash=compute_sha256(path),
-        )
-        augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
-        self._insert_datasets_into_edp(ctx, edp, augmenter, None)
-        augmenter.warn_unapplied_augmentations()
-        return edp
+    await ctx.import_file_with_result(file, file.name)
+    computed_edp_data = _create_computed_edp_data(ctx, file)
+    if _has_temporal_columns(computed_edp_data):
+        computed_edp_data.temporalCover = _get_overall_temporal_cover(computed_edp_data)
+    computed_edp_data.periodicity = _get_overall_temporal_consistency(computed_edp_data)
+    return computed_edp_data
 
-    def _insert_datasets_into_edp(
-        self,
-        ctx: TaskContext,
-        edp: ComputedEdpData,
-        augmenter: "_Augmenter",
-        parent_node_reference: Optional[JsonReference],
-    ):
-        childrens_parent_node_reference: Optional[JsonReference]
-        if ctx.dataset:
-            augmenter.apply(ctx.dataset, ctx.dataset_name)
-            list_name, dataset_type = _DATASET_TYPE_TABLE[type(ctx.dataset)]
-            edp.dataTypes.add(dataset_type)
-            dataset_list: List = getattr(edp, list_name)
-            index = len(dataset_list)
-            dataset_list.append(ctx.dataset)
-            reference = _make_json_reference(f"#/{list_name}/{index}")
-            edp.datasetTree.append(
-                DatasetTreeNode(
-                    dataset=reference,
-                    datasetType=dataset_type,
-                    parent=parent_node_reference,
-                    name=ctx.dataset_name,
-                    fileProperties=ctx.file_properties,
-                )
+
+def _create_computed_edp_data(ctx: TaskContext, path: Path) -> ComputedEdpData:
+    generated_by = f"EDP Service @ {edps.__version__}"
+    edp = ComputedEdpData(
+        schemaVersion=CURRENT_VERSION,
+        volume=calculate_size(path),
+        generatedBy=generated_by,
+        assetSha256Hash=compute_sha256(path),
+    )
+    augmenter = _Augmenter(ctx, ctx.config.augmentedColumns)
+    _insert_datasets_into_edp(ctx, edp, augmenter, None)
+    augmenter.warn_unapplied_augmentations()
+    return edp
+
+
+def _insert_datasets_into_edp(
+    ctx: TaskContext,
+    edp: ComputedEdpData,
+    augmenter: "_Augmenter",
+    parent_node_reference: Optional[JsonReference],
+):
+    childrens_parent_node_reference: Optional[JsonReference]
+    if ctx.dataset:
+        augmenter.apply(ctx.dataset, ctx.dataset_name)
+        list_name, dataset_type = _DATASET_TYPE_TABLE[type(ctx.dataset)]
+        edp.dataTypes.add(dataset_type)
+        dataset_list: List = getattr(edp, list_name)
+        index = len(dataset_list)
+        dataset_list.append(ctx.dataset)
+        reference = _make_json_reference(f"#/{list_name}/{index}")
+        edp.datasetTree.append(
+            DatasetTreeNode(
+                dataset=reference,
+                datasetType=dataset_type,
+                parent=parent_node_reference,
+                name=ctx.dataset_name,
+                fileProperties=ctx.file_properties,
             )
-            childrens_parent_node_reference = _make_json_reference(f"#/datasetTree/{len(edp.datasetTree) - 1}")
-        else:
-            childrens_parent_node_reference = parent_node_reference
-
-        for child in ctx.children:
-            self._insert_datasets_into_edp(child, edp, augmenter, childrens_parent_node_reference)
-
-    def _has_temporal_columns(self, edp: ComputedEdpData) -> bool:
-        for structured in edp.structuredDatasets:
-            if len(structured.datetimeColumns) > 0:
-                return True
-
-        return False
-
-    def _get_overall_temporal_cover(self, edp: ComputedEdpData) -> TemporalCover:
-        earliest = min(
-            column.temporalCover.earliest
-            for structured in edp.structuredDatasets
-            for column in structured.datetimeColumns
         )
-        latest = max(
-            column.temporalCover.latest
-            for structured in edp.structuredDatasets
-            for column in structured.datetimeColumns
-        )
-        return TemporalCover(earliest=earliest, latest=latest)
+        childrens_parent_node_reference = _make_json_reference(f"#/datasetTree/{len(edp.datasetTree) - 1}")
+    else:
+        childrens_parent_node_reference = parent_node_reference
 
-    def _get_overall_temporal_consistency(self, edp: ComputedEdpData) -> Optional[str]:
-        all_temporal_consistencies = list(self._iterate_all_temporal_consistencies(edp))
-        if len(all_temporal_consistencies) == 0:
-            return None
-        sum_temporal_consistencies = sum(all_temporal_consistencies[1:], all_temporal_consistencies[0])
-        return cast(
-            Optional[str],
-            determine_periodicity(
-                sum_temporal_consistencies["numberOfGaps"], sum_temporal_consistencies["differentAbundancies"]
-            ),
-        )
+    for child in ctx.children:
+        _insert_datasets_into_edp(child, edp, augmenter, childrens_parent_node_reference)
 
-    def _iterate_all_temporal_consistencies(self, edp: ComputedEdpData) -> Iterator[DataFrame]:
-        for dataset in edp.structuredDatasets:
-            for row in dataset.datetimeColumns:
-                dataframe = DataFrame(
-                    index=[item.timeScale for item in row.temporalConsistencies],
-                )
-                dataframe["differentAbundancies"] = [item.differentAbundancies for item in row.temporalConsistencies]
-                dataframe["numberOfGaps"] = [item.numberOfGaps for item in row.temporalConsistencies]
-                yield dataframe
 
-    async def _generate_report(self, ctx: TaskContext, edp: ExtendedDatasetProfile):
-        try:
-            input = ReportInput(edp=edp)
-            with get_report_path(ctx).open("wb") as file_io:
-                await PdfReportGenerator().generate(ctx, input, ctx.output_path, file_io)
-        except Exception as exception:
-            ctx.logger.warning("Error generating the report, continuing anyways..", exc_info=exception)
-            warnings.warn(f"Error generating the report. Error: {exception}")
+def _has_temporal_columns(edp: ComputedEdpData) -> bool:
+    for structured in edp.structuredDatasets:
+        if len(structured.datetimeColumns) > 0:
+            return True
+
+    return False
+
+
+def _get_overall_temporal_cover(edp: ComputedEdpData) -> TemporalCover:
+    earliest = min(
+        column.temporalCover.earliest for structured in edp.structuredDatasets for column in structured.datetimeColumns
+    )
+    latest = max(
+        column.temporalCover.latest for structured in edp.structuredDatasets for column in structured.datetimeColumns
+    )
+    return TemporalCover(earliest=earliest, latest=latest)
+
+
+def _get_overall_temporal_consistency(edp: ComputedEdpData) -> Optional[str]:
+    all_temporal_consistencies = list(_iterate_all_temporal_consistencies(edp))
+    if len(all_temporal_consistencies) == 0:
+        return None
+    sum_temporal_consistencies = sum(all_temporal_consistencies[1:], all_temporal_consistencies[0])
+    return cast(
+        Optional[str],
+        determine_periodicity(
+            sum_temporal_consistencies["numberOfGaps"], sum_temporal_consistencies["differentAbundancies"]
+        ),
+    )
+
+
+def _iterate_all_temporal_consistencies(edp: ComputedEdpData) -> Iterator[DataFrame]:
+    for dataset in edp.structuredDatasets:
+        for row in dataset.datetimeColumns:
+            dataframe = DataFrame(
+                index=[item.timeScale for item in row.temporalConsistencies],
+            )
+            dataframe["differentAbundancies"] = [item.differentAbundancies for item in row.temporalConsistencies]
+            dataframe["numberOfGaps"] = [item.numberOfGaps for item in row.temporalConsistencies]
+            yield dataframe
+
+
+async def _generate_report(ctx: TaskContext, edp: ExtendedDatasetProfile):
+    try:
+        input = ReportInput(edp=edp)
+        with get_report_path(ctx).open("wb") as file_io:
+            await PdfReportGenerator().generate(ctx, input, ctx.output_path, file_io)
+    except Exception as exception:
+        ctx.logger.warning("Error generating the report, continuing anyways..", exc_info=exception)
+        warnings.warn(f"Error generating the report. Error: {exception}")
 
 
 def _as_dict(model: BaseModel):
