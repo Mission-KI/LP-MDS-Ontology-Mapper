@@ -21,6 +21,7 @@ async def test_client(app):
         yield client
 
 
+@pytest.mark.slow
 async def test_api(test_client: AsyncClient, user_provided_data, path_data_test_csv):
     job_data = JobData(user_provided_edp_data=user_provided_data)
     response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
@@ -49,6 +50,7 @@ async def test_api(test_client: AsyncClient, user_provided_data, path_data_test_
     assert response.status_code == 200, response.text
 
 
+@pytest.mark.slow
 async def test_api_client_error(test_client: AsyncClient):
     random_uuid = uuid4()
     response = await test_client.get(f"/v1/dataspace/analysisjob/{random_uuid}/result")
@@ -56,6 +58,7 @@ async def test_api_client_error(test_client: AsyncClient):
     assert response.json()["detail"] is not None
 
 
+@pytest.mark.slow
 async def test_api_cancel_waiting_for_data(test_client: AsyncClient, user_provided_data, path_data_test_csv):
     job_data = JobData(user_provided_edp_data=user_provided_data)
     response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
@@ -68,6 +71,7 @@ async def test_api_cancel_waiting_for_data(test_client: AsyncClient, user_provid
     assert response.status_code == 204, response.text
 
 
+@pytest.mark.slow
 async def test_api_cancel_running(test_client: AsyncClient, user_provided_data, path_data_test_csv):
     job_data = JobData(user_provided_edp_data=user_provided_data)
     response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
