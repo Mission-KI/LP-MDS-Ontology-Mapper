@@ -110,7 +110,7 @@ class AnalysisJobManager:
 
             # Update state to CANCELLATION_REQUEST which is handled by _cancellation_listener
             logger.info("Job %s marked for cancellation.", job.job_id)
-            job.update_state(JobState.CANCELLATION_REQUESTED, "Cancelling job")
+            job.set_state(JobState.CANCELLATION_REQUESTED, "Cancelling job")
 
     async def store_input_file(self, job_id: UUID, filename: Optional[str], file):
         """Store uploaded job data which will be analyzed later.
@@ -144,7 +144,7 @@ class AnalysisJobManager:
                 data_file_path.unlink()
                 raise
 
-            job.update_state(JobState.QUEUED)
+            job.set_state(JobState.QUEUED)
 
             logger.info(
                 "File upload for job %s is complete: %s (%s bytes)",
@@ -212,7 +212,7 @@ class AnalysisJobProcessor:
             job = await session.get_job(job_id)
             if job.state != JobState.QUEUED:
                 raise ApiClientException(f"Job can't be processed because it's in state {job.state.value}.")
-            job.update_state(JobState.PROCESSING)
+            job.set_state(JobState.PROCESSING)
             job.started = datetime.now(tz=UTC)
 
         # In a new session do the actual processing.
@@ -234,17 +234,17 @@ class AnalysisJobProcessor:
 
                     job_logger.info("EDP created successfully.")
                     logger.info("Job %s completed.", job.job_id)
-                    job.update_state(JobState.COMPLETED)
+                    job.set_state(JobState.COMPLETED)
 
                 except asyncio.CancelledError:
                     job_logger.info("Job was cancelled.")
                     logger.info("Job %s cancelled.", job.job_id)
-                    job.update_state(JobState.CANCELLED, "Analysis was cancelled.")
+                    job.set_state(JobState.CANCELLED, "Analysis was cancelled.")
 
                 except Exception as exception:
                     job_logger.info("Job has failed.")
                     logger.error("Job %s has failed.", job.job_id, exc_info=exception)
-                    job.update_state(JobState.FAILED, f"Processing failed: {exception}")
+                    job.set_state(JobState.FAILED, f"Processing failed: {exception}")
 
                 finally:
                     job.finished = datetime.now(tz=UTC)

@@ -27,6 +27,9 @@ class JobState(str, Enum):
     CANCELLED = "CANCELLED"
 
 
+END_STATES = set([JobState.FAILED, JobState.CANCELLED, JobState.COMPLETED])
+
+
 class JobView(BaseModel):
     job_id: UUID = Field(description="Job ID", frozen=True)
     state: JobState = Field(

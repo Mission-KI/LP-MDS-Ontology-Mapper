@@ -49,7 +49,7 @@ class DbJob(SQLModel, Job, table=True):
     def state_detail(self) -> Optional[str]:
         return self.f_state_detail
 
-    def update_state(self, state: JobState, detail: Optional[str] = None) -> None:
+    def _set_state_impl(self, state: JobState, detail: Optional[str] = None) -> None:
         self.f_state = state
         self.f_state_detail = detail
 

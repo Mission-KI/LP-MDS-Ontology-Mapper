@@ -36,7 +36,7 @@ class InMemoryJob(Job):
     def state_detail(self) -> Optional[str]:
         return self._state_detail
 
-    def update_state(self, state: JobState, detail: Optional[str] = None) -> None:
+    def _set_state_impl(self, state: JobState, detail: Optional[str] = None) -> None:
         self._state = state
         self._state_detail = detail
 

@@ -1,3 +1,4 @@
+import shutil
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -25,8 +26,14 @@ class Job(ABC):
     @abstractmethod
     def state_detail(self) -> Optional[str]: ...
 
+    def set_state(self, state: JobState, detail: Optional[str] = None) -> None:
+        if state in [JobState.COMPLETED, JobState.CANCELLED, JobState.FAILED]:
+            # Finalize job
+            shutil.rmtree(self.input_data_dir, ignore_errors=True)
+        self._set_state_impl(state, detail)
+
     @abstractmethod
-    def update_state(self, state: JobState, detail: Optional[str] = None) -> None: ...
+    def _set_state_impl(self, state: JobState, detail: Optional[str]) -> None: ...
 
     @property
     @abstractmethod
