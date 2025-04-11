@@ -1,9 +1,9 @@
 import asyncio
-from uuid import UUID, uuid4
+from typing import List
+from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
-from httpx import Response
+from httpx import ASGITransport, AsyncClient, Response
 
 from jobapi.__main__ import init_fastapi
 from jobapi.config import AppConfig
@@ -16,80 +16,91 @@ def app(path_work):
 
 
 @pytest.fixture
-def test_client(app):
-    return TestClient(app)
+async def test_client(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
 
 
-async def test_api(test_client, user_provided_data, path_data_test_csv):
+async def test_api(test_client: AsyncClient, user_provided_data, path_data_test_csv):
     job_data = JobData(user_provided_edp_data=user_provided_data)
-    response = test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
+    response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
     assert response.status_code == 200, response.text
     job = JobView.model_validate(response.json())
     assert job.state == JobState.WAITING_FOR_DATA
 
     asset_path = path_data_test_csv
     files = {"upload_file": (asset_path.name, asset_path.read_bytes())}
-    response = test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/data", files=files)
+    response = await test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/data", files=files)
     job = extract_job_view(response)
     assert job.state in [JobState.QUEUED, JobState.PROCESSING]
 
     # Wait until the processing is completed
-    while job.state in [JobState.QUEUED, JobState.PROCESSING]:
-        job = get_status(test_client, job.job_id)
+    job = await _wait_until_state_is_not(test_client, job, [JobState.QUEUED, JobState.PROCESSING])
     assert job.state == JobState.COMPLETED
 
     # Check for valid result
-    response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/result")
+    response = await test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/result")
     assert response.status_code == 200, response.text
     # Check for report
-    response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/report")
+    response = await test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/report")
     assert response.status_code == 200, response.text
     # Check for log
-    response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/log")
+    response = await test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/log")
     assert response.status_code == 200, response.text
 
 
-async def test_api_client_error(test_client):
+async def test_api_client_error(test_client: AsyncClient):
     random_uuid = uuid4()
-    response = test_client.get(f"/v1/dataspace/analysisjob/{random_uuid}/result")
+    response = await test_client.get(f"/v1/dataspace/analysisjob/{random_uuid}/result")
     assert response.status_code == 400
     assert response.json()["detail"] is not None
 
 
-async def test_api_cancel(test_client, user_provided_data, path_data_test_csv):
+async def test_api_cancel_waiting_for_data(test_client: AsyncClient, user_provided_data, path_data_test_csv):
     job_data = JobData(user_provided_edp_data=user_provided_data)
-    response = test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
+    response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
     assert response.status_code == 200, response.text
     job = JobView.model_validate(response.json())
     assert job.state == JobState.WAITING_FOR_DATA
 
     # Try canceling before the job has been queued
-    response = test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
-    assert response.status_code == 400, response.text
+    response = await test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
+    assert response.status_code == 204, response.text
+
+
+async def test_api_cancel_running(test_client: AsyncClient, user_provided_data, path_data_test_csv):
+    job_data = JobData(user_provided_edp_data=user_provided_data)
+    response = await test_client.post("/v1/dataspace/analysisjob", content=job_data.model_dump_json(by_alias=True))
+    assert response.status_code == 200, response.text
+    job = JobView.model_validate(response.json())
+    assert job.state == JobState.WAITING_FOR_DATA
 
     asset_path = path_data_test_csv
     files = {"upload_file": (asset_path.name, asset_path.read_bytes())}
 
-    async with asyncio.TaskGroup() as group:
-        processing_task = group.create_task(
-            asyncio.to_thread(test_client.post, f"/v1/dataspace/analysisjob/{job.job_id}/data", files=files)
-        )
-        await asyncio.sleep(1)
+    await test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/data", files=files)
+    await asyncio.sleep(1)
 
-        response = test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
-        assert response.status_code == 204, response.text
+    response = await test_client.post(f"/v1/dataspace/analysisjob/{job.job_id}/cancel")
+    assert response.status_code == 204, response.text
+    job = await _wait_until_state_is_not(test_client, job, [JobState.CANCELLATION_REQUESTED])
 
-        await processing_task
+    # Check for status
+    response = await test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/status")
+    job = extract_job_view(response)
+    assert job.state == JobState.CANCELLED
 
-        # Check for status
-        response = test_client.get(f"/v1/dataspace/analysisjob/{job.job_id}/status")
+
+async def _wait_until_state_is_not(client: AsyncClient, job: JobView, blocking_states: List[JobState]):
+    response = await client.get(f"/v1/dataspace/analysisjob/{job.job_id}/status")
+    job = extract_job_view(response)
+
+    while job.state in blocking_states:
+        response = await client.get(f"/v1/dataspace/analysisjob/{job.job_id}/status")
         job = extract_job_view(response)
-        assert job.state == JobState.CANCELLED
+        await asyncio.sleep(1.0)
 
-
-def get_status(client: TestClient, job_id: UUID):
-    response: Response = client.get(f"/v1/dataspace/analysisjob/{job_id}/status")
-    return extract_job_view(response)
+    return job
 
 
 def extract_job_view(response: Response) -> JobView:
