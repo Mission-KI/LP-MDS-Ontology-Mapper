@@ -22,7 +22,7 @@ from jobapi.repo import Job, JobRepository
 from jobapi.repo.base import JobRepositoryFactory
 from jobapi.repo.inmemory import InMemoryJobRepositoryFactory
 from jobapi.repo.persistent import DbJobRepositoryFactory
-from jobapi.types import JobData, JobState, JobView
+from jobapi.types import END_STATES, JobData, JobState, JobView
 
 logger = getLogger(__name__)
 
@@ -105,7 +105,8 @@ class AnalysisJobManager:
     async def cancel_job(self, job_id: UUID):
         async with self._job_repo.new_session() as session:
             job = await session.get_job(job_id)
-            if job.state not in [JobState.PROCESSING, JobState.QUEUED]:
+
+            if job.state in END_STATES:
                 raise ApiClientException(f"Job cannot be cancelled because it's in state {job.state.value}.")
 
             # Update state to CANCELLATION_REQUEST which is handled by _cancellation_listener
