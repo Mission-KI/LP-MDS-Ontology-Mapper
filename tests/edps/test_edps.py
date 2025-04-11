@@ -10,7 +10,6 @@ from extended_dataset_profile.models.v0.edp import (
     ExtendedDatasetProfile,
     FileReference,
     ImageColorMode,
-    ImageDPI,
     ModificationState,
     Resolution,
     TemporalConsistency,
@@ -316,7 +315,7 @@ async def test_analyse_gif(ctx, path_data_test_gif):
     assert edp.imageDatasets[0].codec == "GIF"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.PALETTED
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
-    assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
+    assert edp.imageDatasets[0].dpi is None
     _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 
@@ -363,7 +362,7 @@ async def test_analyse_webp(ctx, path_data_test_webp):
     assert edp.imageDatasets[0].codec == "WEBP"
     assert edp.imageDatasets[0].colorMode == ImageColorMode.RGB
     assert edp.imageDatasets[0].resolution == Resolution(width=600, height=400)
-    assert edp.imageDatasets[0].dpi == ImageDPI(x=0.0, y=0.0)
+    assert edp.imageDatasets[0].dpi is None
     _assert_image_pixel_metrics(edp.imageDatasets[0])
 
 

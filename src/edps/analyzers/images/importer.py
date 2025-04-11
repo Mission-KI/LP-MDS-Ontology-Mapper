@@ -33,13 +33,13 @@ def parse_raster_image(img: Image) -> tuple[ImageMetadata, np.ndarray]:
     codec = img.format
     color_mode = img.mode
     resolution = img.size
-    dpi = img.info.get("dpi", (0.0, 0.0))
+    dpi = img.info.get("dpi")
     img_rgb = img.convert(ImageColorMode.RGB)
     img_array = np.array(img_rgb)
     img_metadata = ImageMetadata(
         codec=codec or "UNKNOWN",
         color_mode=ImageColorMode(color_mode),
         resolution=Resolution(width=resolution[0], height=resolution[1]),
-        dpi=ImageDPI(x=dpi[0], y=dpi[1]),
+        dpi=ImageDPI(x=dpi[0], y=dpi[1]) if dpi else None,
     )
     return img_metadata, img_array

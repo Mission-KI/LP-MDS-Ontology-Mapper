@@ -18,7 +18,7 @@ from edps.taskcontext import TaskContext
 
 
 class ImageMetadata:
-    def __init__(self, codec: str, color_mode: ImageColorMode, resolution: Resolution, dpi: ImageDPI):
+    def __init__(self, codec: str, color_mode: ImageColorMode, resolution: Resolution, dpi: Optional[ImageDPI]):
         self.codec = codec
         self.color_mode = color_mode
         self.resolution = resolution
