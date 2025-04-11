@@ -22,7 +22,7 @@ class AppConfig(BaseSettings):
         default=None,
     )
     workers: int = Field(
-        default=0,
+        default=8,
         description="""
             Number of workers for job processing in Process/Thread-Pool.
             Depending on 'db_url' and 'workers' either use no pool or ProcessPoolExecutor or ThreadPoolExecutor:
