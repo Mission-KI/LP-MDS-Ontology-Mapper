@@ -1,0 +1,351 @@
+{
+    "schemaVersion": "0.26.0",
+    "name": "dataset-dummy-name",
+    "assetRefs": [
+        {
+            "assetId": "my-dataset-id",
+            "assetUrl": "https://beebucket.ai/en/",
+            "assetVersion": "2.3.1",
+            "dataSpace": {
+                "name": "TestDataSpace",
+                "url": "https://beebucket.ai/en/"
+            },
+            "publisher": {
+                "name": "beebucket",
+                "url": null
+            },
+            "publishDate": "1995-10-10T10:00:00Z",
+            "license": {
+                "name": null,
+                "url": "https://opensource.org/license/mit"
+            }
+        }
+    ],
+    "dataCategory": "TestDataCategory",
+    "assetProcessingStatus": "Original Data",
+    "description": "Our very first test edp",
+    "tags": [
+        "test",
+        "csv",
+        "Äöüß"
+    ],
+    "dataSubCategory": null,
+    "assetTypeInfo": null,
+    "generatedBy": "EDP Service @ unset-version",
+    "transferTypeFlag": null,
+    "transferTypeFrequency": null,
+    "growthFlag": null,
+    "immutabilityFlag": null,
+    "allowedForAiTraining": null,
+    "nda": null,
+    "dpa": null,
+    "dataLog": null,
+    "freely_available": true,
+    "volume": 45272,
+    "dataTypes": [
+        "structured",
+        "unstructuredText",
+        "image",
+        "documents"
+    ],
+    "temporalCover": null,
+    "periodicity": null,
+    "assetSha256Hash": "7b1764f8f74096fa6b72adac83dd7b2b84d528a8f59e0e1be5b8250f9999bab3",
+    "archiveDatasets": [],
+    "structuredDatasets": [
+        {
+            "rowCount": 388,
+            "columnCount": 4,
+            "numericColumnCount": 2,
+            "datetimeColumnCount": 0,
+            "stringColumnCount": 2,
+            "correlationGraph": "test_docx/table_001/correlations.png",
+            "correlationSummary": {
+                "no": 1,
+                "partial": 0,
+                "strong": 0
+            },
+            "numericColumns": [
+                {
+                    "name": "anzahl",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 388,
+                    "numberUnique": 24,
+                    "augmentation": null,
+                    "min": 3.0,
+                    "max": 34.0,
+                    "mean": 6.47680412371134,
+                    "median": 5.0,
+                    "variance": 24.668711207011377,
+                    "stddev": 4.9667606351636655,
+                    "upperPercentile": 24.25999999999999,
+                    "lowerPercentile": 3.0,
+                    "percentileOutlierCount": 4,
+                    "upperQuantile": 7.0,
+                    "lowerQuantile": 3.0,
+                    "quantileOutlierCount": 96,
+                    "upperZScore": 21.377086029202335,
+                    "lowerZScore": -8.423477781779656,
+                    "zScoreOutlierCount": 11,
+                    "upperIQR": 13.0,
+                    "lowerIQR": -3.0,
+                    "iqr": 4.0,
+                    "iqrOutlierCount": 32,
+                    "relativeOutlierCount": 0.04037800687285223,
+                    "distribution": "norm",
+                    "distributionGraph": "test_docx/table_001/anzahl_distribution.png",
+                    "boxPlot": "test_docx/table_001/anzahl_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [],
+                    "seasonalities": [],
+                    "trends": [],
+                    "residuals": [],
+                    "dataType": "UInt8"
+                },
+                {
+                    "name": "position",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 388,
+                    "numberUnique": 3,
+                    "augmentation": null,
+                    "min": 1.0,
+                    "max": 3.0,
+                    "mean": 1.2448453608247423,
+                    "median": 1.0,
+                    "variance": 0.1957097951463811,
+                    "stddev": 0.4423909980394957,
+                    "upperPercentile": 2.0,
+                    "lowerPercentile": 1.0,
+                    "percentileOutlierCount": 2,
+                    "upperQuantile": 1.0,
+                    "lowerQuantile": 1.0,
+                    "quantileOutlierCount": 93,
+                    "upperZScore": 2.5720183549432294,
+                    "lowerZScore": -0.08232763329374482,
+                    "zScoreOutlierCount": 2,
+                    "upperIQR": 1.0,
+                    "lowerIQR": 1.0,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 93,
+                    "relativeOutlierCount": 0.08333333333333334,
+                    "distribution": "cauchy",
+                    "distributionGraph": null,
+                    "boxPlot": "test_docx/table_001/position_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [],
+                    "seasonalities": [],
+                    "trends": [],
+                    "residuals": [],
+                    "dataType": "UInt8"
+                }
+            ],
+            "datetimeColumns": [],
+            "stringColumns": [
+                {
+                    "name": "vorname",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 388,
+                    "numberUnique": 327,
+                    "augmentation": null,
+                    "distributionGraph": "test_docx/table_001/vorname_distribution.png"
+                },
+                {
+                    "name": "geschlecht",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 388,
+                    "numberUnique": 2,
+                    "augmentation": null,
+                    "distributionGraph": null
+                }
+            ],
+            "primaryDatetimeColumn": null
+        }
+    ],
+    "semiStructuredDatasets": [],
+    "unstructuredTextDatasets": [
+        {
+            "embeddedTables": [],
+            "languages": [
+                "deu"
+            ],
+            "wordCloud": [
+                {
+                    "word": "Vornamen",
+                    "count": 3
+                },
+                {
+                    "word": "Datensatz",
+                    "count": 2
+                },
+                {
+                    "word": "Neugeborenen",
+                    "count": 1
+                },
+                {
+                    "word": "Stadt",
+                    "count": 1
+                },
+                {
+                    "word": "Aachen",
+                    "count": 1
+                },
+                {
+                    "word": "Jungen",
+                    "count": 1
+                },
+                {
+                    "word": "Mädchen",
+                    "count": 1
+                },
+                {
+                    "word": "Liste",
+                    "count": 1
+                },
+                {
+                    "word": "Anzahl",
+                    "count": 1
+                },
+                {
+                    "word": "Angabe",
+                    "count": 1
+                }
+            ],
+            "lineCount": 3,
+            "wordCount": 30
+        }
+    ],
+    "imageDatasets": [
+        {
+            "codec": "JPEG",
+            "colorMode": "L",
+            "resolution": {
+                "width": 275,
+                "height": 183
+            },
+            "dpi": {
+                "x": 220.0,
+                "y": 220.0
+            },
+            "brightness": 2.8024242424242423,
+            "blurriness": 2238.74130153999,
+            "sharpness": 7.13371087928465,
+            "brisque": 113.96496525774447,
+            "noise": 3.044561319408421,
+            "lowContrast": false,
+            "elaScore": 21.51711654663086
+        },
+        {
+            "codec": "PNG",
+            "colorMode": "P",
+            "resolution": {
+                "width": 600,
+                "height": 400
+            },
+            "dpi": {
+                "x": 96.012,
+                "y": 96.012
+            },
+            "brightness": 2.8063125,
+            "blurriness": 660.2066666666667,
+            "sharpness": 3.0270166666666665,
+            "brisque": 92.74720850417302,
+            "noise": 11.835988868848242,
+            "lowContrast": false,
+            "elaScore": null
+        }
+    ],
+    "videoDatasets": [],
+    "audioDatasets": [],
+    "documentDatasets": [
+        {
+            "title": "Vornamen von Neugeborenen in der Stadt Aachen 2021",
+            "subject": "Vornamen-Statistik",
+            "author": "Martin Kaeser",
+            "toolchain": null,
+            "creationDate": "2025-02-18T11:16:00Z",
+            "modificationDate": "2025-02-18T17:41:00Z",
+            "keywords": [
+                "Vornamen",
+                "Neugeborene",
+                "Aachen",
+                "2021"
+            ],
+            "docType": "DOCX",
+            "numPages": null,
+            "numImages": 2,
+            "modified": "modified",
+            "encrypted": false
+        }
+    ],
+    "datasetTree": [
+        {
+            "dataset": {
+                "$ref": "#/documentDatasets/0"
+            },
+            "datasetType": "documents",
+            "parent": null,
+            "name": "test_docx",
+            "fileProperties": {
+                "name": "test.docx",
+                "fileType": "docx",
+                "size": 45272
+            }
+        },
+        {
+            "dataset": {
+                "$ref": "#/unstructuredTextDatasets/0"
+            },
+            "datasetType": "unstructuredText",
+            "parent": {
+                "$ref": "#/datasetTree/0"
+            },
+            "name": "text",
+            "fileProperties": null
+        },
+        {
+            "dataset": {
+                "$ref": "#/structuredDatasets/0"
+            },
+            "datasetType": "structured",
+            "parent": {
+                "$ref": "#/datasetTree/0"
+            },
+            "name": "table_001",
+            "fileProperties": null
+        },
+        {
+            "dataset": {
+                "$ref": "#/imageDatasets/0"
+            },
+            "datasetType": "image",
+            "parent": {
+                "$ref": "#/datasetTree/0"
+            },
+            "name": "image1_jpeg",
+            "fileProperties": {
+                "name": "image1.jpeg",
+                "fileType": "jpg",
+                "size": 3929
+            }
+        },
+        {
+            "dataset": {
+                "$ref": "#/imageDatasets/1"
+            },
+            "datasetType": "image",
+            "parent": {
+                "$ref": "#/datasetTree/0"
+            },
+            "name": "image2_png",
+            "fileProperties": {
+                "name": "image2.png",
+                "fileType": "png",
+                "size": 1785
+            }
+        }
+    ]
+}

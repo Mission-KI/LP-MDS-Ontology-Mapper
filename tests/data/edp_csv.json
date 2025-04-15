@@ -1,0 +1,749 @@
+{
+    "schemaVersion": "0.26.0",
+    "name": "dataset-dummy-name",
+    "assetRefs": [
+        {
+            "assetId": "my-dataset-id",
+            "assetUrl": "https://beebucket.ai/en/",
+            "assetVersion": "2.3.1",
+            "dataSpace": {
+                "name": "TestDataSpace",
+                "url": "https://beebucket.ai/en/"
+            },
+            "publisher": {
+                "name": "beebucket",
+                "url": null
+            },
+            "publishDate": "1995-10-10T10:00:00Z",
+            "license": {
+                "name": null,
+                "url": "https://opensource.org/license/mit"
+            }
+        }
+    ],
+    "dataCategory": "Traffic Information",
+    "assetProcessingStatus": "Original Data",
+    "description": "Our very first test edp",
+    "tags": [
+        "test",
+        "csv"
+    ],
+    "dataSubCategory": "Accidents",
+    "assetTypeInfo": null,
+    "generatedBy": "EDP Service @ unset-version",
+    "transferTypeFlag": null,
+    "transferTypeFrequency": null,
+    "growthFlag": null,
+    "immutabilityFlag": null,
+    "allowedForAiTraining": null,
+    "nda": null,
+    "dpa": null,
+    "dataLog": null,
+    "freely_available": true,
+    "volume": 90988,
+    "dataTypes": [
+        "structured"
+    ],
+    "temporalCover": {
+        "earliest": "2018-01-01T00:00:00",
+        "latest": "2018-02-11T16:00:00"
+    },
+    "periodicity": "hours",
+    "assetSha256Hash": "e1eb5f95aecb5530dc7b9ba86f24f37f6bff59ae7a524bde6392a45202e9e258",
+    "archiveDatasets": [],
+    "structuredDatasets": [
+        {
+            "rowCount": 1000,
+            "columnCount": 12,
+            "numericColumnCount": 10,
+            "datetimeColumnCount": 1,
+            "stringColumnCount": 1,
+            "correlationGraph": "bast_csv/correlations.png",
+            "correlationSummary": {
+                "no": 7,
+                "partial": 1,
+                "strong": 2
+            },
+            "numericColumns": [
+                {
+                    "name": "Unnamed: 0",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1000,
+                    "augmentation": null,
+                    "min": 0.0,
+                    "max": 999.0,
+                    "mean": 499.5,
+                    "median": 499.5,
+                    "variance": 83416.66666666667,
+                    "stddev": 288.8194360957494,
+                    "upperPercentile": 989.01,
+                    "lowerPercentile": 9.99,
+                    "percentileOutlierCount": 20,
+                    "upperQuantile": 749.25,
+                    "lowerQuantile": 249.75,
+                    "quantileOutlierCount": 500,
+                    "upperZScore": 1365.9583082872482,
+                    "lowerZScore": -366.9583082872482,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 1498.5,
+                    "lowerIQR": -499.5,
+                    "iqr": 499.5,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.006666666666666667,
+                    "distribution": "uniform",
+                    "distributionGraph": "bast_csv/Unnamed0_distribution.png",
+                    "boxPlot": "bast_csv/Unnamed0_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Unnamed0_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Unnamed0_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Unnamed0_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Unnamed0_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "TKNR",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "min": 6020.0,
+                    "max": 6020.0,
+                    "mean": 6020.0,
+                    "median": 6020.0,
+                    "variance": 0.0,
+                    "stddev": 0.0,
+                    "upperPercentile": 6020.0,
+                    "lowerPercentile": 6020.0,
+                    "percentileOutlierCount": 0,
+                    "upperQuantile": 6020.0,
+                    "lowerQuantile": 6020.0,
+                    "quantileOutlierCount": 0,
+                    "upperZScore": 6020.0,
+                    "lowerZScore": 6020.0,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 6020.0,
+                    "lowerIQR": 6020.0,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.0,
+                    "distribution": "single value",
+                    "distributionGraph": null,
+                    "boxPlot": "bast_csv/TKNR_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/TKNR_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/TKNR_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/TKNR_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/TKNR_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "Zst",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "min": 9033.0,
+                    "max": 9033.0,
+                    "mean": 9033.0,
+                    "median": 9033.0,
+                    "variance": 0.0,
+                    "stddev": 0.0,
+                    "upperPercentile": 9033.0,
+                    "lowerPercentile": 9033.0,
+                    "percentileOutlierCount": 0,
+                    "upperQuantile": 9033.0,
+                    "lowerQuantile": 9033.0,
+                    "quantileOutlierCount": 0,
+                    "upperZScore": 9033.0,
+                    "lowerZScore": 9033.0,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 9033.0,
+                    "lowerIQR": 9033.0,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.0,
+                    "distribution": "single value",
+                    "distributionGraph": null,
+                    "boxPlot": "bast_csv/Zst_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Zst_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Zst_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Zst_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Zst_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "Land",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "min": 9.0,
+                    "max": 9.0,
+                    "mean": 9.0,
+                    "median": 9.0,
+                    "variance": 0.0,
+                    "stddev": 0.0,
+                    "upperPercentile": 9.0,
+                    "lowerPercentile": 9.0,
+                    "percentileOutlierCount": 0,
+                    "upperQuantile": 9.0,
+                    "lowerQuantile": 9.0,
+                    "quantileOutlierCount": 0,
+                    "upperZScore": 9.0,
+                    "lowerZScore": 9.0,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 9.0,
+                    "lowerIQR": 9.0,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.0,
+                    "distribution": "single value",
+                    "distributionGraph": null,
+                    "boxPlot": "bast_csv/Land_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Land_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Land_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Land_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Land_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt8"
+                },
+                {
+                    "name": "KFZ_R1",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 848,
+                    "augmentation": null,
+                    "min": 122.0,
+                    "max": 4944.0,
+                    "mean": 1879.341,
+                    "median": 1924.5,
+                    "variance": 1238273.334053053,
+                    "stddev": 1112.777306586117,
+                    "upperPercentile": 4153.19,
+                    "lowerPercentile": 187.96,
+                    "percentileOutlierCount": 20,
+                    "upperQuantile": 2718.25,
+                    "lowerQuantile": 762.0,
+                    "quantileOutlierCount": 499,
+                    "upperZScore": 5217.672919758351,
+                    "lowerZScore": -1458.990919758351,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 5652.625,
+                    "lowerIQR": -2172.375,
+                    "iqr": 1956.25,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.006666666666666667,
+                    "distribution": "norm",
+                    "distributionGraph": "bast_csv/KFZ_R1_distribution.png",
+                    "boxPlot": "bast_csv/KFZ_R1_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R1_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R1_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R1_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R1_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "KFZ_R2",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 847,
+                    "augmentation": null,
+                    "min": 95.0,
+                    "max": 4327.0,
+                    "mean": 1921.552,
+                    "median": 1987.0,
+                    "variance": 1088823.1644604604,
+                    "stddev": 1043.4668966768713,
+                    "upperPercentile": 4095.49,
+                    "lowerPercentile": 240.0,
+                    "percentileOutlierCount": 18,
+                    "upperQuantile": 2738.0,
+                    "lowerQuantile": 922.75,
+                    "quantileOutlierCount": 500,
+                    "upperZScore": 5051.952690030614,
+                    "lowerZScore": -1208.848690030614,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 5460.875,
+                    "lowerIQR": -1800.125,
+                    "iqr": 1815.25,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.006,
+                    "distribution": "gamma",
+                    "distributionGraph": "bast_csv/KFZ_R2_distribution.png",
+                    "boxPlot": "bast_csv/KFZ_R2_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R2_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R2_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R2_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/KFZ_R2_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "Lkw_R1",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 484,
+                    "augmentation": null,
+                    "min": 5.0,
+                    "max": 729.0,
+                    "mean": 321.26,
+                    "median": 310.0,
+                    "variance": 34009.347747747735,
+                    "stddev": 184.41623504384785,
+                    "upperPercentile": 679.02,
+                    "lowerPercentile": 21.990000000000002,
+                    "percentileOutlierCount": 20,
+                    "upperQuantile": 457.25,
+                    "lowerQuantile": 191.75,
+                    "quantileOutlierCount": 500,
+                    "upperZScore": 874.5087051315436,
+                    "lowerZScore": -231.9887051315436,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 855.5,
+                    "lowerIQR": -206.5,
+                    "iqr": 265.5,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.006666666666666667,
+                    "distribution": "norm",
+                    "distributionGraph": "bast_csv/Lkw_R1_distribution.png",
+                    "boxPlot": "bast_csv/Lkw_R1_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R1_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R1_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R1_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R1_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "Lkw_R2",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 496,
+                    "augmentation": null,
+                    "min": 4.0,
+                    "max": 805.0,
+                    "mean": 341.084,
+                    "median": 355.0,
+                    "variance": 37529.60054454455,
+                    "stddev": 193.72558051156938,
+                    "upperPercentile": 707.01,
+                    "lowerPercentile": 14.98,
+                    "percentileOutlierCount": 20,
+                    "upperQuantile": 498.25,
+                    "lowerQuantile": 198.75,
+                    "quantileOutlierCount": 500,
+                    "upperZScore": 922.2607415347081,
+                    "lowerZScore": -240.09274153470807,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 947.5,
+                    "lowerIQR": -250.5,
+                    "iqr": 299.5,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.006666666666666667,
+                    "distribution": "norm",
+                    "distributionGraph": "bast_csv/Lkw_R2_distribution.png",
+                    "boxPlot": "bast_csv/Lkw_R2_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R2_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R2_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R2_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/Lkw_R2_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "UInt16"
+                },
+                {
+                    "name": "lat",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "min": 49.9882698059082,
+                    "max": 49.9882698059082,
+                    "mean": 49.988277435302734,
+                    "median": 49.9882698059082,
+                    "variance": 5.826592680557852e-11,
+                    "stddev": 7.633211680513341e-6,
+                    "upperPercentile": 49.9882698059082,
+                    "lowerPercentile": 49.9882698059082,
+                    "percentileOutlierCount": 0,
+                    "upperQuantile": 49.9882698059082,
+                    "lowerQuantile": 49.9882698059082,
+                    "quantileOutlierCount": 0,
+                    "upperZScore": 49.988300334937776,
+                    "lowerZScore": 49.98825453566769,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 49.9882698059082,
+                    "lowerIQR": 49.9882698059082,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.0,
+                    "distribution": "single value",
+                    "distributionGraph": null,
+                    "boxPlot": "bast_csv/lat_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lat_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lat_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lat_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lat_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "Float32"
+                },
+                {
+                    "name": "lon",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "min": 9.029922485351562,
+                    "max": 9.029922485351562,
+                    "mean": 9.029922485351562,
+                    "median": 9.029922485351562,
+                    "variance": 0.0,
+                    "stddev": 0.0,
+                    "upperPercentile": 9.029922485351562,
+                    "lowerPercentile": 9.029922485351562,
+                    "percentileOutlierCount": 0,
+                    "upperQuantile": 9.029922485351562,
+                    "lowerQuantile": 9.029922485351562,
+                    "quantileOutlierCount": 0,
+                    "upperZScore": 9.029922485351562,
+                    "lowerZScore": 9.029922485351562,
+                    "zScoreOutlierCount": 0,
+                    "upperIQR": 9.029922485351562,
+                    "lowerIQR": 9.029922485351562,
+                    "iqr": 0.0,
+                    "iqrOutlierCount": 0,
+                    "relativeOutlierCount": 0.0,
+                    "distribution": "single value",
+                    "distributionGraph": null,
+                    "boxPlot": "bast_csv/lon_box_plot.png",
+                    "trend": "No Trend",
+                    "original_series": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lon_over_augmented_time_original.png"
+                        }
+                    ],
+                    "seasonalities": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lon_over_augmented_time_seasonality.png"
+                        }
+                    ],
+                    "trends": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lon_over_augmented_time_trend.png"
+                        }
+                    ],
+                    "residuals": [
+                        {
+                            "timeBaseColumn": "augmented_time",
+                            "file": "bast_csv/lon_over_augmented_time_residual.png"
+                        }
+                    ],
+                    "dataType": "Float32"
+                }
+            ],
+            "datetimeColumns": [
+                {
+                    "name": "augmented_time",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1000,
+                    "augmentation": null,
+                    "temporalCover": {
+                        "earliest": "2018-01-01T00:00:00",
+                        "latest": "2018-02-11T16:00:00"
+                    },
+                    "all_entries_are_unique": true,
+                    "monotonically_increasing": false,
+                    "monotonically_decreasing": false,
+                    "periodicity": "hours",
+                    "temporalConsistencies": [
+                        {
+                            "timeScale": "microseconds",
+                            "differentAbundancies": 1000,
+                            "stable": false,
+                            "numberOfGaps": 999
+                        },
+                        {
+                            "timeScale": "milliseconds",
+                            "differentAbundancies": 1000,
+                            "stable": false,
+                            "numberOfGaps": 999
+                        },
+                        {
+                            "timeScale": "seconds",
+                            "differentAbundancies": 1000,
+                            "stable": false,
+                            "numberOfGaps": 999
+                        },
+                        {
+                            "timeScale": "minutes",
+                            "differentAbundancies": 1000,
+                            "stable": false,
+                            "numberOfGaps": 999
+                        },
+                        {
+                            "timeScale": "hours",
+                            "differentAbundancies": 1000,
+                            "stable": false,
+                            "numberOfGaps": 1
+                        },
+                        {
+                            "timeScale": "days",
+                            "differentAbundancies": 43,
+                            "stable": false,
+                            "numberOfGaps": 0
+                        },
+                        {
+                            "timeScale": "weeks",
+                            "differentAbundancies": 7,
+                            "stable": false,
+                            "numberOfGaps": 0
+                        },
+                        {
+                            "timeScale": "months",
+                            "differentAbundancies": 3,
+                            "stable": false,
+                            "numberOfGaps": 0
+                        },
+                        {
+                            "timeScale": "years",
+                            "differentAbundancies": 1,
+                            "stable": true,
+                            "numberOfGaps": 0
+                        }
+                    ],
+                    "format": "ISO8601"
+                }
+            ],
+            "stringColumns": [
+                {
+                    "name": "Strklas",
+                    "nullCount": 0,
+                    "inconsistentCount": 0,
+                    "interpretableCount": 1000,
+                    "numberUnique": 1,
+                    "augmentation": null,
+                    "distributionGraph": null
+                }
+            ],
+            "primaryDatetimeColumn": null
+        }
+    ],
+    "semiStructuredDatasets": [],
+    "unstructuredTextDatasets": [],
+    "imageDatasets": [],
+    "videoDatasets": [],
+    "audioDatasets": [],
+    "documentDatasets": [],
+    "datasetTree": [
+        {
+            "dataset": {
+                "$ref": "#/structuredDatasets/0"
+            },
+            "datasetType": "structured",
+            "parent": null,
+            "name": "bast_csv",
+            "fileProperties": {
+                "name": "bast.csv",
+                "fileType": "csv",
+                "size": 90988
+            }
+        }
+    ]
+}

@@ -5,7 +5,7 @@ set -euo pipefail
 pushd $(dirname "$0")/..
 
 DISTRIBUTION_DIR="./dist"
-PACKAGE_VERSION_FILE="src/edps/version.py"
+PACKAGE_VERSION_FILE="src/mds_mapper/version.py"
 
 rm -rf ${DISTRIBUTION_DIR} build **/*.egg-info **/__pycache__
 mkdir -p ${DISTRIBUTION_DIR}

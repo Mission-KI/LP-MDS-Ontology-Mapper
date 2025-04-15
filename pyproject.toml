@@ -3,14 +3,10 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "edps"
+name = "mds_mapper"
 dynamic = ["version"]
-authors = [
-    { name = "Michael Wielpuetz", email = "mw@beebucket.de" },
-    { name = "Daniel Eckstein", email = "de@beebucket.de" },
-    { name = "Joshua Lauterbach", email = "jl@beebucket.de" },
-]
-description = "Beebucket application to create Enhanced Dataset Profiles."
+authors = [{ name = "Joshua Lauterbach", email = "jl@beebucket.de" }]
+description = "A small service to convert Beebucket EDP's into the MDS Ontology"
 readme = "README.md"
 requires-python = ">=3.12"
 classifiers = [
@@ -21,77 +17,34 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "argparse",
     "extended-dataset-profile @ git+https://github.com/Beebucket/extended_dataset_profile@0.26.1",
-    "boto3",
-    "filetype",
-    "lingua-language-detector",
-    "matplotlib",
-    "numpy",
-    "pandas",
-    "pathlib",
+    "pg8000",
     "pydantic",
     "pydantic-settings",
     "python-iso639",
-    "seaborn",
-    "statsmodels",
     "requests",
-    "fastapi[standard]",
-    "openpyxl",
-    "xlrd",
     "sqlmodel",
-    "pg8000",
-    "pillow",
-    "opencv-python",
-    "scikit-image",
-    "brisque",
-    "PyWavelets",
-    "pypdf",
-    "python-docx",
-    "torch",
-    "torchvision",
-    "easyocr",
-    "ffmpeg-python",
-    "static-ffmpeg",
-    "genson",
-    "spacy ~= 3.8",
-    "Jinja2",
-    "xhtml2pdf",
-    "clevercsv @ git+https://github.com/Beebucket/CleverCSV@0.8.3",
-    "de-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl",
-    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
-    "fr-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_lg-3.8.0/fr_core_news_lg-3.8.0-py3-none-any.whl",
+    "fastapi[standard]",
 ]
 
 [project.scripts]
-edps_download_artifacts = "edps.service:download_artifacts"
-edps_export_openapi_schema = "jobapi.__main__:cmdline_export_openapi_schema"
-edps_jobapi = "jobapi.__main__:main"
-edps_pontusx = "pontusx.__main__:main"
+mds_mapper_rest_api = "mds_mapper.rest_api.__main__:main"
 
 [project.optional-dependencies]
 test = [
-    "boto3-stubs[boto3]",
     "pytest",
     "pytest-asyncio",
-    "pytest-benchmark",
     "mypy",
-    "pandas-stubs",
-    "scipy-stubs",
-    "types-seaborn",
     "types-requests",
     "ruff>=0.7.4",
     "pre-commit>=4.0.1",
     "pip-licenses>=5.0.0",
     "pydantic-markdown @ git+https://github.com/Beebucket/pydantic_markdown@2.0.1",
 ]
-dev = ["edps[test]"]
+dev = ["mds_mapper[test]"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-"edps" = ["styles/*.mplstyle", "report/templates/*.jinja"]
 
 [tool.setuptools.dynamic]
 version = { file = "dist/VERSION.txt" }
@@ -115,11 +68,7 @@ log_cli_level = "WARNING"
 log_format = "%(asctime)s | %(levelname)s | %(name)s | %(pathname)s:%(lineno)d | - %(message)s"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
-filterwarnings = [
-    "error",
-    "ignore::matplotlib._api.deprecation.MatplotlibDeprecationWarning",
-    "ignore::DeprecationWarning:libsvm.svm",
-]
+filterwarnings = ["error"]
 markers = ["slow: Tests that may take more than a few seconds."]
 
 [tool.mypy]
@@ -130,56 +79,7 @@ check_untyped_defs = true
 sqlite_cache = true
 cache_fine_grained = true
 
-[tool.uv]
-override-dependencies = [
-    "chardet; sys_platform == 'never'", # Exclude chardet (transitive dependency of xhtml2pdf)
-]
-
-[[tool.mypy.overrides]]
-module = [
-    "filetype",
-    "statsmodels.*",
-    "brisque.*",
-    "easyocr",
-    "ffmpeg",
-    "static_ffmpeg",
-    "genson",
-    "xhtml2pdf.*",
-]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["pandas.*"]
-ignore_errors = true
-
 [tool.pip-licenses]
 from = "classifier"
-ignore-packages = [
-    "edps",
-    "extended-dataset-profile",
-    "libsvm-official",
-    "torchvision",
-    "easyocr",
-]
+ignore-packages = ["extended-dataset-profile"]
 partial-match = true
-
-[tool.uv.sources]
-torch = [
-    { index = "pypi", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-unix", marker = "sys_platform != 'win32'" },
-]
-torchvision = [
-    { index = "pypi", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-unix", marker = "sys_platform != 'win32'" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-unix"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-
-[[tool.uv.index]]
-name = "pypi"
-url = "https://pypi.python.org/simple"
-default = true

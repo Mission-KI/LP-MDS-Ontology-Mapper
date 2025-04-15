@@ -5,9 +5,8 @@ on:
         tags: "*"
 
 env:
-    OPENAPI_SCHEMA: edps_openapi_${{ github.ref_name }}.json
-    IMAGE_PATH: beebucket/edps
-    WHEEL_NAME: edps.whl
+    IMAGE_PATH: beebucket/mds_mapper
+    WHEEL_NAME: mds_mapper.whl
     LICENSES_ARTIFACT_NAME: licenses.csv
     CONFIG_README_ARTIFACT_NAME: config_readme.md
     PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
@@ -32,36 +31,8 @@ jobs:
         -   uses: actions/upload-artifact@v4
             with:
                 name: ${{ env.WHEEL_NAME }}
-                path: "${{ env.DISTRIBUTION_DIR }}/edps*.whl"
+                path: "${{ env.DISTRIBUTION_DIR }}/mds_mapper*.whl"
                 if-no-files-found: error
-
-    generate_schemas:
-        runs-on: ubuntu-24.04
-        name: Generate Schemata
-        needs:
-        -   build_wheel
-        steps:
-        -   uses: actions/checkout@v4
-        -   uses: actions/setup-python@v5
-            with:
-                python-version-file: '.python-version'
-                cache: 'pip'
-        -   uses: actions/download-artifact@v4
-            id: download_wheel
-            with:
-                name: ${{ env.WHEEL_NAME }}
-                path: ${{ github.workspace }}
-        -   name: Install
-            run: |
-                git config --global url."https://${{ secrets.GIT_HUB_API_KEY }}@github.com/".insteadOf "git@github.com:"
-                git config --global url."https://${{ secrets.GIT_HUB_API_KEY }}@github.com".insteadOf "https://github.com"
-                pip install ${{ steps.download_wheel.outputs.download-path }}
-        -   name: Generate OpenAPI Schema
-            run: edps_export_openapi_schema --output ${{ env.OPENAPI_SCHEMA }}
-        -   uses: actions/upload-artifact@v4
-            with:
-                name: ${{ env.OPENAPI_SCHEMA }}
-                path: ${{ env.OPENAPI_SCHEMA }}
 
     license_report:
         runs-on: ubuntu-24.04
@@ -114,7 +85,7 @@ jobs:
                 git config --global url."https://${{ secrets.GIT_HUB_API_KEY }}@github.com".insteadOf "https://github.com"
                 pip install ${{ steps.download_wheel.outputs.download-path }}[test]
         -   name: Run pydantic markdown generator
-            run: pydantic_markdown --model edps.Config --output ${{ env.CONFIG_README_ARTIFACT_NAME }}
+            run: pydantic_markdown --model mds_mapper.Config --output ${{ env.CONFIG_README_ARTIFACT_NAME }}
         -   name: Upload readme
             uses: actions/upload-artifact@v4
             with:
@@ -123,7 +94,7 @@ jobs:
             
     build_and_release_docker:
         runs-on: ubuntu-24.04
-        name: Build and Push EDPS docker image
+        name: Build and Push MDS Mapper docker image
         needs:
         -   build_wheel
         timeout-minutes: 1440
@@ -179,7 +150,6 @@ jobs:
         name: Create Release
         needs:
         -   build_wheel
-        -   generate_schemas
         -   build_and_release_docker
         -   license_report
         -   configuration-readme
@@ -191,10 +161,6 @@ jobs:
         -   uses: actions/download-artifact@v4
             with:
                 name: ${{ env.WHEEL_NAME }}
-                path: ${{ env.ARTIFACTS_DIR }}
-        -   uses: actions/download-artifact@v4
-            with:
-                name: ${{ env.OPENAPI_SCHEMA }}
                 path: ${{ env.ARTIFACTS_DIR }}
         -   uses: actions/download-artifact@v4
             with:

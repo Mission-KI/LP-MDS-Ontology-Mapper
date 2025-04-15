@@ -1,7 +1,6 @@
 services:
-  edps:
-    image: beebucket/edps:${EDPS_VERSION}
-    entrypoint: edps_jobapi
+  mds_mapper:
+    image: beebucket/mds_mapper:${MDS_MAPPER_VERSION}
     # deploy:
     #   resources:
     #     limits:
@@ -20,11 +19,10 @@ services:
     # ports:
     #   - "8000:8000"
     volumes:
-      - edps-work:/work
+      - mds_mapper-work:/work
     environment:
       HOST: "0.0.0.0"
-      DB_URL: "postgresql+pg8000://${DB_USER}:${DB_PASSWORD}@edps-db:5432/${DB_NAME}"
-      WORKERS: "${EDPS_WORKERS}"
+      DB_URL: "postgresql+pg8000://${DB_USER}:${DB_PASSWORD}@mds_mapper-db:5432/${DB_NAME}"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.edp.rule=Host(`${TRAEFIK_HOSTNAME}`)"
@@ -58,14 +56,14 @@ services:
       - "./.letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
-  edps-db:
+  mds_mapper-db:
     image: postgres:17.2
     environment:
       POSTGRES_DB: "${DB_NAME}"
       POSTGRES_USER: "${DB_USER}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
     volumes:
-      - edps-db-data:/var/lib/postgresql/data:z
+      - mds_mapper-db-data:/var/lib/postgresql/data:z
     restart: on-failure
     # Should not be exposed! Only enable this temporarily for debugging!
     # ports:
@@ -77,5 +75,5 @@ services:
       retries: 5
 
 volumes:
-  edps-work:
-  edps-db-data:
+  mds_mapper-work:
+  mds_mapper-db-data:
