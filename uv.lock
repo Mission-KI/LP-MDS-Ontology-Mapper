@@ -149,8 +149,8 @@ wheels = [
 
 [[package]]
 name = "extended-dataset-profile"
-version = "0.26.1"
-source = { git = "https://github.com/Beebucket/extended_dataset_profile?rev=0.26.1#2e8ae3d42ce88021f58a3937bedebb679c310812" }
+version = "1.0.0"
+source = { git = "https://github.com/Mission-KI/LP-EDP?rev=1.0.0#91bc6c50c36e6ccd9a98465f22684d5acf90b8b6" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
@@ -427,7 +427,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "extended-dataset-profile", git = "https://github.com/Beebucket/extended_dataset_profile?rev=0.26.1" },
+    { name = "extended-dataset-profile", git = "https://github.com/Mission-KI/LP-EDP?rev=1.0.0" },
     { name = "fastapi", extras = ["standard"] },
     { name = "mds-mapper", extras = ["test"], marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'test'" },
