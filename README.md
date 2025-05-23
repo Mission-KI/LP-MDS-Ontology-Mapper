@@ -84,8 +84,11 @@ and create a draft for a release. You can then review it and decide to publish o
 
 ## Creating you own service
 
-You can create your own service by forking this repository.
-Strip the components you do not need. Then start adding in your own functionality.
+This is a sample service based on the [Enhanced Dataset Profile Service](https://github.com/Mission-KI/LP-EDPS) (EDPS). It builds upon the [Enhanced Dataset Profile](https://github.com/Mission-KI/LP-EDP) (EDP) schema as a foundational model to implement an Mobility Data Space (MDS) Ontology Mapper, as outlined in the official MDS [documentation](https://github.com/Mobility-Data-Space/mobility-data-space/wiki/MDS-Ontology).
+
+The goal of this example implementation is to illustrate how organizations can define and apply their own Enhanced Dataset Profiles tailored to their specific needs. Using these custom profiles, they can then develop their own EDPS instances to facilitate semantic data integration and interoperability within their ecosystem.
+
+By providing a concrete reference implementation, this service is intended to guide developers and data providers in building scalable, standards-based data services that align with the principles of openness, extensibility, and semantic clarity.
 
 ## Scripts
 
